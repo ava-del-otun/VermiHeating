@@ -1,0 +1,357 @@
+============================================================
+VERMICOMPOSTER AIR-HEATER DESIGN MODEL
+============================================================
+Greenhouse air design temperature          : -15.0 C
+Active vessel configuration                : closed top with vents
+
+Design specifications:
+  Vessel interior                         : 1.22 m x 1.22 m x 0.61 m, fill fraction 0.90
+  Vent specification                     : 1 vent hole(s), 25.0 mm diameter each, area per hole 0.000491 m^2, total vent area 0.000491 m^2
+  Vessel wall stack                       : 1.5 mm steel (k = 50.0 W/m-K) + 50.8 mm insulation (k = 0.040 W/m-K)
+  Heater tube                             : L 0.300 m, ID 15.0 mm, OD 19.0 mm, insulation 10.0 mm
+  Heater coil geometry                    : mean D 11.5 mm, pitch 4.0 mm, axial span 300.0 mm
+  Aeration network                        : 7 tubes, each L 1.22 m, ID 50.0 mm, OD 53.0 mm
+  Distribution manifold                  : no separate header; 7-way splitter(s), splitter inlet ID 19.0 mm, branch connector ID 19.0 mm, connector length 0.000 m
+  Contraction model                      : Idel'chik conical converging bellmouth without end wall, 60 deg
+  Tube layout                             : center height 54.9 mm, horizontal pitch 488.0, 488.0 mm, clear OD gap 435.0, 435.0 mm, nearest center spacing 219.6 mm
+  Perforations                            : 100 holes/tube, 5.0 mm dia, total holes 700, total open area 0.013744 m^2
+  Moisture model                          : RH 80%, wetted area 612.297 m^2, surface temp 20.0 C
+  Bed-side heat-transfer assumption       : effective sensible h = 8.0 W/m^2-K
+  Perforation release fraction            : 95.0% of tube flow
+  Heater wire                             : Nichrome 80/20, 31 AWG, 0.227 mm diameter
+  Operating sweep                         : V = 2.0:1.2:120.0 V, flow = 40.0:5.7:600.0 L/min
+  Limits                                  : I_total <= 20.0 A, T_wire <= 350.0 C, T_air,out <= 70.0 C, dP <= 1500 Pa, water loss <= 10.0 kg/24 h, hole velocity <= 10.00 m/s
+Lumped heat-loss requirement at 20.0 C bed : 135.3 W
+Overall UA to greenhouse air               : 3.658 W/K
+External natural-convection h estimate     : 5.16 W/m^2-K
+Lumped time constant                       : 129.1 h
+Lumped Biot number estimate                : 1.57
+Lumped-capacitance criterion               : Bi < 0.1 NOT satisfied
+                                             use the lumped model for
+                                             heat-loss sizing, not for
+                                             detailed internal gradients
+Minimum total flow at 100% duty, 70.0 C cap: 122.9 L/min
+Minimum total flow at 90% duty, 70.0 C cap : 131.0 L/min
+Maximum allowed total current              : 20.0 A
+Feasible operating points found            : 0 of 50000
+
+Export/config consistency warnings:
+  - Configured voltage sweep (2.0 to 120.0, 80 points) differs from loaded export (2.0 to 120.0, 100 points); rerun analyze_vermicomposter_heater.py to update the physics dataset.
+  - Configured flow sweep (40.0 to 600.0, 120 points) differs from loaded export (40.0 to 600.0, 100 points); rerun analyze_vermicomposter_heater.py to update the physics dataset.
+  - Configured wire-diameter sweep (0.1 to 0.6, 60 points) differs from loaded export (0.1 to 0.6, 100 points); rerun analyze_vermicomposter_heater.py to update the physics dataset.
+
+Vessel configuration comparison:
+  config                    UA(W/K)  Qreq(W)  Flow100  Flow20  Pref(W)  Qref(L/min)  Iref(A)  status
+  Covered top                3.652    135.1    122.7   130.8   1162.2       588.7    10.41  best-available only
+  Covered top + vent         3.658    135.3    122.9   131.0   1162.2       588.7    10.41  best-available only
+  Uncovered top             12.154    449.7    408.2   435.5   1162.2       588.7    10.41  best-available only
+  Note                               : all three comparison rows collapse to the same
+                                       best-available heater operating point because no
+                                       hard-safe configuration point exists in this sweep;
+                                       the fallback ranking is then dominated by the same
+                                       heater-side outlet/current/water-loss boundary
+
+Selection process:
+  One consistent lexicographic rule is used everywhere in this study:
+    1. Vessel-comparison recommended point selection.
+    2. Top candidate ranking for the active configuration.
+    3. Wire-diameter hard-safe selected point at each sampled diameter.
+    4. Optimization-ranked point table.
+  Step 1: compute the hard-constraint residuals listed below for every candidate point.
+  Step 2: define a hard-safe point as one with zero residual for current, wire temperature,
+          outlet-air temperature, pressure drop, water loss, hole velocity, bottom temperature, top temperature,
+          and bottom-top spread, plus positive net heat-to-bed output.
+  Step 3: if one or more hard-safe points exist, rank only those points lexicographically
+          with the ordered criteria below. Inside that hard-safe set, the clean physical
+          rule is: maximize the colder-node bed temperature, then minimize power, then
+          minimize bottom-top spread; mean bed temperature and heat shortfall are only
+          late tie-breakers.
+  Step 4: if no hard-safe point exists, report no recommended design point and fall back to
+          the lexicographically best available point only as a plot/reference point.
+  No blended penalty score is used anywhere in the selection logic.
+  Criteria settings:
+    spread limit                       : 5.0 C
+    minimum bottom temperature         : 22.0 C
+    minimum top temperature            : 22.0 C
+  Hard-constraint residuals            : current, wire temperature, outlet-air temperature,
+                                         pressure drop, water loss, hole-velocity excess, bottom-temperature shortfall,
+                                         top-temperature shortfall, and spread excess
+  Priority order:
+     1. current excess above the supply limit (A)
+     2. wire-temperature excess above the limit (C)
+     3. outlet-air excess above the limit (C)
+     4. pressure-drop excess above the limit (Pa)
+     5. bottom-temperature shortfall below 22.0 C
+     6. top-temperature shortfall below 22.0 C
+     7. water-loss excess above 10.0 kg/24 h
+     8. temperature-spread excess above 5.0 C
+     9. negative colder-node temperature, so warmer colder-node values rank earlier
+    10. total electrical power (W)
+    11. raw bottom-top temperature spread (C)
+    12. negative mean bed temperature, so warmer overall bed values rank earlier
+    13. heat shortfall, expressed as max(0, dutyNeeded - 1)
+  Wire-diameter study note:
+    The wire plot now distinguishes hard-safe selected points from best-available
+    reference points. If no hard-safe point exists at a sampled diameter, the solid
+    selected curve is left blank there rather than dropping onto a last-resort point.
+
+Optimization process:
+  The optimization table is not a separate penalty-score solver.
+  It is the same lexicographic ranking applied to the active-configuration design-point list.
+  Hard-safe points rank ahead of violating points. If no hard-safe points exist, the table
+  reports the least-violating best-available points and labels the active failure mode.
+  Clean objective inside the hard-safe set:
+    1. maximize min(T_bottom, T_top)
+    2. minimize total electrical power
+    3. minimize |T_bottom - T_top|
+    4. use mean bed temperature and heat shortfall only as late tie-breakers
+  Interpretation for a real system:
+    1. Keep true equipment and safety limits as hard constraints: current, wire temperature, outlet-air temperature, and pressure drop.
+    2. Treat bed-temperature minimums, water-loss limit, and maximum allowed bottom-top spread as hard process constraints, not soft penalties.
+    3. After the hard constraints are satisfied, prefer the point with the warmer colder-node temperature, then the lower electrical power, then the smaller bottom-top spread.
+    4. Adjust threshold values such as spread_limit_C, min_bottom_temp_C, and min_top_temp_C to reflect the real system rather than tuning arbitrary penalty multipliers.
+
+Perforation and moisture process:
+  Per-hole release and moisture loss are evaluated explicitly for the aeration tubes.
+  Source map                           : Frederickson et al. (2007) Table 3 particle-size data,
+                                         Churchill-Bernstein hole convection, Lewis relation,
+                                         and IAPWS saturation/latent-heat relations
+  Perforation geometry                 : 100 holes/tube, 5.0 mm diameter, area per hole 0.00001963 m^2
+  Tube release fraction                : 95.0% of each tube flow is released through the perforations
+  Per-hole flow relation               : released tube flow / holes per tube
+  Hole-velocity relation               : released tube flow / (holes per tube x area per hole)
+  Evaporation relation                 : m_dot = min(m_diffusion, m_capacity, m_heat)
+  Diffusion limit                      : m_diffusion = h_m A (rho_v,sat(T_surface) - rho_v,bulk)
+                                         the diffusion, carrying-capacity, and heat-limited
+                                         evaporation rates are all evaluated in kg/s
+  Heat-mass analogy                    : h_m = h / (rho c_p Le^(2/3)); h comes from the hole-scale convection correlation
+  Sensible-to-latent cap               : m_heat = q_available / h_fg
+  Moisture-state inputs                : RH 80%, surface temp 20.0 C, wetted area 612.297 m^2, Lewis factor 1.00
+  Wetted-area basis                    : particle-surface estimate from Frederickson et al. (2007), Table 3
+  Table 3 windrow fractions            : > 40 mm 9.8%, 20-40 mm 26.6%, 10-20 mm 26.6%, < 10 mm 37.0%
+  Table 3 vermicompost fractions       : > 40 mm 7.9%, 20-40 mm 6.9%, 10-20 mm 19.8%, < 10 mm 65.3%
+  Blended fractions used               : > 40 mm 8.9%, 20-40 mm 16.8%, 10-20 mm 23.2%, < 10 mm 51.2%
+  Representative diameters             : > 40 mm 60.0 mm, 20-40 mm 30.0 mm, 10-20 mm 15.0 mm, < 10 mm 5.0 mm
+  Equivalent particle diameter         : d32 = 8.01 mm from 1/d32 = sum(w_i / d_i)
+  External area per fill volume        : 6/d32 = 749.3 m^2/m^3
+  Wetted-area derivation               : A_wet = f_access x (6/d32) x V_fill = 1.00 x 749.3 x 0.817 = 612.297 m^2
+                                         assumes the Table 3 mass fractions represent equal-density
+                                         agglomerate classes, so the external particle area follows
+                                         the Sauter-mean relation for equivalent spheres
+  Evaporation h multiplier             : 1.00
+  Water-loss constraint                : predicted sprinkler make-up must stay at or below 10.0 kg/24 h
+  Velocity-limit interpretation        : there is no single fixed hole-velocity limit independent of
+                                         voltage, temperature, humidity, and flow; the dashed red
+                                         contour on the moisture plot is the actual allowable boundary
+                                         for the configured water-loss limit
+  Bed-side h interpretation            : the configured bed-side h is treated as an effective sensible
+                                         coefficient; latent evaporation is modeled separately and is
+                                         therefore not folded into h a second time
+
+Radial air-cooling profile:
+  Purpose                              : estimate the distance from the aeration tube outer surface
+                                         at which the released air cools to the configured worm-safety
+                                         threshold
+  Source map                           : finite-radius plume energy balance with a local
+                                         temperature-plus-vapor re-solve using the same
+                                         Table 3 wetted-area basis as the moisture model
+  Governing temperature relation       : m'_rel c_p dT/dx = -(q'_sens + q'_lat)
+  Local sensible term                  : q'_sens = h_sens pi a_wet b(x)^2 (T - T_sink)
+  Local evaporation term               : q'_lat = m'_evap h_fg with
+                                         m'_evap = h_m pi a_wet b(x)^2 (rho_v,sat(T_surface) - rho_v,bulk)
+                                         limited stepwise by plume carrying capacity and by the
+                                         remaining sensible enthalpy above T_sink
+  Plume-radius law                     : b(x) = b0 + alpha x, with optional cap b_max
+  Tube outer radius                    : 26.5 mm
+  Initial plume radius                 : 2.5 mm
+  Plume spreading rate                 : 0.150 m plume radius per m radial distance
+  Maximum plume radius                 : none; plume radius grows linearly across the plotted range
+  Selected outlet temperature          : 70.0 C
+  Sink temperature used                : 25.2 C
+  Bed reference temperature            : 25.2 C
+  Wetted-area density                  : 749.3 m^2/m^3
+  Base sensible coefficient            : 8.00 W/m^2-K
+  Mean latent coefficient              : 23.79 W/m^2-K
+  Mean combined sink coefficient       : 31.79 W/m^2-K
+  Released mass flow per tube length   : 0.001492 kg/s-m
+  Initial / final plume RH             : 0.7% -> 62.9%
+  Initial / final vapor density        : 0.0013 -> 0.0147 kg/m^3
+  Integrated radial sensible / latent  : 23.21 W and 44.03 W
+  Safe distance result                 : 195.4 mm from the tube outer surface
+
+Tube layout and worm-habitat exclusion:
+  Tube-center placement                : rule-based 1-to-12 tube layout from tube_layout.layoutMode
+                                         using 10% of the filled-bed width/height as the wall offset
+  Filled-bed cross section             : 1220.0 mm wide x 549.0 mm high
+  Tube center height above floor       : 54.9 mm
+  Tube center x positions              : 122.0, 1098.0, 122.0, 1098.0, 122.0, 1098.0, 610.0 mm
+  Center-to-center pitch               : 488.0, 488.0 mm
+  Clear gap between tube OD surfaces   : 435.0, 435.0 mm
+  Nearest tube-center spacing          : 219.6 mm
+  Nearest clear tube-to-tube gap       : 166.6 mm
+  Side clearances to tube OD           : left 95.5 mm, right 95.5 mm
+  Safe-distance exclusion radius       : tube radius + safe offset = 26.5 + 195.4 = 221.9 mm
+  Pipe solid volume                    : 0.0188 m^3 (2.30% of filled-bed volume)
+  Pipe exclusion-cylinder union volume : 0.5737 m^3 (70.21% of filled-bed volume)
+  Added wall-return unsafe volume      : 0.2237 m^3 before overlap with the tube exclusion cylinders
+  Total worm-unsafe union volume       : 0.5802 m^3 (71.00% of filled-bed volume)
+  Worm-unsafe shell volume             : 0.5614 m^3 (68.70% of filled-bed volume)
+  Remaining habitable bed volume       : 0.2369 m^3 (29.00% of filled-bed volume)
+  Pipe-overlap correction              : 0.0000 m^3 removed from the naive sum of 7 pipe cylinders
+  Exclusion-overlap correction         : 0.2695 m^3 removed from the naive sum of 7
+                                         safe-distance exclusion cylinders
+  Wall-return unsafe depths            : left 118.6 mm, right 118.6 mm, bottom 53.8 mm
+  Wall plume-contact temperatures      : left 58.6 C, right 58.6 C, bottom 69.2 C
+  Predicted inner-wall temperatures    : left 52.8 C, right 52.8 C, bottom 62.6 C
+  Overlap evaluation method            : overlap-aware union area on a 700 x 700 midpoint grid
+                                         clipped to the filled-bed rectangle, then extruded over the
+                                         aeration-tube length to obtain volume; the final unsafe union
+                                         includes both plume exclusion cylinders and 1D wall-return bands
+
+Helical geometry trade studies:
+  Wire diameter study                 : best-available only at 0.282 mm, colder node 13.3 C, Qbed 109.9 W
+  Coil mean diameter study            : best-available only at 9.103 mm, colder node 11.2 C, Qbed 101.8 W
+  Wire length study                   : best-available only at 1.164 m, colder node 13.1 C, Qbed 109.2 W
+
+Criteria-based recommended design point:
+  Configuration                      : closed top with vents
+  Result                             : no hard-constraint-safe design point found in the current sweep
+
+Best-available active reference point:
+  Configuration                      : closed top with vents
+  Pitch                              : 4.0 mm
+  Supply voltage per branch          : 111.7 V
+  Total flow                         : 588.7 L/min
+  Selected operating trio            : 1162.2 W, 10.41 A, 588.7 L/min
+  Branch flow                        : 84.1 L/min
+  Branch wire length                 : 2.73 m
+  Branch coil axial length           : 0.30 m
+  Wire gauge / diameter              : 31 AWG / 0.227 mm
+  Branch resistance                  : 75.09 ohm
+  Supply equivalent resistance       : 10.73 ohm
+  Branch current                     : 1.49 A
+  Total current                      : 10.41 A
+  Branch electrical power            : 166.0 W
+  Total electrical power             : 1162.2 W
+  h_wire                             : 683.0 W/m^2-K
+  Branch air outlet temperature      : 70.0 C
+  Max wire temperature               : 188.6 C
+  Total heat to bed                  : 138.9 W
+  Duty needed at design loss         : 0.97
+  Total pressure drop                : 149.8 Pa
+  Distribution manifold dP          : 20.0 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 16.7, connector friction 0.0, connector->branch 3.3 Pa
+  Released flow per hole             : 1.06 L/min
+  Hole velocity                      : 0.90 m/s
+  Water loss / sprinkler make-up     : 17.42 kg/24 h
+  Latent evaporation load            : 493.7 W
+  Full-power bed estimate            : bottom 25.2 C, top 20.7 C
+  Status                             : best-available only; it violates one or more hard constraints
+  Note                               : 90% duty is not achieved;
+                                       more tubes help local temperature
+                                       distribution, but not the minimum
+                                       m_dot*cp*DeltaT requirement
+
+Covered-top-plus-vent criteria-based design point:
+  Configuration                      : closed top with vents
+  Result                             : no hard-constraint-safe design point found in the current sweep
+
+Covered-top-plus-vent best-available reference point:
+  Configuration                      : closed top with vents
+  Pitch                              : 4.0 mm
+  Supply voltage per branch          : 111.7 V
+  Total flow                         : 588.7 L/min
+  Selected operating trio            : 1162.2 W, 10.41 A, 588.7 L/min
+  Branch flow                        : 84.1 L/min
+  Branch wire length                 : 2.73 m
+  Branch coil axial length           : 0.30 m
+  Wire gauge / diameter              : 31 AWG / 0.227 mm
+  Branch resistance                  : 75.09 ohm
+  Supply equivalent resistance       : 10.73 ohm
+  Branch current                     : 1.49 A
+  Total current                      : 10.41 A
+  Branch electrical power            : 166.0 W
+  Total electrical power             : 1162.2 W
+  h_wire                             : 683.0 W/m^2-K
+  Branch air outlet temperature      : 70.0 C
+  Max wire temperature               : 188.6 C
+  Total heat to bed                  : 138.9 W
+  Duty needed at design loss         : 0.97
+  Total pressure drop                : 149.8 Pa
+  Distribution manifold dP          : 20.0 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 16.7, connector friction 0.0, connector->branch 3.3 Pa
+  Released flow per hole             : 1.06 L/min
+  Hole velocity                      : 0.90 m/s
+  Water loss / sprinkler make-up     : 17.42 kg/24 h
+  Latent evaporation load            : 493.7 W
+  Full-power bed estimate            : bottom 25.2 C, top 20.7 C
+  Status                             : best-available only; it violates one or more hard constraints
+  Note                               : 90% duty is not achieved;
+                                       more tubes help local temperature
+                                       distribution, but not the minimum
+                                       m_dot*cp*DeltaT requirement
+
+Top best-available candidate points for active configuration:
+  pitch  V   Qtot(L/min)  Ptot(W)  Vhole  evap(kg/d)  Tair(C)  Twire(C)  Qbed(W)  duty   dP(Pa)  stage
+    4.0 112       588.7    1162.2    0.90      17.42      70.0      188.6     138.9  0.97    149.8  last_resort
+    4.0 110       577.4    1137.8    0.88      16.99      69.8      187.1     137.0  0.99    144.2  last_resort
+    8.0 81       594.3    1167.9    0.91      17.52      69.6      304.9     136.9  0.99    152.5  last_resort
+    6.0 91       583.0    1147.8    0.89      17.18      69.7      245.7     136.5  0.99    147.0  last_resort
+    6.0 93       600.0    1177.5    0.92      17.70      69.5      247.6     136.2  0.99    155.3  last_resort
+    8.0 79       577.4    1134.4    0.88      16.93      69.6      301.3     135.3  1.00    144.2  last_resort
+    4.0 109       566.1    1113.7    0.87      16.56      69.7      185.5     135.2  1.00    138.8  last_resort
+    4.0 112       594.3    1162.4    0.91      17.43      69.2      187.4     134.1  1.01    152.4  last_resort
+    8.0 78       560.4    1101.3    0.86      16.34      69.5      297.7     134.0  1.01    136.1  last_resort
+    6.0 88       537.8    1061.0    0.82      15.65      69.8      238.8     133.4  1.01    125.7  last_resort
+    4.0 108       554.7    1089.8    0.85      16.15      69.5      184.0     133.1  1.02    133.4  last_resort
+    6.0 89       554.7    1089.6    0.85      16.15      69.5      240.6     133.0  1.02    133.4  last_resort
+   10.0 69       526.5    1039.5    0.81      15.28      69.9      345.2     132.4  1.02    120.6  last_resort
+    8.0 77       543.4    1068.6    0.83      15.79      69.6      294.2     132.3  1.02    128.2  last_resort
+    6.0 90       571.7    1118.6    0.87      16.66      69.2      242.4     132.3  1.02    141.3  last_resort
+    6.0 91       588.7    1148.0    0.90      17.19      68.9      244.3     131.8  1.03    149.5  last_resort
+    8.0 81       600.0    1168.2    0.92      17.55      68.8      303.3     131.7  1.03    155.1  last_resort
+    4.0 110       583.0    1138.0    0.89      17.02      69.0      185.9     131.6  1.03    146.8  last_resort
+    4.0 107       543.4    1066.1    0.83      15.74      69.4      182.5     131.1  1.03    128.1  last_resort
+    8.0 76       526.5    1036.5    0.81      15.23      69.6      290.8     130.9  1.03    120.6  last_resort
+   10.0 70       549.1    1075.2    0.84      15.90      69.2      348.6     130.7  1.04    130.7  last_resort
+    4.0 103       503.8     996.6    0.77      14.55      70.0      179.5     130.4  1.04    110.8  last_resort
+    8.0 79       583.0    1134.6    0.89      16.96      68.8      299.7     130.0  1.04    146.7  last_resort
+    4.0 109       571.7    1113.8    0.87      16.58      68.8      184.3     130.0  1.04    141.2  last_resort
+    6.0 85       509.5    1005.0    0.78      14.70      69.8      234.0     129.7  1.04    113.2  last_resort
+    8.0 75       509.5    1004.7    0.78      14.69      69.7      287.5     129.6  1.04    113.2  last_resort
+   10.0 68       509.5    1004.6    0.78      14.69      69.7      340.1     129.6  1.04    113.2  last_resort
+    4.0 106       532.1    1042.8    0.81      15.34      69.3      181.0     129.2  1.05    123.0  last_resort
+    6.0 87       526.5    1032.9    0.80      15.17      69.3      235.6     129.1  1.05    120.5  last_resort
+    4.0 112       600.0    1162.5    0.91      17.45      68.4      186.2     129.0  1.05    155.0  last_resort
+
+Optimization-ranked points:
+  pitch  V   Qtot(L/min)  Ptot(W)  Tb(C)  Tt(C)  dT(C)  Vhole  evap(kg/d)  Tair(C)  Twire(C)  duty  dP(Pa)  state
+    4.0 112       588.7   1162.2   25.2   20.7    4.5  0.90      17.42     70.0     188.6  0.97   149.8  water loss
+    4.0 110       577.4   1137.8   24.7   20.2    4.4  0.88      16.99     69.8     187.1  0.99   144.2  water loss
+    8.0  81       594.3   1167.9   24.7   20.2    4.4  0.91      17.52     69.6     304.9  0.99   152.5  water loss
+    6.0  91       583.0   1147.8   24.5   20.1    4.4  0.89      17.18     69.7     245.7  0.99   147.0  water loss
+    6.0  93       600.0   1177.5   24.5   20.0    4.4  0.92      17.70     69.5     247.6  0.99   155.3  water loss
+    8.0  79       577.4   1134.4   24.2   19.8    4.4  0.88      16.93     69.6     301.3  1.00   144.2  water loss
+    4.0 109       566.1   1113.7   24.2   19.8    4.4  0.87      16.56     69.7     185.5  1.00   138.8  water loss
+    4.0 112       594.3   1162.4   23.9   19.5    4.3  0.91      17.43     69.2     187.4  1.01   152.4  water loss
+    8.0  78       560.4   1101.3   23.8   19.5    4.3  0.86      16.34     69.5     297.7  1.01   136.1  water loss
+    6.0  88       537.8   1061.0   23.6   19.3    4.3  0.82      15.65     69.8     238.8  1.01   125.7  water loss
+
+Constraint logic:
+  Hard-safe means all of the following are satisfied simultaneously:
+  Explicit equipment limits            : I_total <= 20.0 A, T_air,out <= 70.0 C, T_wire <= 350.0 C, dP <= 1500 Pa, water loss <= 10.0 kg/24 h, hole velocity <= 10.00 m/s
+  Explicit thermal limits              : T_bottom >= 22.0 C, T_top >= 22.0 C, |T_bottom - T_top| <= 5.0 C, Q_to_bed > 0
+  Feasible means hard-safe plus meeting the full heating target:
+                                         Q_to_bed >= lumped heat-loss requirement
+                                         equivalently, dutyNeeded <= 1.00 at full power
+  Recommended design point             : best lexicographic point among hard-safe candidates only
+  Best-available reference point       : best lexicographic point in the full sweep when no hard-safe
+                                         candidate exists; used for plots and fallback diagnostics
+  Clean ordering inside the hard-safe set
+                                         : maximize min(T_bottom, T_top), then minimize power,
+                                           then minimize |T_bottom - T_top|, then break remaining
+                                           ties with mean bed temperature and heat shortfall
+  Failure categorization order         : current, wire temperature, outlet air, pressure drop,
+                                         water loss, hole velocity, bottom temperature, top temperature,
+                                         spread, then residual heat shortfall/nonpositive heat
+============================================================
