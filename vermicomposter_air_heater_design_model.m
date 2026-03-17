@@ -800,6 +800,42 @@ if ~isfield(params, 'evaporation') || ~isstruct(params.evaporation)
     return;
 end
 
+basis = 'top_plan_area';
+if isfield(params.evaporation, 'wettedAreaBasis') && ...
+        ~isempty(params.evaporation.wettedAreaBasis)
+    basis = lower(string(params.evaporation.wettedAreaBasis));
+end
+
+wetFraction = 1.0;
+if isfield(params.evaporation, 'wettedAreaFraction') && ...
+        ~isempty(params.evaporation.wettedAreaFraction)
+    wetFraction = max(0.0, params.evaporation.wettedAreaFraction);
+end
+
+accessibleFraction = wetFraction;
+if isfield(params.evaporation, 'accessibleSurfaceFraction') && ...
+        ~isempty(params.evaporation.accessibleSurfaceFraction)
+    accessibleFraction = max(0.0, params.evaporation.accessibleSurfaceFraction);
+end
+
+switch basis
+    case "manual"
+        if ~isfield(params.evaporation, 'wettedArea_m2') || ...
+                isempty(params.evaporation.wettedArea_m2)
+            params.evaporation.wettedArea_m2 = derivedWettedArea_m2(params, wetFraction);
+        end
+    case "table3_particle_surface"
+        params.evaporation.wettedArea_m2 = derivedWettedAreaParticleSurface_m2( ...
+            params, accessibleFraction);
+        params.evaporation.wettedAreaBasis = char(basis);
+        params.evaporation.accessibleSurfaceFraction = accessibleFraction;
+    otherwise
+        params.evaporation.wettedArea_m2 = derivedWettedArea_m2(params, wetFraction);
+        params.evaporation.wettedAreaBasis = char(basis);
+        params.evaporation.wettedAreaFraction = wetFraction;
+end
+end
+
 function counts = preferredElectricalStringTubeCounts(nTubes, electrical)
 nTubes = max(1, round(nTubes));
 counts = [];
@@ -850,42 +886,6 @@ for i = 1:numel(uniqueCounts)
     parts(i) = sprintf('%dx%dS', nStrings, nSeries);
 end
 label = strjoin(cellstr(parts), ' + ');
-end
-
-basis = 'top_plan_area';
-if isfield(params.evaporation, 'wettedAreaBasis') && ...
-        ~isempty(params.evaporation.wettedAreaBasis)
-    basis = lower(string(params.evaporation.wettedAreaBasis));
-end
-
-wetFraction = 1.0;
-if isfield(params.evaporation, 'wettedAreaFraction') && ...
-        ~isempty(params.evaporation.wettedAreaFraction)
-    wetFraction = max(0.0, params.evaporation.wettedAreaFraction);
-end
-
-accessibleFraction = wetFraction;
-if isfield(params.evaporation, 'accessibleSurfaceFraction') && ...
-        ~isempty(params.evaporation.accessibleSurfaceFraction)
-    accessibleFraction = max(0.0, params.evaporation.accessibleSurfaceFraction);
-end
-
-switch basis
-    case "manual"
-        if ~isfield(params.evaporation, 'wettedArea_m2') || ...
-                isempty(params.evaporation.wettedArea_m2)
-            params.evaporation.wettedArea_m2 = derivedWettedArea_m2(params, wetFraction);
-        end
-    case "table3_particle_surface"
-        params.evaporation.wettedArea_m2 = derivedWettedAreaParticleSurface_m2( ...
-            params, accessibleFraction);
-        params.evaporation.wettedAreaBasis = char(basis);
-        params.evaporation.accessibleSurfaceFraction = accessibleFraction;
-    otherwise
-        params.evaporation.wettedArea_m2 = derivedWettedArea_m2(params, wetFraction);
-        params.evaporation.wettedAreaBasis = char(basis);
-        params.evaporation.wettedAreaFraction = wetFraction;
-end
 end
 
 function area_m2 = derivedWettedArea_m2(params, wetFraction)

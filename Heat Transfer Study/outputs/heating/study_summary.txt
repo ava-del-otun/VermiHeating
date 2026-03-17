@@ -9,12 +9,12 @@ Design specifications:
   Vent specification                     : 1 vent hole(s), 25.0 mm diameter each, area per hole 0.000491 m^2, total vent area 0.000491 m^2
   Vessel wall stack                       : 1.5 mm steel (k = 50.0 W/m-K) + 50.8 mm insulation (k = 0.040 W/m-K)
   Heater tube                             : L 0.300 m, ID 15.0 mm, OD 19.0 mm, insulation 10.0 mm
-  Heater coil geometry                    : mean D 11.5 mm, pitch 4.0 mm, axial span 300.0 mm
-  Aeration network                        : 7 tubes, each L 1.22 m, ID 50.0 mm, OD 53.0 mm
-  Distribution manifold                  : no separate header; 7-way splitter(s), splitter inlet ID 19.0 mm, branch connector ID 19.0 mm, connector length 0.000 m
+  Heater coil geometry                    : mean D 11.5 mm, pitch 10.0 mm, axial span 300.0 mm
+  Aeration network                        : 9 tubes, each L 1.22 m, ID 50.0 mm, OD 53.0 mm
+  Distribution manifold                  : no separate header; 9-way splitter(s), splitter inlet ID 19.0 mm, branch connector ID 19.0 mm, connector length 0.000 m
   Contraction model                      : Idel'chik conical converging bellmouth without end wall, 60 deg
-  Tube layout                             : center height 54.9 mm, horizontal pitch 488.0, 488.0 mm, clear OD gap 435.0, 435.0 mm, nearest center spacing 219.6 mm
-  Perforations                            : 100 holes/tube, 5.0 mm dia, total holes 700, total open area 0.013744 m^2
+  Tube layout                             : center height 54.9 mm, horizontal pitch 244.0, 244.0, 244.0, 244.0 mm, clear OD gap 191.0, 191.0, 191.0, 191.0 mm, nearest center spacing 219.6 mm
+  Perforations                            : 100 holes/tube, 5.0 mm dia, total holes 900, total open area 0.017671 m^2
   Moisture model                          : RH 80%, wetted area 612.297 m^2, surface temp 20.0 C
   Bed-side heat-transfer assumption       : effective sensible h = 8.0 W/m^2-K
   Perforation release fraction            : 95.0% of tube flow
@@ -42,9 +42,9 @@ Export/config consistency warnings:
 
 Vessel configuration comparison:
   config                    UA(W/K)  Qreq(W)  Flow100  Flow20  Pref(W)  Qref(L/min)  Iref(A)  status
-  Covered top                3.652    135.1    122.7   130.8   1162.2       588.7    10.41  best-available only
-  Covered top + vent         3.658    135.3    122.9   131.0   1162.2       588.7    10.41  best-available only
-  Uncovered top             12.154    449.7    408.2   435.5   1162.2       588.7    10.41  best-available only
+  Covered top                3.652    135.1    122.7   130.8    841.7       520.8     7.01  best-available only
+  Covered top + vent         3.658    135.3    122.9   131.0    841.7       520.8     7.01  best-available only
+  Uncovered top             12.154    449.7    408.2   435.5    841.7       520.8     7.01  best-available only
   Note                               : all three comparison rows collapse to the same
                                        best-available heater operating point because no
                                        hard-safe configuration point exists in this sweep;
@@ -83,10 +83,10 @@ Selection process:
      4. pressure-drop excess above the limit (Pa)
      5. bottom-temperature shortfall below 22.0 C
      6. top-temperature shortfall below 22.0 C
-     7. water-loss excess above 10.0 kg/24 h
-     8. temperature-spread excess above 5.0 C
-     9. negative colder-node temperature, so warmer colder-node values rank earlier
-    10. total electrical power (W)
+     7. total electrical power (W)
+     8. water-loss excess above 10.0 kg/24 h
+     9. temperature-spread excess above 5.0 C
+    10. negative colder-node temperature, so warmer colder-node values rank earlier
     11. raw bottom-top temperature spread (C)
     12. negative mean bed temperature, so warmer overall bed values rank earlier
     13. heat shortfall, expressed as max(0, dutyNeeded - 1)
@@ -166,52 +166,52 @@ Radial air-cooling profile:
   Initial plume radius                 : 2.5 mm
   Plume spreading rate                 : 0.150 m plume radius per m radial distance
   Maximum plume radius                 : none; plume radius grows linearly across the plotted range
-  Selected outlet temperature          : 70.0 C
-  Sink temperature used                : 25.2 C
-  Bed reference temperature            : 25.2 C
+  Selected outlet temperature          : 69.9 C
+  Sink temperature used                : 20.0 C
+  Bed reference temperature            : 14.6 C
   Wetted-area density                  : 749.3 m^2/m^3
   Base sensible coefficient            : 8.00 W/m^2-K
-  Mean latent coefficient              : 23.79 W/m^2-K
-  Mean combined sink coefficient       : 31.79 W/m^2-K
-  Released mass flow per tube length   : 0.001492 kg/s-m
-  Initial / final plume RH             : 0.7% -> 62.9%
-  Initial / final vapor density        : 0.0013 -> 0.0147 kg/m^3
-  Integrated radial sensible / latent  : 23.21 W and 44.03 W
-  Safe distance result                 : 195.4 mm from the tube outer surface
+  Mean latent coefficient              : 11.23 W/m^2-K
+  Mean combined sink coefficient       : 19.23 W/m^2-K
+  Released mass flow per tube length   : 0.001027 kg/s-m
+  Initial / final plume RH             : 0.7% -> 74.4%
+  Initial / final vapor density        : 0.0013 -> 0.0133 kg/m^3
+  Integrated radial sensible / latent  : 24.04 W and 27.09 W
+  Safe distance result                 : 176.0 mm from the tube outer surface
 
 Tube layout and worm-habitat exclusion:
   Tube-center placement                : rule-based 1-to-12 tube layout from tube_layout.layoutMode
                                          using 10% of the filled-bed width/height as the wall offset
   Filled-bed cross section             : 1220.0 mm wide x 549.0 mm high
   Tube center height above floor       : 54.9 mm
-  Tube center x positions              : 122.0, 1098.0, 122.0, 1098.0, 122.0, 1098.0, 610.0 mm
-  Center-to-center pitch               : 488.0, 488.0 mm
-  Clear gap between tube OD surfaces   : 435.0, 435.0 mm
+  Tube center x positions              : 122.0, 122.0, 122.0, 1098.0, 1098.0, 1098.0, 366.0, 610.0, 854.0 mm
+  Center-to-center pitch               : 244.0, 244.0, 244.0, 244.0 mm
+  Clear gap between tube OD surfaces   : 191.0, 191.0, 191.0, 191.0 mm
   Nearest tube-center spacing          : 219.6 mm
   Nearest clear tube-to-tube gap       : 166.6 mm
   Side clearances to tube OD           : left 95.5 mm, right 95.5 mm
-  Safe-distance exclusion radius       : tube radius + safe offset = 26.5 + 195.4 = 221.9 mm
-  Pipe solid volume                    : 0.0188 m^3 (2.30% of filled-bed volume)
-  Pipe exclusion-cylinder union volume : 0.5737 m^3 (70.21% of filled-bed volume)
-  Added wall-return unsafe volume      : 0.2237 m^3 before overlap with the tube exclusion cylinders
-  Total worm-unsafe union volume       : 0.5802 m^3 (71.00% of filled-bed volume)
-  Worm-unsafe shell volume             : 0.5614 m^3 (68.70% of filled-bed volume)
-  Remaining habitable bed volume       : 0.2369 m^3 (29.00% of filled-bed volume)
-  Pipe-overlap correction              : 0.0000 m^3 removed from the naive sum of 7 pipe cylinders
-  Exclusion-overlap correction         : 0.2695 m^3 removed from the naive sum of 7
+  Safe-distance exclusion radius       : tube radius + safe offset = 26.5 + 176.0 = 202.5 mm
+  Pipe solid volume                    : 0.0242 m^3 (2.96% of filled-bed volume)
+  Pipe exclusion-cylinder union volume : 0.6001 m^3 (73.44% of filled-bed volume)
+  Added wall-return unsafe volume      : 0.1633 m^3 before overlap with the tube exclusion cylinders
+  Total worm-unsafe union volume       : 0.6001 m^3 (73.44% of filled-bed volume)
+  Worm-unsafe shell volume             : 0.5759 m^3 (70.48% of filled-bed volume)
+  Remaining habitable bed volume       : 0.2171 m^3 (26.56% of filled-bed volume)
+  Pipe-overlap correction              : 0.0000 m^3 removed from the naive sum of 9 pipe cylinders
+  Exclusion-overlap correction         : 0.3418 m^3 removed from the naive sum of 9
                                          safe-distance exclusion cylinders
-  Wall-return unsafe depths            : left 118.6 mm, right 118.6 mm, bottom 53.8 mm
-  Wall plume-contact temperatures      : left 58.6 C, right 58.6 C, bottom 69.2 C
-  Predicted inner-wall temperatures    : left 52.8 C, right 52.8 C, bottom 62.6 C
+  Wall-return unsafe depths            : left 82.5 mm, right 82.5 mm, bottom 41.8 mm
+  Wall plume-contact temperatures      : left 55.4 C, right 55.4 C, bottom 68.9 C
+  Predicted inner-wall temperatures    : left 49.9 C, right 49.9 C, bottom 62.3 C
   Overlap evaluation method            : overlap-aware union area on a 700 x 700 midpoint grid
                                          clipped to the filled-bed rectangle, then extruded over the
                                          aeration-tube length to obtain volume; the final unsafe union
                                          includes both plume exclusion cylinders and 1D wall-return bands
 
 Helical geometry trade studies:
-  Wire diameter study                 : best-available only at 0.282 mm, colder node 13.3 C, Qbed 109.9 W
-  Coil mean diameter study            : best-available only at 9.103 mm, colder node 11.2 C, Qbed 101.8 W
-  Wire length study                   : best-available only at 1.164 m, colder node 13.1 C, Qbed 109.2 W
+  Wire diameter study                 : best-available only at 0.127 mm, colder node -4.2 C, Qbed 42.1 W
+  Coil mean diameter study            : best-available only at 14.069 mm, colder node -9.1 C, Qbed 22.8 W
+  Wire length study                   : best-available only at 2.800 m, colder node -8.5 C, Qbed 25.3 W
 
 Criteria-based recommended design point:
   Configuration                      : closed top with vents
@@ -219,33 +219,33 @@ Criteria-based recommended design point:
 
 Best-available active reference point:
   Configuration                      : closed top with vents
-  Pitch                              : 4.0 mm
-  Supply voltage per branch          : 111.7 V
-  Total flow                         : 588.7 L/min
-  Selected operating trio            : 1162.2 W, 10.41 A, 588.7 L/min
-  Branch flow                        : 84.1 L/min
-  Branch wire length                 : 2.73 m
+  Pitch                              : 10.0 mm
+  Supply voltage per branch          : 120.0 V
+  Total flow                         : 520.8 L/min
+  Selected operating trio            : 841.7 W, 7.01 A, 520.8 L/min
+  Branch flow                        : 57.9 L/min
+  Branch wire length                 : 1.12 m
   Branch coil axial length           : 0.30 m
   Wire gauge / diameter              : 31 AWG / 0.227 mm
-  Branch resistance                  : 75.09 ohm
-  Supply equivalent resistance       : 10.73 ohm
-  Branch current                     : 1.49 A
-  Total current                      : 10.41 A
-  Branch electrical power            : 166.0 W
-  Total electrical power             : 1162.2 W
-  h_wire                             : 683.0 W/m^2-K
-  Branch air outlet temperature      : 70.0 C
-  Max wire temperature               : 188.6 C
-  Total heat to bed                  : 138.9 W
-  Duty needed at design loss         : 0.97
-  Total pressure drop                : 149.8 Pa
-  Distribution manifold dP          : 20.0 Pa
-  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 16.7, connector friction 0.0, connector->branch 3.3 Pa
-  Released flow per hole             : 1.06 L/min
-  Hole velocity                      : 0.90 m/s
-  Water loss / sprinkler make-up     : 17.42 kg/24 h
-  Latent evaporation load            : 493.7 W
-  Full-power bed estimate            : bottom 25.2 C, top 20.7 C
+  Branch resistance                  : 153.97 ohm
+  Supply equivalent resistance       : 17.11 ohm
+  Branch current                     : 0.78 A
+  Total current                      : 7.01 A
+  Branch electrical power            : 93.5 W
+  Total electrical power             : 841.7 W
+  h_wire                             : 557.6 W/m^2-K
+  Branch air outlet temperature      : 69.9 C
+  Max wire temperature               : 310.8 C
+  Total heat to bed                  : 102.1 W
+  Duty needed at design loss         : 1.33
+  Total pressure drop                : 72.7 Pa
+  Distribution manifold dP          : 9.5 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 7.9, connector friction 0.0, connector->branch 1.6 Pa
+  Released flow per hole             : 0.73 L/min
+  Hole velocity                      : 0.62 m/s
+  Water loss / sprinkler make-up     : 9.74 kg/24 h
+  Latent evaporation load            : 276.0 W
+  Full-power bed estimate            : bottom 14.6 C, top 11.3 C
   Status                             : best-available only; it violates one or more hard constraints
   Note                               : 90% duty is not achieved;
                                        more tubes help local temperature
@@ -258,33 +258,33 @@ Covered-top-plus-vent criteria-based design point:
 
 Covered-top-plus-vent best-available reference point:
   Configuration                      : closed top with vents
-  Pitch                              : 4.0 mm
-  Supply voltage per branch          : 111.7 V
-  Total flow                         : 588.7 L/min
-  Selected operating trio            : 1162.2 W, 10.41 A, 588.7 L/min
-  Branch flow                        : 84.1 L/min
-  Branch wire length                 : 2.73 m
+  Pitch                              : 10.0 mm
+  Supply voltage per branch          : 120.0 V
+  Total flow                         : 520.8 L/min
+  Selected operating trio            : 841.7 W, 7.01 A, 520.8 L/min
+  Branch flow                        : 57.9 L/min
+  Branch wire length                 : 1.12 m
   Branch coil axial length           : 0.30 m
   Wire gauge / diameter              : 31 AWG / 0.227 mm
-  Branch resistance                  : 75.09 ohm
-  Supply equivalent resistance       : 10.73 ohm
-  Branch current                     : 1.49 A
-  Total current                      : 10.41 A
-  Branch electrical power            : 166.0 W
-  Total electrical power             : 1162.2 W
-  h_wire                             : 683.0 W/m^2-K
-  Branch air outlet temperature      : 70.0 C
-  Max wire temperature               : 188.6 C
-  Total heat to bed                  : 138.9 W
-  Duty needed at design loss         : 0.97
-  Total pressure drop                : 149.8 Pa
-  Distribution manifold dP          : 20.0 Pa
-  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 16.7, connector friction 0.0, connector->branch 3.3 Pa
-  Released flow per hole             : 1.06 L/min
-  Hole velocity                      : 0.90 m/s
-  Water loss / sprinkler make-up     : 17.42 kg/24 h
-  Latent evaporation load            : 493.7 W
-  Full-power bed estimate            : bottom 25.2 C, top 20.7 C
+  Branch resistance                  : 153.97 ohm
+  Supply equivalent resistance       : 17.11 ohm
+  Branch current                     : 0.78 A
+  Total current                      : 7.01 A
+  Branch electrical power            : 93.5 W
+  Total electrical power             : 841.7 W
+  h_wire                             : 557.6 W/m^2-K
+  Branch air outlet temperature      : 69.9 C
+  Max wire temperature               : 310.8 C
+  Total heat to bed                  : 102.1 W
+  Duty needed at design loss         : 1.33
+  Total pressure drop                : 72.7 Pa
+  Distribution manifold dP          : 9.5 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 7.9, connector friction 0.0, connector->branch 1.6 Pa
+  Released flow per hole             : 0.73 L/min
+  Hole velocity                      : 0.62 m/s
+  Water loss / sprinkler make-up     : 9.74 kg/24 h
+  Latent evaporation load            : 276.0 W
+  Full-power bed estimate            : bottom 14.6 C, top 11.3 C
   Status                             : best-available only; it violates one or more hard constraints
   Note                               : 90% duty is not achieved;
                                        more tubes help local temperature
@@ -293,49 +293,49 @@ Covered-top-plus-vent best-available reference point:
 
 Top best-available candidate points for active configuration:
   pitch  V   Qtot(L/min)  Ptot(W)  Vhole  evap(kg/d)  Tair(C)  Twire(C)  Qbed(W)  duty   dP(Pa)  stage
-    4.0 112       588.7    1162.2    0.90      17.42      70.0      188.6     138.9  0.97    149.8  last_resort
-    4.0 110       577.4    1137.8    0.88      16.99      69.8      187.1     137.0  0.99    144.2  last_resort
-    8.0 81       594.3    1167.9    0.91      17.52      69.6      304.9     136.9  0.99    152.5  last_resort
-    6.0 91       583.0    1147.8    0.89      17.18      69.7      245.7     136.5  0.99    147.0  last_resort
-    6.0 93       600.0    1177.5    0.92      17.70      69.5      247.6     136.2  0.99    155.3  last_resort
-    8.0 79       577.4    1134.4    0.88      16.93      69.6      301.3     135.3  1.00    144.2  last_resort
-    4.0 109       566.1    1113.7    0.87      16.56      69.7      185.5     135.2  1.00    138.8  last_resort
-    4.0 112       594.3    1162.4    0.91      17.43      69.2      187.4     134.1  1.01    152.4  last_resort
-    8.0 78       560.4    1101.3    0.86      16.34      69.5      297.7     134.0  1.01    136.1  last_resort
-    6.0 88       537.8    1061.0    0.82      15.65      69.8      238.8     133.4  1.01    125.7  last_resort
-    4.0 108       554.7    1089.8    0.85      16.15      69.5      184.0     133.1  1.02    133.4  last_resort
-    6.0 89       554.7    1089.6    0.85      16.15      69.5      240.6     133.0  1.02    133.4  last_resort
-   10.0 69       526.5    1039.5    0.81      15.28      69.9      345.2     132.4  1.02    120.6  last_resort
-    8.0 77       543.4    1068.6    0.83      15.79      69.6      294.2     132.3  1.02    128.2  last_resort
-    6.0 90       571.7    1118.6    0.87      16.66      69.2      242.4     132.3  1.02    141.3  last_resort
-    6.0 91       588.7    1148.0    0.90      17.19      68.9      244.3     131.8  1.03    149.5  last_resort
-    8.0 81       600.0    1168.2    0.92      17.55      68.8      303.3     131.7  1.03    155.1  last_resort
-    4.0 110       583.0    1138.0    0.89      17.02      69.0      185.9     131.6  1.03    146.8  last_resort
-    4.0 107       543.4    1066.1    0.83      15.74      69.4      182.5     131.1  1.03    128.1  last_resort
-    8.0 76       526.5    1036.5    0.81      15.23      69.6      290.8     130.9  1.03    120.6  last_resort
-   10.0 70       549.1    1075.2    0.84      15.90      69.2      348.6     130.7  1.04    130.7  last_resort
-    4.0 103       503.8     996.6    0.77      14.55      70.0      179.5     130.4  1.04    110.8  last_resort
-    8.0 79       583.0    1134.6    0.89      16.96      68.8      299.7     130.0  1.04    146.7  last_resort
-    4.0 109       571.7    1113.8    0.87      16.58      68.8      184.3     130.0  1.04    141.2  last_resort
-    6.0 85       509.5    1005.0    0.78      14.70      69.8      234.0     129.7  1.04    113.2  last_resort
-    8.0 75       509.5    1004.7    0.78      14.69      69.7      287.5     129.6  1.04    113.2  last_resort
-   10.0 68       509.5    1004.6    0.78      14.69      69.7      340.1     129.6  1.04    113.2  last_resort
-    4.0 106       532.1    1042.8    0.81      15.34      69.3      181.0     129.2  1.05    123.0  last_resort
-    6.0 87       526.5    1032.9    0.80      15.17      69.3      235.6     129.1  1.05    120.5  last_resort
-    4.0 112       600.0    1162.5    0.91      17.45      68.4      186.2     129.0  1.05    155.0  last_resort
+   10.0 120       520.8     841.7    0.62       9.74      69.9      310.8     102.1  1.33     72.7  last_resort
+   10.0 120       526.5     841.9    0.63       9.70      69.1      309.0      98.7  1.37     74.1  last_resort
+   12.0 108       498.2     802.5    0.59       9.18      69.6      348.8      98.7  1.37     66.7  last_resort
+   10.0 119       515.2     825.5    0.61       9.48      69.2      306.9      98.4  1.37     71.1  last_resort
+   10.0 118       503.8     809.3    0.60       9.26      69.4      304.8      98.2  1.38     68.1  last_resort
+   10.0 116       492.5     793.2    0.59       9.05      69.6      302.7      98.1  1.38     65.2  last_resort
+   12.0 107       486.9     785.3    0.58       8.94      69.7      345.8      98.0  1.38     63.8  last_resort
+   10.0 115       481.2     777.3    0.57       8.84      69.8      300.7      98.0  1.38     62.4  last_resort
+   12.0 106       475.6     768.2    0.57       8.71      69.8      342.9      97.4  1.39     61.0  last_resort
+   12.0 105       464.2     751.2    0.55       8.48      69.9      340.0      96.9  1.40     58.2  last_resort
+   12.0 109       515.2     820.2    0.61       9.38      68.7      349.9      96.2  1.41     71.0  last_resort
+   10.0 120       532.1     842.1    0.63       9.66      68.2      307.2      95.5  1.42     75.5  last_resort
+   12.0 108       503.8     802.7    0.60       9.14      68.7      346.8      95.4  1.42     68.0  last_resort
+   10.0 119       520.8     825.7    0.62       9.44      68.3      305.1      95.2  1.42     72.5  last_resort
+   10.0 118       509.5     809.5    0.60       9.22      68.5      302.9      95.0  1.43     69.5  last_resort
+   10.0 110       441.6     715.3    0.53       7.98      69.9      291.1      94.8  1.43     52.9  last_resort
+   10.0 116       498.2     793.4    0.59       9.01      68.6      300.8      94.8  1.43     66.6  last_resort
+   12.0 107       492.5     785.4    0.58       8.90      68.7      343.8      94.7  1.43     65.1  last_resort
+   10.0 112       452.9     730.6    0.54       8.18      69.6      292.9      94.7  1.43     55.5  last_resort
+   10.0 115       486.9     777.5    0.58       8.80      68.8      298.8      94.6  1.43     63.7  last_resort
+   10.0 114       475.6     761.7    0.56       8.59      69.1      296.8      94.6  1.43     60.9  last_resort
+   10.0 113       464.2     746.1    0.55       8.38      69.3      294.8      94.6  1.43     58.2  last_resort
+   12.0 106       481.2     768.4    0.57       8.67      68.8      340.8      94.1  1.44     62.3  last_resort
+   12.0 105       469.9     751.4    0.56       8.44      68.9      337.8      93.5  1.45     59.5  last_resort
+    8.0 120       424.6     688.6    0.51       7.62      69.9      244.6      93.4  1.45     49.1  last_resort
+   12.0 103       458.6     734.7    0.54       8.21      69.0      335.0      93.0  1.45     56.8  last_resort
+   12.0 102       447.3     718.1    0.53       7.99      69.2      332.1      92.6  1.46     54.1  last_resort
+   12.0 109       520.8     820.4    0.62       9.35      67.8      347.9      92.5  1.46     72.4  last_resort
+   12.0 101       436.0     701.7    0.52       7.77      69.3      329.3      92.2  1.47     51.5  last_resort
+   10.0 107       413.3     670.4    0.49       7.36      69.9      283.7      92.2  1.47     46.6  last_resort
 
 Optimization-ranked points:
   pitch  V   Qtot(L/min)  Ptot(W)  Tb(C)  Tt(C)  dT(C)  Vhole  evap(kg/d)  Tair(C)  Twire(C)  duty  dP(Pa)  state
-    4.0 112       588.7   1162.2   25.2   20.7    4.5  0.90      17.42     70.0     188.6  0.97   149.8  water loss
-    4.0 110       577.4   1137.8   24.7   20.2    4.4  0.88      16.99     69.8     187.1  0.99   144.2  water loss
-    8.0  81       594.3   1167.9   24.7   20.2    4.4  0.91      17.52     69.6     304.9  0.99   152.5  water loss
-    6.0  91       583.0   1147.8   24.5   20.1    4.4  0.89      17.18     69.7     245.7  0.99   147.0  water loss
-    6.0  93       600.0   1177.5   24.5   20.0    4.4  0.92      17.70     69.5     247.6  0.99   155.3  water loss
-    8.0  79       577.4   1134.4   24.2   19.8    4.4  0.88      16.93     69.6     301.3  1.00   144.2  water loss
-    4.0 109       566.1   1113.7   24.2   19.8    4.4  0.87      16.56     69.7     185.5  1.00   138.8  water loss
-    4.0 112       594.3   1162.4   23.9   19.5    4.3  0.91      17.43     69.2     187.4  1.01   152.4  water loss
-    8.0  78       560.4   1101.3   23.8   19.5    4.3  0.86      16.34     69.5     297.7  1.01   136.1  water loss
-    6.0  88       537.8   1061.0   23.6   19.3    4.3  0.82      15.65     69.8     238.8  1.01   125.7  water loss
+   10.0 120       520.8    841.7   14.6   11.3    3.3  0.62       9.74     69.9     310.8  1.33    72.7  bottom temperature
+   10.0 120       526.5    841.9   13.6   10.4    3.2  0.63       9.70     69.1     309.0  1.37    74.1  bottom temperature
+   12.0 108       498.2    802.5   13.6   10.4    3.2  0.59       9.18     69.6     348.8  1.37    66.7  bottom temperature
+   10.0 119       515.2    825.5   13.5   10.3    3.2  0.61       9.48     69.2     306.9  1.37    71.1  bottom temperature
+   10.0 118       503.8    809.3   13.4   10.3    3.2  0.60       9.26     69.4     304.8  1.38    68.1  bottom temperature
+   10.0 116       492.5    793.2   13.4   10.2    3.2  0.59       9.05     69.6     302.7  1.38    65.2  bottom temperature
+   12.0 107       486.9    785.3   13.4   10.2    3.2  0.58       8.94     69.7     345.8  1.38    63.8  bottom temperature
+   10.0 115       481.2    777.3   13.4   10.2    3.2  0.57       8.84     69.8     300.7  1.38    62.4  bottom temperature
+   12.0 106       475.6    768.2   13.2   10.1    3.2  0.57       8.71     69.8     342.9  1.39    61.0  bottom temperature
+   12.0 105       464.2    751.2   13.1    9.9    3.1  0.55       8.48     69.9     340.0  1.40    58.2  bottom temperature
 
 Constraint logic:
   Hard-safe means all of the following are satisfied simultaneously:

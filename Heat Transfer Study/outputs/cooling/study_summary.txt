@@ -10,11 +10,11 @@ Design specifications:
   Vent specification                     : 1 vent hole(s), 25.0 mm diameter each, area per hole 0.000491 m^2, total vent area 0.000491 m^2
   Vessel wall stack                       : 1.5 mm steel (k = 50.0 W/m-K) + 50.8 mm insulation (k = 0.040 W/m-K)
   Heater tube hardware                    : L 0.300 m, ID 15.0 mm, OD 19.0 mm, insulation 10.0 mm
-  Aeration network                        : 7 tubes, each L 1.22 m, ID 50.0 mm, OD 53.0 mm
-  Distribution manifold                  : no separate header; 7-way splitter(s), splitter inlet ID 19.0 mm, branch connector ID 19.0 mm, connector length 0.000 m
+  Aeration network                        : 9 tubes, each L 1.22 m, ID 50.0 mm, OD 53.0 mm
+  Distribution manifold                  : no separate header; 9-way splitter(s), splitter inlet ID 19.0 mm, branch connector ID 19.0 mm, connector length 0.000 m
   Contraction model                      : Idel'chik conical converging bellmouth without end wall, 60 deg
   Tube layout                             : nearest center spacing 219.6 mm, nearest clear OD gap 166.6 mm
-  Perforations                            : 100 holes/tube, 5.0 mm dia, total holes 700, total open area 0.013744 m^2
+  Perforations                            : 100 holes/tube, 5.0 mm dia, total holes 900, total open area 0.017671 m^2
   Spot cooler                            : target supply air derived from rated specs, max sensible capacity unlimited by config, COP 3.00
   Cooling-air architecture               : spot cooler discharges into an insulated metal plenum; a downstream assist blower draws from the plenum and pushes air through the bed network
   Assist blower                          : Goorui GHBH 1D7 34 1R5 side channel blower, 150.1 CFM @ 0.0 in. H2O, shutoff 56.2 in. H2O, 1100.0 W
@@ -26,7 +26,7 @@ Design specifications:
   Assist-blower source note             : Goorui GHBH 1D7 34 1R5 side channel blower basis: 255 m^3/h maximum airflow (= about 150.1 CFM), 140 mbar maximum pressure (= about 56.2 in H2O), 1.1 kW motor, 3-phase, converter-operation capable, about $640. The current model treats 255 m^3/h as the free-air endpoint and 140 mbar as the shutoff-pressure endpoint until a full fan curve is available.
   Bed moisture model                      : ambient RH 35%, surface temp 20.0 C, wetted area 612.297 m^2
   Cooling sweep                           : flow = 40.0:70.5:4200.0 L/min, electrical heater power fixed at 0 W
-  Summer hard constraints                 : assist-blower available static >= network dP at the selected flow, dP <= 1500 Pa, water loss <= 10.0 kg/24 h, hole velocity <= 10.00 m/s, T_bottom <= 25.0 C, T_top <= 25.0 C, |T_bottom - T_top| <= 10.0 C
+  Summer hard constraints                 : assist-blower available static >= network dP at the selected flow, dP <= 1500 Pa, water loss <= 10.0 kg/24 h, hole velocity <= 10.00 m/s, T_bottom <= 24.0 C, T_top <= 24.0 C, |T_bottom - T_top| <= 10.0 C
 Lumped cooling requirement at 20.0 C bed   : 61.5 W
 Overall UA to ambient air                  : 3.517 W/K
 External natural-convection h estimate     : 3.89 W/m^2-K
@@ -104,14 +104,14 @@ Radial air-cooling profile:
   Initial plume radius                 : 2.5 mm
   Plume spreading rate                 : 0.150 m plume radius per m radial distance
   Maximum plume radius                 : none; plume radius grows linearly across the plotted range
-  Selected outlet temperature          : 23.9 C
-  Sink temperature used                : 23.9 C
-  Bed reference temperature            : 24.9 C
+  Selected outlet temperature          : 24.0 C
+  Sink temperature used                : 24.0 C
+  Bed reference temperature            : 25.4 C
   Wetted-area density                  : 749.3 m^2/m^3
   Base sensible coefficient            : 8.00 W/m^2-K
   Mean latent coefficient              : 0.00 W/m^2-K
   Mean combined sink coefficient       : 8.00 W/m^2-K
-  Released mass flow per tube length   : 0.009754 kg/s-m
+  Released mass flow per tube length   : 0.007864 kg/s-m
   Initial / final plume RH             : 5.9% -> 5.9%
   Initial / final vapor density        : 0.0013 -> 0.0013 kg/m^3
   Integrated radial sensible / latent  : 0.00 W and 0.00 W
@@ -123,21 +123,21 @@ Tube layout and worm-habitat exclusion:
                                          using 10% of the filled-bed width/height as the wall offset
   Filled-bed cross section             : 1220.0 mm wide x 549.0 mm high
   Tube center height above floor       : 54.9 mm
-  Tube center x positions              : 122.0, 1098.0, 122.0, 1098.0, 122.0, 1098.0, 610.0 mm
-  Center-to-center pitch               : 488.0, 488.0 mm
-  Clear gap between tube OD surfaces   : 435.0, 435.0 mm
+  Tube center x positions              : 122.0, 122.0, 122.0, 1098.0, 1098.0, 1098.0, 366.0, 610.0, 854.0 mm
+  Center-to-center pitch               : 244.0, 244.0, 244.0, 244.0 mm
+  Clear gap between tube OD surfaces   : 191.0, 191.0, 191.0, 191.0 mm
   Nearest tube-center spacing          : 219.6 mm
   Nearest clear tube-to-tube gap       : 166.6 mm
   Side clearances to tube OD           : left 95.5 mm, right 95.5 mm
   Safe-distance exclusion radius       : tube radius + safe offset = 26.5 + 0.0 = 26.5 mm
-  Pipe solid volume                    : 0.0188 m^3 (2.30% of filled-bed volume)
-  Pipe exclusion-cylinder union volume : 0.0188 m^3 (2.30% of filled-bed volume)
+  Pipe solid volume                    : 0.0242 m^3 (2.96% of filled-bed volume)
+  Pipe exclusion-cylinder union volume : 0.0242 m^3 (2.96% of filled-bed volume)
   Added wall-return unsafe volume      : 0.0000 m^3 before overlap with the tube exclusion cylinders
-  Total worm-unsafe union volume       : 0.0188 m^3 (2.30% of filled-bed volume)
+  Total worm-unsafe union volume       : 0.0242 m^3 (2.96% of filled-bed volume)
   Worm-unsafe shell volume             : 0.0000 m^3 (0.00% of filled-bed volume)
-  Remaining habitable bed volume       : 0.7983 m^3 (97.70% of filled-bed volume)
-  Pipe-overlap correction              : 0.0000 m^3 removed from the naive sum of 7 pipe cylinders
-  Exclusion-overlap correction         : 0.0000 m^3 removed from the naive sum of 7
+  Remaining habitable bed volume       : 0.7929 m^3 (97.04% of filled-bed volume)
+  Pipe-overlap correction              : 0.0000 m^3 removed from the naive sum of 9 pipe cylinders
+  Exclusion-overlap correction         : 0.0000 m^3 removed from the naive sum of 9
                                          safe-distance exclusion cylinders
   Overlap evaluation method            : overlap-aware union area on a 700 x 700 midpoint grid
                                          clipped to the filled-bed rectangle, then extruded over the
@@ -148,75 +148,75 @@ Criteria-based summer cooling point:
   Result                             : no hard-constraint-safe summer cooling point found in the current sweep
 
 Best-available summer reference point:
-  Total flow                         : 3847.5 L/min
+  Total flow                         : 3988.5 L/min
   Spot-cooler target supply air      : 23.5 C
   Spec-derived middle-case supply    : 23.5 C
   Spot-cooler actual supply air      : 23.5 C
   Spot-cooler supply RH              : 78.1 %
-  Spot-cooler sensible load          : 1028.8 W
-  Spot-cooler electric power         : 342.9 W
+  Spot-cooler sensible load          : 1066.5 W
+  Spot-cooler electric power         : 355.5 W
   Assist-blower electric power       : 1100.0 W
-  Assist-blower available static     : 1327.0 Pa
+  Assist-blower available static     : 862.5 Pa
   Spot-cooler condensate output      : 0.00 kg/24 h
-  Aeration outlet temperature        : 23.9 C
-  Net cooling to bed                 : 41.8 W
-  Signed Q_to_bed                    : -41.8 W
-  Bottom-node steady temperature     : 24.9 C
-  Top-node steady temperature        : 26.3 C
-  Bottom-top spread                  : 1.4 C
-  Released flow per hole             : 4.99 L/min
-  Hole velocity                      : 4.24 m/s
-  Substrate water loss               : 0.71 kg/24 h
-  Latent evaporation load            : 20.0 W
-  Total pressure drop                : 1083.3 Pa
-  Distribution manifold dP          : 1075.8 Pa
-  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 621.1, connector friction 0.0, connector->branch 454.7 Pa
-  Assist-blower static-pressure margin: 243.7 Pa
+  Aeration outlet temperature        : 24.0 C
+  Net cooling to bed                 : 40.1 W
+  Signed Q_to_bed                    : -40.1 W
+  Bottom-node steady temperature     : 25.4 C
+  Top-node steady temperature        : 26.7 C
+  Bottom-top spread                  : 1.3 C
+  Released flow per hole             : 4.02 L/min
+  Hole velocity                      : 3.42 m/s
+  Substrate water loss               : 0.67 kg/24 h
+  Latent evaporation load            : 19.0 W
+  Total pressure drop                : 704.4 Pa
+  Distribution manifold dP          : 699.4 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 403.8, connector friction 0.0, connector->branch 295.6 Pa
+  Assist-blower static-pressure margin: 158.1 Pa
   Status                             : best-available only; it violates one or more summer hard constraints
 
 Top best-available summer cooling candidates:
   Qtot(L/min)  Tbottom(C)  Ttop(C)  dT(C)  Tair,out(C)  cooling(W)  water(kg/d)  Qspot(W)  Pspot(W)  Pblow(W)  Vhole  dP(Pa)  state
-      3847.5       24.9     26.3    1.4         23.9       41.8        0.71    1028.8     342.9    1100.0   4.24  1083.3  top temperature
-      3776.9       25.0     26.3    1.4         23.9       41.7        0.70    1009.9     336.6    1100.0   4.16  1044.0  top temperature
-      3706.4       25.0     26.4    1.4         23.9       41.5        0.70     991.1     330.4    1100.0   4.08  1005.4  bottom temperature
-      3635.9       25.1     26.4    1.3         23.9       41.3        0.70     972.2     324.1    1100.0   4.01   967.5  bottom temperature
-      3565.4       25.1     26.5    1.3         23.9       41.1        0.69     953.4     317.8    1100.0   3.93   930.4  bottom temperature
-      3494.9       25.2     26.5    1.3         24.0       41.0        0.69     934.5     311.5    1100.0   3.85   894.0  bottom temperature
-      3424.4       25.2     26.5    1.3         24.0       40.9        0.69     915.7     305.2    1100.0   3.77   858.3  bottom temperature
-      3353.9       25.2     26.6    1.3         24.0       40.8        0.69     896.8     298.9    1100.0   3.70   823.3  bottom temperature
-      3283.4       25.3     26.6    1.3         24.0       40.6        0.68     878.0     292.7    1100.0   3.62   789.1  bottom temperature
-      3212.9       25.3     26.6    1.3         24.0       40.5        0.68     859.1     286.4    1100.0   3.54   755.5  bottom temperature
-      3142.4       25.4     26.7    1.3         24.0       40.3        0.68     840.2     280.1    1100.0   3.46   722.8  bottom temperature
-      3071.9       25.4     26.7    1.3         24.0       40.1        0.67     821.4     273.8    1100.0   3.39   690.7  bottom temperature
-      3001.4       25.5     26.8    1.3         24.1       40.0        0.67     802.5     267.5    1100.0   3.31   659.4  bottom temperature
-      2930.8       25.6     26.8    1.3         24.1       39.7        0.67     783.7     261.2    1100.0   3.23   628.8  bottom temperature
-      2860.3       25.6     26.9    1.3         24.1       39.5        0.66     764.8     254.9    1100.0   3.15   598.9  bottom temperature
-      2789.8       25.7     27.0    1.3         24.1       39.3        0.66     746.0     248.7    1100.0   3.08   569.7  bottom temperature
-      2719.3       25.7     27.0    1.3         24.1       39.1        0.65     727.1     242.4    1100.0   3.00   541.3  bottom temperature
-      2648.8       25.8     27.1    1.3         24.2       38.9        0.65     708.3     236.1    1100.0   2.92   513.6  bottom temperature
-      2578.3       25.9     27.1    1.3         24.2       38.7        0.64     689.4     229.8    1100.0   2.84   486.7  bottom temperature
-      2507.8       25.9     27.2    1.3         24.2       38.4        0.64     670.6     223.5    1100.0   2.77   460.4  bottom temperature
-      2437.3       26.0     27.3    1.2         24.3       38.2        0.63     651.7     217.2    1100.0   2.69   434.9  bottom temperature
-      2366.8       26.1     27.3    1.2         24.3       37.9        0.63     632.9     211.0    1100.0   2.61   410.1  bottom temperature
-      2296.3       26.2     27.4    1.2         24.3       37.7        0.63     614.0     204.7    1100.0   2.53   386.1  bottom temperature
-      2225.8       26.3     27.5    1.2         24.3       37.4        0.62     595.2     198.4    1100.0   2.46   362.7  bottom temperature
-      2155.3       26.4     27.6    1.2         24.4       37.0        0.61     576.3     192.1    1100.0   2.38   340.1  bottom temperature
-      2084.7       26.5     27.7    1.2         24.4       36.7        0.61     557.4     185.8    1100.0   2.30   318.2  bottom temperature
-      2014.2       26.6     27.7    1.2         24.5       36.4        0.60     538.6     179.5    1100.0   2.22   297.1  bottom temperature
-      1943.7       26.7     27.8    1.2         24.5       36.1        0.60     519.7     173.2    1100.0   2.15   276.7  bottom temperature
-      1873.2       26.8     27.9    1.2         24.6       35.7        0.59     500.9     167.0    1100.0   2.07   257.0  bottom temperature
-      1802.7       26.9     28.0    1.2         24.6       35.3        0.58     482.0     160.7    1100.0   1.99   238.0  bottom temperature
+      3988.5       25.4     26.7    1.3         24.0       40.1        0.67    1066.5     355.5    1100.0   3.42   704.4  bottom temperature
+      3918.0       25.5     26.8    1.3         24.1       40.1        0.67    1047.6     349.2    1100.0   3.36   679.7  bottom temperature
+      3847.5       25.5     26.8    1.3         24.1       40.0        0.67    1028.8     342.9    1100.0   3.30   655.5  bottom temperature
+      3776.9       25.6     26.9    1.3         24.1       39.7        0.66    1009.9     336.6    1100.0   3.24   631.7  bottom temperature
+      3706.4       25.6     26.9    1.3         24.1       39.6        0.66     991.1     330.4    1100.0   3.18   608.3  bottom temperature
+      3635.9       25.7     26.9    1.3         24.1       39.4        0.66     972.2     324.1    1100.0   3.12   585.4  bottom temperature
+      3565.4       25.7     27.0    1.3         24.1       39.3        0.66     953.4     317.8    1100.0   3.06   562.9  bottom temperature
+      3494.9       25.7     27.0    1.3         24.1       39.1        0.65     934.5     311.5    1100.0   3.00   540.9  bottom temperature
+      3424.4       25.8     27.1    1.3         24.2       39.0        0.65     915.7     305.2    1100.0   2.94   519.3  bottom temperature
+      3353.9       25.8     27.1    1.3         24.2       38.8        0.65     896.8     298.9    1100.0   2.88   498.2  bottom temperature
+      3283.4       25.9     27.1    1.3         24.2       38.6        0.64     878.0     292.7    1100.0   2.82   477.4  bottom temperature
+      3212.9       26.0     27.2    1.3         24.2       38.4        0.64     859.1     286.4    1100.0   2.76   457.2  bottom temperature
+      3142.4       26.0     27.3    1.2         24.2       38.2        0.64     840.2     280.1    1100.0   2.70   437.3  bottom temperature
+      3071.9       26.1     27.3    1.2         24.3       38.0        0.63     821.4     273.8    1100.0   2.63   417.9  bottom temperature
+      3001.4       26.1     27.4    1.2         24.3       37.8        0.63     802.5     267.5    1100.0   2.57   399.0  bottom temperature
+      2930.8       26.2     27.4    1.2         24.3       37.6        0.62     783.7     261.2    1100.0   2.51   380.5  bottom temperature
+      2860.3       26.3     27.5    1.2         24.3       37.4        0.62     764.8     254.9    1100.0   2.45   362.4  bottom temperature
+      2789.8       26.3     27.6    1.2         24.4       37.1        0.61     746.0     248.7    1100.0   2.39   344.7  bottom temperature
+      2719.3       26.4     27.6    1.2         24.4       36.8        0.61     727.1     242.4    1100.0   2.33   327.5  bottom temperature
+      2648.8       26.5     27.7    1.2         24.4       36.6        0.61     708.3     236.1    1100.0   2.27   310.8  bottom temperature
+      2578.3       26.6     27.7    1.2         24.5       36.4        0.60     689.4     229.8    1100.0   2.21   294.5  bottom temperature
+      2507.8       26.6     27.8    1.2         24.5       36.1        0.60     670.6     223.5    1100.0   2.15   278.6  bottom temperature
+      2437.3       26.7     27.9    1.2         24.5       35.8        0.59     651.7     217.2    1100.0   2.09   263.1  bottom temperature
+      2366.8       26.8     28.0    1.2         24.6       35.5        0.59     632.9     211.0    1100.0   2.03   248.1  bottom temperature
+      2296.3       26.9     28.1    1.1         24.6       35.2        0.58     614.0     204.7    1100.0   1.97   233.6  bottom temperature
+      2225.8       27.0     28.2    1.1         24.7       34.9        0.57     595.2     198.4    1100.0   1.91   219.5  bottom temperature
+      2155.3       27.1     28.2    1.1         24.7       34.5        0.57     576.3     192.1    1100.0   1.85   205.8  bottom temperature
+      2084.7       27.2     28.3    1.1         24.8       34.2        0.56     557.4     185.8    1100.0   1.79   192.6  bottom temperature
+      2014.2       27.3     28.4    1.1         24.8       33.8        0.55     538.6     179.5    1100.0   1.73   179.8  bottom temperature
+      1943.7       27.4     28.5    1.1         24.9       33.5        0.55     519.7     173.2    1100.0   1.67   167.4  bottom temperature
 
 Optimization-ranked summer points:
   Qtot(L/min)  Tmax(C)  Tmean(C)  dT(C)  cooling(W)  water(kg/d)  Pcool(W)  dP(Pa)  state
-      3847.5     26.3      25.6    1.4       41.8        0.71    1442.9  1083.3  top temperature
-      3776.9     26.3      25.7    1.4       41.7        0.70    1436.6  1044.0  top temperature
-      3706.4     26.4      25.7    1.4       41.5        0.70    1430.4  1005.4  bottom temperature
-      3635.9     26.4      25.8    1.3       41.3        0.70    1424.1   967.5  bottom temperature
-      3565.4     26.5      25.8    1.3       41.1        0.69    1417.8   930.4  bottom temperature
-      3494.9     26.5      25.8    1.3       41.0        0.69    1411.5   894.0  bottom temperature
-      3424.4     26.5      25.9    1.3       40.9        0.69    1405.2   858.3  bottom temperature
-      3353.9     26.6      25.9    1.3       40.8        0.69    1398.9   823.3  bottom temperature
-      3283.4     26.6      26.0    1.3       40.6        0.68    1392.7   789.1  bottom temperature
-      3212.9     26.6      26.0    1.3       40.5        0.68    1386.4   755.5  bottom temperature
+      3988.5     26.7      26.1    1.3       40.1        0.67    1455.5   704.4  bottom temperature
+      3918.0     26.8      26.1    1.3       40.1        0.67    1449.2   679.7  bottom temperature
+      3847.5     26.8      26.1    1.3       40.0        0.67    1442.9   655.5  bottom temperature
+      3776.9     26.9      26.2    1.3       39.7        0.66    1436.6   631.7  bottom temperature
+      3706.4     26.9      26.3    1.3       39.6        0.66    1430.4   608.3  bottom temperature
+      3635.9     26.9      26.3    1.3       39.4        0.66    1424.1   585.4  bottom temperature
+      3565.4     27.0      26.3    1.3       39.3        0.66    1417.8   562.9  bottom temperature
+      3494.9     27.0      26.4    1.3       39.1        0.65    1411.5   540.9  bottom temperature
+      3424.4     27.1      26.4    1.3       39.0        0.65    1405.2   519.3  bottom temperature
+      3353.9     27.1      26.5    1.3       38.8        0.65    1398.9   498.2  bottom temperature
 ============================================================
