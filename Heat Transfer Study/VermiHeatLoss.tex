@@ -2965,6 +2965,163 @@ Connecticut climate inputs, and
 two-node model used in the rest of the study.
 \end{enumerate}
 
+\section{Model Credibility, Scope, and Sign-Off Requirements}
+
+\subsection{Physics Blocks with the Strongest Current Basis}
+
+For the present design workflow, the following blocks have the strongest
+engineering basis and are appropriate for comparative design decisions:
+\begin{enumerate}
+\item temperature-dependent Nichrome electrical resistance and resistive heat
+generation in the wire;
+\item series--parallel electrical loading of identical heater branches;
+\item forced convection and friction-factor-based pressure drop in the heater
+and aeration tubes using established internal-flow correlations;
+\item heater-shell loss through the tube wall and insulation by a standard
+series-resistance formulation;
+\item perforation continuity, hole exit velocity, and the bookkeeping of
+useful bed heating as
+\begin{equation}
+Q_{\mathrm{to\,bed}}
+=
+\sum \left(q_{\mathrm{wall}} + q_{\mathrm{jet}} - q_{\mathrm{evap}}\right);
+\end{equation}
+\item natural-convection vessel loss to greenhouse air using established
+vertical- and horizontal-surface correlations; and
+\item year-round re-solving of the already-selected heating and cooling
+reference points under a representative climate driver rather than assuming
+fixed design-point power throughout the year.
+\end{enumerate}
+
+These blocks should be regarded as the most reliable parts of the current
+model for ranking candidate voltages, flows, wire diameters, vessel-top
+configurations, and electrical topologies.
+
+\subsection{Reduced-Order or Screening-Level Blocks}
+
+Other blocks are still physically motivated, but they remain reduced-order or
+screening approximations:
+\begin{enumerate}
+\item the two-node bed model, which resolves only a bottom and top substrate
+temperature rather than a full spatial temperature field;
+\item the covered-top-with-small-vent extension, which treats the vent as an
+area-limited top opening and does not explicitly resolve buoyancy-driven
+exchange through the vent jet;
+\item the splitter/manifold network model, for which the unresolved internal
+losses are represented by a lumped splitter coefficient;
+\item the evaporation model, which is internally consistent and source-backed
+but still depends on a simplified wetted-area estimate and a Lewis-relation
+mass-transfer closure;
+\item the radial warm-air plume and worm-habitat exclusion calculation, which
+is a post-processing estimate rather than a resolved flow field; and
+\item the summer spot-cooler / assist-blower representation, which is
+appropriate for feasibility screening but still relies on a simplified fan
+curve, simplified spot-cooler performance mapping, and a reduced psychrometric
+closure.
+\end{enumerate}
+
+Accordingly, the present model is best interpreted as a design and
+optimization tool rather than a certification-grade hardware prediction.
+
+\subsection{What the Current Model Is Appropriate For}
+
+In its present form, the model is appropriate for:
+\begin{enumerate}
+\item comparing candidate heater geometries, flow rates, wire diameters, and
+electrical topologies;
+\item identifying hard-constraint-safe operating regions for current, wire
+temperature, outlet-air temperature, pressure drop, water loss, and bed
+temperature thresholds;
+\item ranking vessel-top configurations such as uncovered, covered, and
+covered with a small vent hole;
+\item estimating seasonal electricity, water, and cost trends; and
+\item selecting the most defensible prototype configurations for laboratory or
+greenhouse testing.
+\end{enumerate}
+
+It should not, by itself, be treated as sufficient evidence for final
+hardware release, guaranteed worm-safe local exposure, or formal thermal
+safety sign-off under all faulted operating conditions.
+
+\subsection{Requirements for Final Hardware Sign-Off}
+
+A final hardware sign-off model would require all of the following:
+\begin{enumerate}
+\item a frozen as-built geometry, including the actual heater wire route,
+support details, electrical joints, clearances, manifold geometry, vent
+geometry, and enclosure details;
+\item measured electrical and thermal properties for the purchased hardware,
+including the actual wire resistance--temperature relation, insulation
+performance, contact resistances, and shell temperatures;
+\item measured hydraulic data for the real distribution hardware, especially
+the blower curve, splitter/manifold loss coefficients, connector losses, and
+exit losses, rather than placeholder or lumped estimates;
+\item transient validation tests at representative winter and summer boundary
+conditions, including startup, steady operation, duty-cycled operation, and
+shutdown;
+\item explicit fault-case evaluation, including blocked or reduced airflow,
+blower failure, vent blockage, relay failure, and sensor failure;
+\item uncertainty quantification showing that the validated model error band is
+small enough that all limits are still met with margin after uncertainty is
+applied; and
+\item a higher-fidelity substrate model capable of resolving local hot spots,
+temperature gradients, and moisture migration in the bed.
+\end{enumerate}
+
+Only after those requirements are met should the model be treated as a final
+hardware sign-off basis rather than as a prototype-selection tool.
+
+\subsection{What a 2D/3D Conjugate Porous/Moist Model Would Entail}
+
+For this project, a sign-off-grade higher-fidelity model would be a
+\emph{conjugate} model because it would solve the coupled physics in the
+solid hardware, the flowing air, and the porous moist substrate
+simultaneously rather than treating the bed as only two lumped temperature
+nodes.
+
+At minimum, such a model would include:
+\begin{enumerate}
+\item conduction in the metal and insulated hardware domains, including the
+heater tube, aeration tubes, vessel walls, and cover;
+\item fluid flow in the internal air passages and, if resolved, through the
+perforations and the nearby free-plume region;
+\item porous-medium flow and heat transfer in the substrate, with air exchange
+between the perforations and the bed;
+\item transient energy storage in the substrate and walls;
+\item moisture transport in the substrate, including evaporation,
+humidification of the gas phase, and the associated latent heat sink; and
+\item realistic boundary conditions for greenhouse air, cover openings, and
+all forced-flow inlets and outlets.
+\end{enumerate}
+
+In practical terms, this means solving coupled conservation equations for:
+\begin{enumerate}
+\item mass and momentum in the open-flow regions;
+\item energy in the wire, tube walls, insulation, air, and porous substrate;
+\item species transport for water vapor in the gas phase; and
+\item liquid-moisture storage and migration in the porous substrate, either by
+a saturation-based porous-media model or by an experimentally calibrated
+effective-moisture formulation.
+\end{enumerate}
+
+Relative to the current model, the main benefit would be the ability to
+predict spatially resolved quantities such as:
+\begin{enumerate}
+\item local worm-exposure temperatures near perforations and near the tube
+surface;
+\item local bed drying or wetting zones;
+\item nonuniform temperature fields caused by tube placement, wall proximity,
+and vent placement; and
+\item transient recovery and overshoot during startup, shutdown, and disturbed
+airflow events.
+\end{enumerate}
+
+The main cost would be substantially higher model complexity, substantially
+greater computational time, and a much larger experimental burden for
+calibration and validation. For that reason, such a model is usually reserved
+for final design verification after the reduced-order model has already
+narrowed the design space to one or two promising hardware configurations.
+
 \section{Sources}
 
 \begin{enumerate}
