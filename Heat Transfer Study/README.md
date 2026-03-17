@@ -16,7 +16,7 @@ To Run:
   - The script writes `outputs/heating/*`, `outputs/cooling/*`, `outputs/year_round/*`, and `outputs/study_summary.txt`
 - Heating mode only:
   - Set `run_modes.heating = true` and `run_modes.cooling = false`
-  - In the `Heating` directory run: `python ".\analyze_vermicomposter_heater.py" --model-grid-points 100 --plot-points 100 --output-dir ".\python_heater_analysis_autorefresh" --study-config ".\Heat Transfer Study\study_config.json"`
+  - In the `Heating` directory run: `python ".\analyze_vermicomposter_heater.py" --model-grid-points 100 --plot-points 100 --output-dir ".\python_heater_analysis_moisture" --study-config ".\Heat Transfer Study\study_config.json"`
   - Next, in `Heat Transfer Study` run: `python heat_transfer_study.py`
 - Summer cooling mode:
   - Set `run_modes.heating = false` and `run_modes.cooling = true`

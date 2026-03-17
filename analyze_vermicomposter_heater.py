@@ -21,7 +21,7 @@ from scipy.interpolate import interp1d
 
 PROJECT_DIR = Path(__file__).resolve().parent
 MODEL_NAME = "vermicomposter_air_heater_design_model"
-DEFAULT_OUTPUT_DIR = PROJECT_DIR / "python_heater_analysis"
+DEFAULT_OUTPUT_DIR = PROJECT_DIR / "python_heater_analysis_moisture"
 DEFAULT_STUDY_CONFIG = PROJECT_DIR / "Heat Transfer Study" / "study_config.json"
 
 
@@ -55,7 +55,10 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=DEFAULT_OUTPUT_DIR,
-        help="Directory for exported JSON, plots, and summary text.",
+        help=(
+            "Retained for backward compatibility, but outputs are always written "
+            "to the fixed tracked analysis directory."
+        ),
     )
     parser.add_argument(
         "--matlab",
@@ -106,6 +109,19 @@ def resolve_path(root: Path, raw_path: str) -> Path:
     if path.is_absolute():
         return path
     return (root / path).resolve()
+
+
+def reset_generated_output_dir(output_dir: Path) -> None:
+    preserved_names = {".gitattributes", ".gitignore", ".gitkeep"}
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    for child in output_dir.iterdir():
+        if child.name in preserved_names:
+            continue
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
 
 
 def model_overrides_signature(overrides: dict) -> str:
@@ -636,6 +652,7 @@ def export_results_json(
             raise FileNotFoundError(
                 f"MATLAB export completed without creating the expected JSON: {temp_export_json}"
             )
+        reset_generated_output_dir(output_dir)
         shutil.copy2(temp_export_json, export_json)
     finally:
         temp_script.unlink(missing_ok=True)
@@ -1015,7 +1032,7 @@ def write_summary(payload: dict, output_dir: Path, plot_points: int, model_grid_
 
 def main() -> None:
     args = parse_args()
-    output_dir = args.output_dir.resolve()
+    output_dir = DEFAULT_OUTPUT_DIR.resolve()
     matlab_exe = find_matlab(args.matlab)
     study_config_path = args.study_config.resolve() if args.study_config is not None else None
     study_config = load_json(study_config_path)

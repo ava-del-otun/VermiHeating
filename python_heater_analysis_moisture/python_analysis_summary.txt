@@ -5,18 +5,18 @@ Active configuration:
 - open top
 
 Recommended point used throughout:
-- Pitch: 10.0 mm
-- Voltage: 16.3 V
-- Total flow: 40.0 L/min
-- Total power: 34.9 W
-- Total current: 2.14 A
+- Pitch: 6.0 mm
+- Voltage: 72.3 V
+- Total flow: 400.0 L/min
+- Total power: 417.2 W
+- Total current: 5.77 A
 
 What "recommended" means:
-- Recommended = the single operating point selected for a vessel configuration from the MATLAB sweep. The code first prefers fully feasible points, then current-safe fallback points, then the lowest-penalty point overall.
+- Recommended = the single operating point selected for a vessel configuration from the MATLAB sweep by the shared lexicographic criteria used throughout the study. Earlier criteria dominate later criteria completely.
 
 Why the same star appears on every constraint/performance plot:
-- The star marks the same comparison-based recommended operating point on every constraint/performance panel because all panels share the same voltage-flow plane at one pitch; only the plotted response variable changes.
-- In this case the starred point is 10.0 mm, 16.3 V, 40.0 L/min, so every panel shows the same x-y location while the z-value changes by metric.
+- The standalone Heat Transfer Study plots do not place stars on the contour panels. Recommended operating points are reported in the text summary.
+- In this case the starred point is 6.0 mm, 72.3 V, 400.0 L/min, so every panel shows the same x-y location while the z-value changes by metric.
 
 300-point display note:
 - Continuous Python plots were redrawn at 100 display points per axis where that makes sense.
