@@ -26,7 +26,7 @@ Design specifications:
   Assist-blower source note             : Goorui GHBH 1D7 34 1R5 side channel blower basis: 255 m^3/h maximum airflow (= about 150.1 CFM), 140 mbar maximum pressure (= about 56.2 in H2O), 1.1 kW motor, 3-phase, converter-operation capable, about $640. The current model treats 255 m^3/h as the free-air endpoint and 140 mbar as the shutoff-pressure endpoint until a full fan curve is available.
   Bed moisture model                      : ambient RH 35%, surface temp 20.0 C, wetted area 612.297 m^2
   Cooling sweep                           : flow = 40.0:70.5:4200.0 L/min, electrical heater power fixed at 0 W
-  Summer hard constraints                 : assist-blower available static >= network dP at the selected flow, dP <= 1500 Pa, water loss <= 10.0 kg/24 h, hole velocity <= 10.00 m/s, T_bottom <= 24.0 C, T_top <= 24.0 C, |T_bottom - T_top| <= 10.0 C
+  Summer hard constraints                 : assist-blower available static >= network dP at the selected flow, dP <= 1500 Pa, water loss <= 10.0 kg/24 h, hole velocity <= 10.00 m/s, T_bottom >= 18.0 C, T_top >= 18.0 C, T_bottom <= 24.0 C, T_top <= 24.0 C, |T_bottom - T_top| <= 10.0 C
 Lumped cooling requirement at 20.0 C bed   : 61.5 W
 Overall UA to ambient air                  : 3.517 W/K
 External natural-convection h estimate     : 3.89 W/m^2-K
@@ -38,7 +38,7 @@ Summer cooling selection process:
   Hard-safe means all of the following hold simultaneously:
     1. the predicted network pressure drop stays below the assist-blower available static pressure at that airflow;
     2. pressure drop, substrate water loss, and hole velocity remain below their configured limits;
-    3. bottom and top bed temperatures remain below their configured summer maxima;
+    3. bottom and top bed temperatures remain within their configured summer minima and maxima;
     4. bottom-top spread remains below the configured spread limit; and
     5. net Q_to_bed is negative, so the spot-cooled airflow is actually removing heat from the bed.
   Clean ordering inside the hard-safe set:
