@@ -5123,6 +5123,104 @@ def append_optimization_process(lines: list[str], payload: dict, config: dict) -
         lines.append("    3. After those are met, prefer warmer bed temperatures and then lower power.")
 
 
+def heating_constraint_label_map(payload: dict, config: dict) -> dict[str, str]:
+    limits = effective_limits(payload, config)
+    opt_cfg = optimization_config(config)
+    return {
+        "current_excess_A": f"total current above {float(limits['maxTotalCurrent_A']):.1f} A",
+        "wire_temp_excess_C": f"wire temperature above {float(limits['maxWireTemp_C']):.1f} C",
+        "air_outlet_excess_C": f"outlet air above {float(limits['maxAirOutletTemp_C']):.1f} C",
+        "pressure_drop_excess_Pa": f"pressure drop above {float(limits['maxPressureDrop_Pa']):.0f} Pa",
+        "water_loss_excess_kg_day": f"water loss above {float(limits.get('maxWaterLoss_kg_day', np.nan)):.1f} kg/24 h",
+        "hole_velocity_excess_m_s": f"hole velocity above {float(limits.get('maxHoleVelocity_m_s', np.inf)):.2f} m/s",
+        "bottom_temp_shortfall_C": f"bottom temperature below {float(opt_cfg['min_bottom_temp_C']):.1f} C",
+        "top_temp_shortfall_C": f"top temperature below {float(opt_cfg['min_top_temp_C']):.1f} C",
+        "bottom_temp_excess_C": f"bottom temperature above {float(opt_cfg['max_bottom_temp_C']):.1f} C",
+        "top_temp_excess_C": f"top temperature above {float(opt_cfg['max_top_temp_C']):.1f} C",
+        "temp_spread_excess_C": f"bottom-top spread above {float(opt_cfg['spread_limit_C']):.1f} C",
+        "heat_shortfall": "full-load heating target not met",
+        "nonpositive_heat_excess_W": "nonpositive net heat delivered to the bed",
+    }
+
+
+def format_heating_constraint_residual(key: str, value: float) -> str:
+    if key.endswith("_A"):
+        return f"{value:.3f} A"
+    if key.endswith("_Pa"):
+        return f"{value:.3f} Pa"
+    if key.endswith("_kg_day"):
+        return f"{value:.3f} kg/24 h"
+    if key.endswith("_m_s"):
+        return f"{value:.3f} m/s"
+    if key.endswith("_C"):
+        return f"{value:.3f} C"
+    if key == "heat_shortfall":
+        return f"{value:.6f} in dutyNeeded - 1"
+    if key == "nonpositive_heat_excess_W":
+        return f"{value:.6f} W"
+    return f"{value:.6f}"
+
+
+def append_no_feasible_pareto_diagnostics(
+    lines: list[str],
+    payload: dict,
+    config: dict,
+    ranked_points: list[dict],
+    max_items: int = 12,
+) -> None:
+    if payload.get("recommended"):
+        return
+    if not ranked_points:
+        return
+
+    labels = heating_constraint_label_map(payload, config)
+    best = ranked_points[0]
+    best_metrics = point_metrics(best, payload, config)
+    total_points = len(ranked_points)
+    counts = {key: 0 for key in HEATING_NSGA_CONSTRAINT_KEYS}
+    minima: dict[str, tuple[float, dict]] = {}
+
+    for pt in ranked_points:
+        metrics = point_metrics(pt, payload, config)
+        for key in HEATING_NSGA_CONSTRAINT_KEYS:
+            value = float(metrics.get(key, 0.0))
+            if value > 1.0e-12:
+                counts[key] += 1
+                current = minima.get(key)
+                if current is None or value < current[0]:
+                    minima[key] = (value, pt)
+
+    violated_best = [
+        (key, float(best_metrics.get(key, 0.0)))
+        for key in HEATING_NSGA_CONSTRAINT_KEYS
+        if float(best_metrics.get(key, 0.0)) > 1.0e-12
+    ]
+
+    lines.append("")
+    lines.append("No-feasible-Pareto diagnostics:")
+    if violated_best:
+        lines.append("  Best-available active reference violates:")
+        for key, value in violated_best:
+            lines.append(f"    - {labels.get(key, key)}: {format_heating_constraint_residual(key, value)}")
+    else:
+        lines.append("  Best-available active reference satisfies all hard constraints but still misses the full heating target.")
+
+    lines.append("  Closest misses across the full evaluated heating sweep:")
+    shown = 0
+    for key in HEATING_NSGA_CONSTRAINT_KEYS:
+        if key not in minima:
+            continue
+        value, pt = minima[key]
+        lines.append(
+            f"    - {labels.get(key, key)}: closest miss {format_heating_constraint_residual(key, value)}; "
+            f"violated by {counts[key]} / {total_points} points; nearest point at pitch {float(pt['pitch_mm']):.1f} mm, "
+            f"V {float(pt['voltage_V']):.1f}, flow {float(pt['totalFlow_Lpm']):.1f} L/min"
+        )
+        shown += 1
+        if shown >= max_items:
+            break
+
+
 def append_moisture_process(lines: list[str], payload: dict, config: dict) -> None:
     limits = payload["limits"]
     model_overrides = normalized_model_overrides(config)
@@ -6044,9 +6142,12 @@ def write_summary(payload: dict, config: dict, output_dir: Path) -> None:
     wetted_area = derived_wetted_area_m2(summary_inputs, model_overrides)
     tube_layout = compute_tube_layout_and_habitat(payload, config)
 
-    feasible_count = sum(1 for pt in rank_points_by_criteria(payload, config) if pt.get("selectionStage") == "feasible")
+    ranked_points = rank_points_by_criteria(payload, config)
+    feasible_count = sum(1 for pt in ranked_points if pt.get("selectionStage") == "feasible")
     top_n = int(opt_cfg.get("top_candidate_count", 8))
     top_list = matlab_top_candidates(payload, config, top_n)
+    if not rec and not top_list:
+        top_list = ranked_points[: min(top_n, len(ranked_points))]
     optimization_list = optimization_ranked_points(payload, config)
     consistency_warnings = export_consistency_warnings(payload, config)
 
@@ -6348,6 +6449,8 @@ def write_summary(payload: dict, config: dict, output_dir: Path) -> None:
                 f"{float(pt['wireMax_C']):9.1f} {float(pt['dutyNeeded']):5.2f} {float(pt['deltaP_Pa']):7.1f}  "
                 f"{pt['constraintState']}"
             )
+
+    append_no_feasible_pareto_diagnostics(lines, payload, config, ranked_points)
 
     lines.append("")
     lines.append("Constraint logic:")
