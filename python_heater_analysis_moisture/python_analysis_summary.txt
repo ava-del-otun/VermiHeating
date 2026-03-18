@@ -2,21 +2,21 @@ Vermicomposter Heater Python Analysis
 ====================================
 
 Active configuration:
-- open top
+- Covered top + vent
 
 Recommended point used throughout:
-- Pitch: 6.0 mm
-- Voltage: 72.3 V
-- Total flow: 400.0 L/min
-- Total power: 417.2 W
-- Total current: 5.77 A
+- Pitch: 10.0 mm
+- Voltage: 89.0 V
+- Total flow: 441.6 L/min
+- Total power: 761.0 W
+- Total current: 8.55 A
 
 What "recommended" means:
-- Recommended = the single operating point selected for a vessel configuration from the MATLAB sweep by the shared lexicographic criteria used throughout the study. Earlier criteria dominate later criteria completely.
+- Recommended = the single hard-constraint-safe operating point selected for a vessel configuration from the MATLAB sweep by the shared lexicographic criteria used throughout the study. Inside the hard-safe set, the rule is: maximize the colder-node bed temperature, then minimize power, then minimize spread. If no hard-safe point exists, the best-available point is retained only as a reference point.
 
 Why the same star appears on every constraint/performance plot:
 - The standalone Heat Transfer Study plots do not place stars on the contour panels. Recommended operating points are reported in the text summary.
-- In this case the starred point is 6.0 mm, 72.3 V, 400.0 L/min, so every panel shows the same x-y location while the z-value changes by metric.
+- In this case the starred point is 10.0 mm, 89.0 V, 441.6 L/min, so every panel shows the same x-y location while the z-value changes by metric.
 
 300-point display note:
 - Continuous Python plots were redrawn at 100 display points per axis where that makes sense.

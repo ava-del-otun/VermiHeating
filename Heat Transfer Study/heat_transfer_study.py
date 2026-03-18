@@ -16,6 +16,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Patch
+from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.core.problem import ElementwiseProblem
+from pymoo.operators.crossover.sbx import SBX
+from pymoo.operators.mutation.pm import PM
+from pymoo.operators.repair.rounding import RoundingRepair
+from pymoo.operators.sampling.rnd import IntegerRandomSampling
+from pymoo.optimize import minimize
 from scipy.interpolate import interp1d
 
 
@@ -32,7 +39,21 @@ DEFAULT_PRIORITY_ORDER = (
     "hole_velocity_excess_m_s",
     "bottom_temp_shortfall_C",
     "top_temp_shortfall_C",
+    "bottom_temp_excess_C",
+    "top_temp_excess_C",
     "temp_spread_excess_C",
+    "minus_min_bed_temp_C",
+    "power_W",
+    "temp_spread_C",
+    "minus_mean_bed_temp_C",
+    "heat_shortfall",
+)
+DEFAULT_HEATING_OBJECTIVES = (
+    "power_W",
+    "minus_min_bed_temp_C",
+    "temp_spread_C",
+)
+DEFAULT_HEATING_REPORT_PRIORITY = (
     "minus_min_bed_temp_C",
     "power_W",
     "temp_spread_C",
@@ -48,13 +69,21 @@ HARD_CONSTRAINT_KEYS = (
     "hole_velocity_excess_m_s",
     "bottom_temp_shortfall_C",
     "top_temp_shortfall_C",
+    "bottom_temp_excess_C",
+    "top_temp_excess_C",
     "temp_spread_excess_C",
+)
+HEATING_NSGA_CONSTRAINT_KEYS = HARD_CONSTRAINT_KEYS + (
+    "heat_shortfall",
+    "nonpositive_heat_excess_W",
 )
 DEFAULT_COOLING_PRIORITY_ORDER = (
     "assist_blower_pressure_excess_Pa",
     "pressure_drop_excess_Pa",
     "water_loss_excess_kg_day",
     "hole_velocity_excess_m_s",
+    "bottom_temp_shortfall_C",
+    "top_temp_shortfall_C",
     "bottom_temp_excess_C",
     "top_temp_excess_C",
     "temp_spread_excess_C",
@@ -678,6 +707,107 @@ def plot_moisture_maps(payload: dict, output_dir: Path, grid_points: int, curve_
         wrap=True,
     )
     fig.savefig(output_dir / "moisture_perforation_maps.png", dpi=220)
+    plt.close(fig)
+
+
+def plot_heating_pareto_front(payload: dict, config: dict, output_dir: Path) -> None:
+    ranked = rank_points_by_criteria(payload, config)
+    if not ranked:
+        return
+
+    feasible = [pt for pt in ranked if pt.get("isFeasibleByCriteria", False)]
+    pareto = list(payload.get("pareto_candidates", []))
+    best_available = payload.get("best_available", {})
+    recommended = payload.get("recommended", {})
+
+    all_power = np.array([float(pt["totalPower_W"]) for pt in ranked], dtype=float)
+    all_colder = np.array([float(pt["colderNodeTemp_C"]) for pt in ranked], dtype=float)
+    feasible_power = np.array([float(pt["totalPower_W"]) for pt in feasible], dtype=float)
+    feasible_colder = np.array([float(pt["colderNodeTemp_C"]) for pt in feasible], dtype=float)
+    feasible_spread = np.array([float(pt["tempSpread_C"]) for pt in feasible], dtype=float)
+
+    fig, ax = plt.subplots(figsize=(10.5, 7.0))
+    fig.subplots_adjust(left=0.11, right=0.97, top=0.88, bottom=0.18)
+    fig.suptitle(
+        "Heating Pareto Front from Constrained NSGA-II\n"
+        "Objectives: minimize power, maximize colder-node bed temperature, minimize bed-temperature spread",
+        fontsize=15,
+        fontweight="bold",
+    )
+
+    ax.scatter(all_power, all_colder, s=12, color="#b8b8b8", alpha=0.22, label="All evaluated points")
+    if feasible:
+        scatter = ax.scatter(
+            feasible_power,
+            feasible_colder,
+            c=feasible_spread,
+            cmap="viridis",
+            s=28,
+            alpha=0.78,
+            edgecolors="none",
+            label="Feasible points",
+        )
+        cb = fig.colorbar(scatter, ax=ax, fraction=0.046, pad=0.03)
+        cb.set_label("Bottom-top spread (C)")
+
+    if pareto:
+        pareto_sorted = sorted(pareto, key=lambda pt: float(pt["totalPower_W"]))
+        pareto_power = np.array([float(pt["totalPower_W"]) for pt in pareto_sorted], dtype=float)
+        pareto_colder = np.array([float(pt["colderNodeTemp_C"]) for pt in pareto_sorted], dtype=float)
+        ax.plot(pareto_power, pareto_colder, color="black", linewidth=1.4, alpha=0.85)
+        ax.scatter(
+            pareto_power,
+            pareto_colder,
+            s=70,
+            facecolors="#f2f2f2",
+            edgecolors="black",
+            linewidths=1.3,
+            label="NSGA-II Pareto candidates",
+            zorder=4,
+        )
+
+    if recommended:
+        ax.scatter(
+            [float(recommended["totalPower_W"])],
+            [float(recommended.get("colderNodeTemp_C", min(recommended.get("TbottomFullPower_C", np.nan), recommended.get("TtopFullPower_C", np.nan))))],
+            s=180,
+            marker="*",
+            color="#d95f02",
+            edgecolors="black",
+            linewidths=1.0,
+            label="Reported design point",
+            zorder=5,
+        )
+
+    if best_available and not recommended:
+        ax.scatter(
+            [float(best_available["totalPower_W"])],
+            [float(best_available.get("colderNodeTemp_C", min(best_available.get("TbottomFullPower_C", np.nan), best_available.get("TtopFullPower_C", np.nan))))],
+            s=90,
+            marker="D",
+            color="#7570b3",
+            edgecolors="black",
+            linewidths=0.9,
+            label="Best available reference",
+            zorder=5,
+        )
+
+    opt_cfg = optimization_config(config)
+    fig.text(
+        0.02,
+        0.05,
+        f"NSGA-II settings: population = {int(opt_cfg.get('population', 50))}, "
+        f"generations = {int(opt_cfg.get('generations', 120))}, "
+        f"report priority = {', '.join(heating_report_priority_order(config))}. "
+        "Only fully feasible points appear on the Pareto front used for the reported design point.",
+        fontsize=9,
+        wrap=True,
+    )
+    ax.set_xlabel("Total electrical power (W)")
+    ax.set_ylabel("Colder-node bed temperature (C)")
+    ax.grid(True, alpha=0.22)
+    ax.legend(loc="best", fontsize=9)
+    fig.savefig(output_dir / "heating_pareto_front.png", dpi=220)
     plt.close(fig)
 
 
@@ -1842,6 +1972,8 @@ def recommended_hard_safe(rec: dict, limits: dict, opt_cfg: dict) -> bool:
         and float(rec.get("holeVelocity_m_s", 0.0)) <= float(limits.get("maxHoleVelocity_m_s", np.inf))
         and bottom >= float(opt_cfg["min_bottom_temp_C"])
         and top >= float(opt_cfg["min_top_temp_C"])
+        and bottom <= float(opt_cfg["max_bottom_temp_C"])
+        and top <= float(opt_cfg["max_top_temp_C"])
         and spread <= float(opt_cfg["spread_limit_C"])
         and float(rec["QtoBed_W"]) > 0.0
     )
@@ -1872,11 +2004,19 @@ def recommended_status_long(rec: dict, limits: dict, opt_cfg: dict) -> str:
 
 
 def optimization_config(config: dict) -> dict:
-    model_opt = normalized_model_overrides(config).get("optimization", {})
+    model_overrides = normalized_model_overrides(config)
+    model_opt = model_overrides.get("optimization", {})
+    bin_inputs = model_overrides.get("bin", {})
     opt = dict(config.get("optimization", {}))
     opt.setdefault("enabled", True)
     opt.setdefault("top_candidate_count", 8)
     opt.setdefault("n_top", 10)
+    opt.setdefault("method", "nsga2")
+    opt.setdefault("population", 50)
+    opt.setdefault("generations", 120)
+    opt.setdefault("seed", 7)
+    opt.setdefault("objectives", list(DEFAULT_HEATING_OBJECTIVES))
+    opt.setdefault("report_priority_order", list(DEFAULT_HEATING_REPORT_PRIORITY))
     opt.setdefault("priority_order", list(DEFAULT_PRIORITY_ORDER))
     opt.setdefault("real_world_guidance", [])
     if "spreadLimit_C" in model_opt:
@@ -1891,7 +2031,25 @@ def optimization_config(config: dict) -> dict:
         opt["min_top_temp_C"] = float(model_opt["minTopTemp_C"])
     else:
         opt.setdefault("min_top_temp_C", 15.0)
+    if "maxBottomTemp_C" in model_opt:
+        opt["max_bottom_temp_C"] = float(model_opt["maxBottomTemp_C"])
+    else:
+        opt.setdefault("max_bottom_temp_C", float(bin_inputs.get("maxSafe_C", np.inf)))
+    if "maxTopTemp_C" in model_opt:
+        opt["max_top_temp_C"] = float(model_opt["maxTopTemp_C"])
+    else:
+        opt.setdefault("max_top_temp_C", float(bin_inputs.get("maxSafe_C", np.inf)))
     return opt
+
+
+def heating_objective_order(config: dict) -> tuple[str, ...]:
+    raw = optimization_config(config).get("objectives", DEFAULT_HEATING_OBJECTIVES)
+    return tuple(str(item) for item in raw)
+
+
+def heating_report_priority_order(config: dict) -> tuple[str, ...]:
+    raw = optimization_config(config).get("report_priority_order", DEFAULT_HEATING_REPORT_PRIORITY)
+    return tuple(str(item) for item in raw)
 
 
 def active_design_points_array(payload: dict) -> list[dict]:
@@ -1905,9 +2063,8 @@ def hard_constraint_safe(metrics: dict[str, float | str]) -> bool:
 
 
 def select_recommended_point(payload: dict, config: dict, points: list[dict] | None = None) -> dict:
-    ranked = rank_points_by_criteria(payload, config, points)
-    hard_safe = [pt for pt in ranked if hard_constraint_safe(pt)]
-    return hard_safe[0] if hard_safe else {}
+    pareto = pareto_candidates_for_points(payload, config, points)
+    return pareto[0] if pareto else {}
 
 
 def select_best_available_point(payload: dict, config: dict, points: list[dict] | None = None) -> dict:
@@ -1936,9 +2093,12 @@ def point_metrics(pt: dict, payload: dict, config: dict) -> dict[str, float | st
     hole_velocity = float(pt.get("holeVelocity_m_s", np.nan))
     hole_velocity_excess = max(0.0, hole_velocity - float(limits.get("maxHoleVelocity_m_s", np.inf)))
     heat_shortfall = max(0.0, float(pt["dutyNeeded"]) - 1.0)
+    nonpositive_heat_excess = max(0.0, -q_to_bed)
     spread_excess = max(0.0, spread - float(opt_cfg["spread_limit_C"]))
     bottom_shortfall = max(0.0, float(opt_cfg["min_bottom_temp_C"]) - bottom)
     top_shortfall = max(0.0, float(opt_cfg["min_top_temp_C"]) - top)
+    bottom_excess = max(0.0, bottom - float(opt_cfg["max_bottom_temp_C"]))
+    top_excess = max(0.0, top - float(opt_cfg["max_top_temp_C"]))
     explicit_safe = (
         current_excess == 0.0
         and wire_excess == 0.0
@@ -1950,6 +2110,8 @@ def point_metrics(pt: dict, payload: dict, config: dict) -> dict[str, float | st
     thermal_safe = (
         bottom_shortfall == 0.0
         and top_shortfall == 0.0
+        and bottom_excess == 0.0
+        and top_excess == 0.0
         and spread_excess == 0.0
         and q_to_bed > 0.0
     )
@@ -1988,6 +2150,12 @@ def point_metrics(pt: dict, payload: dict, config: dict) -> dict[str, float | st
     elif top_shortfall > 0.0:
         stage = "last_resort"
         state = "top temperature"
+    elif bottom_excess > 0.0:
+        stage = "last_resort"
+        state = "bottom temperature"
+    elif top_excess > 0.0:
+        stage = "last_resort"
+        state = "top temperature"
     elif spread_excess > 0.0:
         stage = "last_resort"
         state = "temperature spread"
@@ -2003,9 +2171,12 @@ def point_metrics(pt: dict, payload: dict, config: dict) -> dict[str, float | st
         "water_loss_excess_kg_day": water_loss_excess,
         "hole_velocity_excess_m_s": hole_velocity_excess,
         "heat_shortfall": heat_shortfall,
+        "nonpositive_heat_excess_W": nonpositive_heat_excess,
         "temp_spread_excess_C": spread_excess,
         "bottom_temp_shortfall_C": bottom_shortfall,
         "top_temp_shortfall_C": top_shortfall,
+        "bottom_temp_excess_C": bottom_excess,
+        "top_temp_excess_C": top_excess,
         "minus_min_bed_temp_C": -min(bottom, top),
         "minus_mean_bed_temp_C": -0.5 * (bottom + top),
         "power_W": float(pt["totalPower_W"]),
@@ -2026,6 +2197,33 @@ def point_metrics(pt: dict, payload: dict, config: dict) -> dict[str, float | st
     }
 
 
+def enrich_point_with_metrics(pt: dict, payload: dict, config: dict) -> dict:
+    metrics = point_metrics(pt, payload, config)
+    enriched = dict(pt)
+    enriched["criteriaKey"] = criteria_sort_key(metrics, config)
+    enriched["reportPriorityKey"] = tuple(float(metrics[name]) for name in heating_report_priority_order(config))
+    enriched["objectiveKey"] = tuple(float(metrics[name]) for name in heating_objective_order(config))
+    enriched["selectionStage"] = str(metrics["selectionStage"])
+    enriched["constraintState"] = str(metrics["constraintState"])
+    enriched["isConstraintSafeByCriteria"] = bool(metrics["isConstraintSafeByCriteria"])
+    enriched["isFeasibleByCriteria"] = bool(metrics["isFeasibleByCriteria"])
+    enriched["tempSpread_C"] = float(metrics["temp_spread_C"])
+    enriched["TbottomFullPower_C"] = float(metrics["bottom_temp_C"])
+    enriched["TtopFullPower_C"] = float(metrics["top_temp_C"])
+    enriched["colderNodeTemp_C"] = float(metrics["colder_node_temp_C"])
+    enriched["meanBedTemp_C"] = float(metrics["mean_bed_temp_C"])
+    enriched["heatShortfall"] = float(metrics["heat_shortfall"])
+    enriched["tempSpreadExcess_C"] = float(metrics["temp_spread_excess_C"])
+    enriched["bottomTempShortfall_C"] = float(metrics["bottom_temp_shortfall_C"])
+    enriched["topTempShortfall_C"] = float(metrics["top_temp_shortfall_C"])
+    enriched["flowPerHole_Lpm"] = float(metrics["flowPerHole_Lpm"])
+    enriched["holeVelocity_m_s"] = float(metrics["holeVelocity_m_s"])
+    enriched["waterLoss_kg_day"] = float(metrics["waterLoss_kg_day"])
+    enriched["latentEvap_W"] = float(metrics["latentEvap_W"])
+    enriched["heatingConstraintVector"] = tuple(float(metrics[name]) for name in HEATING_NSGA_CONSTRAINT_KEYS)
+    return enriched
+
+
 def criteria_sort_key(metrics: dict[str, float | str], config: dict) -> tuple[float, ...]:
     order = optimization_config(config)["priority_order"]
     return tuple(float(metrics[name]) for name in order)
@@ -2033,45 +2231,130 @@ def criteria_sort_key(metrics: dict[str, float | str], config: dict) -> tuple[fl
 
 def rank_points_by_criteria(payload: dict, config: dict, points: list[dict] | None = None) -> list[dict]:
     source = active_design_points_array(payload) if points is None else points
-    ranked: list[dict] = []
-    for pt in source:
-        metrics = point_metrics(pt, payload, config)
-        enriched = dict(pt)
-        enriched["criteriaKey"] = criteria_sort_key(metrics, config)
-        enriched["selectionStage"] = str(metrics["selectionStage"])
-        enriched["constraintState"] = str(metrics["constraintState"])
-        enriched["isConstraintSafeByCriteria"] = bool(metrics["isConstraintSafeByCriteria"])
-        enriched["isFeasibleByCriteria"] = bool(metrics["isFeasibleByCriteria"])
-        enriched["tempSpread_C"] = float(metrics["temp_spread_C"])
-        enriched["TbottomFullPower_C"] = float(metrics["bottom_temp_C"])
-        enriched["TtopFullPower_C"] = float(metrics["top_temp_C"])
-        enriched["colderNodeTemp_C"] = float(metrics["colder_node_temp_C"])
-        enriched["meanBedTemp_C"] = float(metrics["mean_bed_temp_C"])
-        enriched["heatShortfall"] = float(metrics["heat_shortfall"])
-        enriched["tempSpreadExcess_C"] = float(metrics["temp_spread_excess_C"])
-        enriched["bottomTempShortfall_C"] = float(metrics["bottom_temp_shortfall_C"])
-        enriched["topTempShortfall_C"] = float(metrics["top_temp_shortfall_C"])
-        enriched["flowPerHole_Lpm"] = float(metrics["flowPerHole_Lpm"])
-        enriched["holeVelocity_m_s"] = float(metrics["holeVelocity_m_s"])
-        enriched["waterLoss_kg_day"] = float(metrics["waterLoss_kg_day"])
-        enriched["latentEvap_W"] = float(metrics["latentEvap_W"])
-        ranked.append(enriched)
+    ranked = [enrich_point_with_metrics(pt, payload, config) for pt in source]
     ranked.sort(key=lambda pt: pt["criteriaKey"])
     return ranked
+
+
+def nsga_design_axes(points: list[dict]) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[tuple[int, int, int], dict]]:
+    pitch_values = np.array(sorted({float(pt["pitch_mm"]) for pt in points}), dtype=float)
+    voltage_values = np.array(sorted({float(pt["voltage_V"]) for pt in points}), dtype=float)
+    flow_values = np.array(sorted({float(pt["totalFlow_Lpm"]) for pt in points}), dtype=float)
+
+    pitch_index = {float(value): idx for idx, value in enumerate(pitch_values)}
+    voltage_index = {float(value): idx for idx, value in enumerate(voltage_values)}
+    flow_index = {float(value): idx for idx, value in enumerate(flow_values)}
+
+    lookup: dict[tuple[int, int, int], dict] = {}
+    for pt in points:
+        key = (
+            pitch_index[float(pt["pitch_mm"])],
+            voltage_index[float(pt["voltage_V"])],
+            flow_index[float(pt["totalFlow_Lpm"])],
+        )
+        lookup[key] = pt
+    return pitch_values, voltage_values, flow_values, lookup
+
+
+class HeatingNsgaProblem(ElementwiseProblem):
+    def __init__(self, payload: dict, config: dict, points: list[dict]):
+        self.payload = payload
+        self.config = config
+        self.pitch_values, self.voltage_values, self.flow_values, self.lookup = nsga_design_axes(points)
+        super().__init__(
+            n_var=3,
+            n_obj=len(heating_objective_order(config)),
+            n_ieq_constr=len(HEATING_NSGA_CONSTRAINT_KEYS),
+            xl=np.array([0, 0, 0]),
+            xu=np.array(
+                [
+                    max(len(self.pitch_values) - 1, 0),
+                    max(len(self.voltage_values) - 1, 0),
+                    max(len(self.flow_values) - 1, 0),
+                ]
+            ),
+            vtype=int,
+        )
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        idx = tuple(int(value) for value in np.rint(x).astype(int))
+        pt = self.lookup[idx]
+        metrics = point_metrics(pt, self.payload, self.config)
+        out["F"] = [float(metrics[name]) for name in heating_objective_order(self.config)]
+        out["G"] = [float(metrics[name]) for name in HEATING_NSGA_CONSTRAINT_KEYS]
+
+    def point_from_vector(self, x: np.ndarray) -> dict:
+        idx = tuple(int(value) for value in np.rint(x).astype(int))
+        return self.lookup[idx]
+
+
+def unique_points_by_signature(points: list[dict]) -> list[dict]:
+    seen: set[tuple[float, float, float]] = set()
+    unique: list[dict] = []
+    for pt in points:
+        signature = (
+            float(pt.get("pitch_mm", np.nan)),
+            float(pt.get("voltage_V", np.nan)),
+            float(pt.get("totalFlow_Lpm", np.nan)),
+        )
+        if signature in seen:
+            continue
+        seen.add(signature)
+        unique.append(pt)
+    return unique
+
+
+def pareto_candidates_for_points(payload: dict, config: dict, points: list[dict] | None = None) -> list[dict]:
+    source = active_design_points_array(payload) if points is None else points
+    opt_cfg = optimization_config(config)
+    if not opt_cfg.get("enabled", True) or str(opt_cfg.get("method", "nsga2")).strip().lower() != "nsga2" or not source:
+        return []
+
+    problem = HeatingNsgaProblem(payload, config, source)
+    algorithm = NSGA2(
+        pop_size=int(opt_cfg.get("population", 50)),
+        sampling=IntegerRandomSampling(),
+        crossover=SBX(prob=1.0, eta=12.0, vtype=float, repair=RoundingRepair()),
+        mutation=PM(prob=1.0 / max(problem.n_var, 1), eta=20.0, vtype=float, repair=RoundingRepair()),
+        eliminate_duplicates=True,
+    )
+    result = minimize(
+        problem,
+        algorithm,
+        ("n_gen", int(opt_cfg.get("generations", 120))),
+        seed=int(opt_cfg.get("seed", 7)),
+        verbose=False,
+    )
+
+    candidate_vectors: list[np.ndarray] = []
+    if getattr(result, "opt", None) is not None and len(result.opt) > 0:
+        candidate_vectors = list(result.opt.get("X"))
+    elif getattr(result, "X", None) is not None:
+        candidate_vectors = list(np.atleast_2d(result.X))
+
+    enriched = [enrich_point_with_metrics(problem.point_from_vector(np.asarray(vec)), payload, config) for vec in candidate_vectors]
+    feasible = [pt for pt in unique_points_by_signature(enriched) if pt.get("isFeasibleByCriteria", False)]
+    feasible.sort(key=lambda pt: pt["reportPriorityKey"])
+    return feasible
 
 
 def optimization_ranked_points(payload: dict, config: dict) -> list[dict]:
     opt_cfg = optimization_config(config)
     if not opt_cfg.get("enabled", True):
         return []
-    ranked = rank_points_by_criteria(payload, config)
-    return ranked[: int(opt_cfg.get("n_top", 10))]
+    pareto = payload.get("pareto_candidates")
+    if isinstance(pareto, list) and pareto:
+        return pareto[: int(opt_cfg.get("n_top", 10))]
+    return pareto_candidates_for_points(payload, config)[: int(opt_cfg.get("n_top", 10))]
 
 
 def matlab_top_candidates(payload: dict, config: dict, n_top: int | None = None) -> list[dict]:
     opt_cfg = optimization_config(config)
     limit = int(opt_cfg.get("top_candidate_count", 8) if n_top is None else n_top)
-    ranked = rank_points_by_criteria(payload, config)
+    pareto = payload.get("pareto_candidates")
+    if isinstance(pareto, list) and pareto:
+        return pareto[: min(limit, len(pareto))]
+    ranked = pareto_candidates_for_points(payload, config)
     return ranked[: min(limit, len(ranked))]
 
 
@@ -2552,6 +2835,8 @@ def cooling_point_metrics(pt: dict, config: dict) -> dict[str, float | str]:
     water_excess = max(0.0, water_loss - float(limits.get("maxWaterLoss_kg_day", np.inf)))
     hole_velocity = float(pt.get("holeVelocity_m_s", np.nan))
     hole_velocity_excess = max(0.0, hole_velocity - float(limits.get("maxHoleVelocity_m_s", np.inf)))
+    bottom_shortfall = max(0.0, float(opt["min_bottom_temp_C"]) - bottom)
+    top_shortfall = max(0.0, float(opt["min_top_temp_C"]) - top)
     bottom_excess = max(0.0, bottom - float(opt["max_bottom_temp_C"]))
     top_excess = max(0.0, top - float(opt["max_top_temp_C"]))
     spread_excess = max(0.0, spread - float(opt["spread_limit_C"]))
@@ -2568,6 +2853,8 @@ def cooling_point_metrics(pt: dict, config: dict) -> dict[str, float | str]:
         and pressure_excess == 0.0
         and water_excess == 0.0
         and hole_velocity_excess == 0.0
+        and bottom_shortfall == 0.0
+        and top_shortfall == 0.0
         and bottom_excess == 0.0
         and top_excess == 0.0
         and spread_excess == 0.0
@@ -2588,6 +2875,12 @@ def cooling_point_metrics(pt: dict, config: dict) -> dict[str, float | str]:
     elif hole_velocity_excess > 0.0:
         stage = "last_resort"
         state = "hole velocity"
+    elif bottom_shortfall > 0.0:
+        stage = "last_resort"
+        state = "bottom temperature"
+    elif top_shortfall > 0.0:
+        stage = "last_resort"
+        state = "top temperature"
     elif bottom_excess > 0.0:
         stage = "last_resort"
         state = "bottom temperature"
@@ -2605,6 +2898,8 @@ def cooling_point_metrics(pt: dict, config: dict) -> dict[str, float | str]:
         "pressure_drop_excess_Pa": pressure_excess,
         "water_loss_excess_kg_day": water_excess,
         "hole_velocity_excess_m_s": hole_velocity_excess,
+        "bottom_temp_shortfall_C": bottom_shortfall,
+        "top_temp_shortfall_C": top_shortfall,
         "bottom_temp_excess_C": bottom_excess,
         "top_temp_excess_C": top_excess,
         "temp_spread_excess_C": spread_excess,
@@ -3940,6 +4235,8 @@ def cooling_mode_config(config: dict) -> dict:
     opt.setdefault("enabled", True)
     opt.setdefault("top_candidate_count", 12)
     opt.setdefault("n_top", 10)
+    opt.setdefault("min_bottom_temp_C", float(model_overrides.get("bin", {}).get("minSafe_C", -np.inf)))
+    opt.setdefault("min_top_temp_C", float(model_overrides.get("bin", {}).get("minSafe_C", -np.inf)))
     opt.setdefault("max_bottom_temp_C", float(model_overrides.get("bin", {}).get("maxSafe_C", 25.0)))
     opt.setdefault("max_top_temp_C", float(model_overrides.get("bin", {}).get("maxSafe_C", 25.0)))
     opt.setdefault("spread_limit_C", float(config.get("optimization", {}).get("spread_limit_C", 10.0)))
@@ -4749,43 +5046,55 @@ def append_selection_process(lines: list[str], payload: dict, config: dict) -> N
         "water_loss_excess_kg_day": f"water-loss excess above {float(payload['limits'].get('maxWaterLoss_kg_day', np.nan)):.1f} kg/24 h",
         "bottom_temp_shortfall_C": f"bottom-temperature shortfall below {float(opt_cfg['min_bottom_temp_C']):.1f} C",
         "top_temp_shortfall_C": f"top-temperature shortfall below {float(opt_cfg['min_top_temp_C']):.1f} C",
+        "bottom_temp_excess_C": f"bottom-temperature excess above {float(opt_cfg['max_bottom_temp_C']):.1f} C",
+        "top_temp_excess_C": f"top-temperature excess above {float(opt_cfg['max_top_temp_C']):.1f} C",
         "temp_spread_excess_C": f"temperature-spread excess above {float(opt_cfg['spread_limit_C']):.1f} C",
         "heat_shortfall": "heat shortfall, expressed as max(0, dutyNeeded - 1)",
         "minus_min_bed_temp_C": "negative colder-node temperature, so warmer colder-node values rank earlier",
         "minus_mean_bed_temp_C": "negative mean bed temperature, so warmer overall bed values rank earlier",
         "power_W": "total electrical power (W)",
         "temp_spread_C": "raw bottom-top temperature spread (C)",
+        "nonpositive_heat_excess_W": "nonpositive heat-to-bed excess below zero delivered heat (W)",
+    }
+    objective_labels = {
+        "power_W": "minimize total electrical power",
+        "minus_min_bed_temp_C": "maximize the colder-node bed temperature",
+        "temp_spread_C": "minimize bottom-top bed-temperature spread",
+        "minus_mean_bed_temp_C": "maximize mean bed temperature",
+        "heat_shortfall": "minimize heating shortfall relative to the lumped requirement",
     }
 
     lines.append("")
     lines.append("Selection process:")
-    lines.append("  One consistent lexicographic rule is used everywhere in this study:")
-    lines.append("    1. Vessel-comparison recommended point selection.")
-    lines.append("    2. Top candidate ranking for the active configuration.")
-    lines.append("    3. Wire-diameter hard-safe selected point at each sampled diameter.")
-    lines.append("    4. Optimization-ranked point table.")
-    lines.append("  Step 1: compute the hard-constraint residuals listed below for every candidate point.")
-    lines.append("  Step 2: define a hard-safe point as one with zero residual for current, wire temperature,")
-    lines.append("          outlet-air temperature, pressure drop, water loss, hole velocity, bottom temperature, top temperature,")
-    lines.append("          and bottom-top spread, plus positive net heat-to-bed output.")
-    lines.append("  Step 3: if one or more hard-safe points exist, rank only those points lexicographically")
-    lines.append("          with the ordered criteria below. Inside that hard-safe set, the clean physical")
-    lines.append("          rule is: maximize the colder-node bed temperature, then minimize power, then")
-    lines.append("          minimize bottom-top spread; mean bed temperature and heat shortfall are only")
-    lines.append("          late tie-breakers.")
-    lines.append("  Step 4: if no hard-safe point exists, report no recommended design point and fall back to")
-    lines.append("          the lexicographically best available point only as a plot/reference point.")
-    lines.append("  No blended penalty score is used anywhere in the selection logic.")
+    lines.append("  Heating recommendations now use constrained NSGA-II on the existing evaluated design space.")
+    lines.append("  MATLAB still provides the physics and the full discrete candidate table; the Python layer")
+    lines.append("  then runs NSGA-II with integer decision variables on pitch, voltage, and total-flow indices.")
+    lines.append(
+        f"  NSGA-II settings                      : population {int(opt_cfg.get('population', 50))}, "
+        f"generations {int(opt_cfg.get('generations', 120))}, seed {int(opt_cfg.get('seed', 7))}"
+    )
+    lines.append("  Step 1: compute the inequality-constraint residuals listed below for every candidate point.")
+    lines.append("  Step 2: run NSGA-II with those residuals as hard constraints and the objective set listed below.")
+    lines.append("  Step 3: keep only fully feasible points on the resulting Pareto front.")
+    lines.append("  Step 4: report one design point from that feasible Pareto set using the configured")
+    lines.append("          report-priority order. If the feasible Pareto set is empty, report no recommended")
+    lines.append("          design point and retain only the best-available reference point for diagnostics.")
+    lines.append("  No weighted penalty score is used to collapse the objectives before the Pareto step.")
     lines.append("  Criteria settings:")
     lines.append(f"    spread limit                       : {float(opt_cfg['spread_limit_C']):.1f} C")
     lines.append(f"    minimum bottom temperature         : {float(opt_cfg['min_bottom_temp_C']):.1f} C")
     lines.append(f"    minimum top temperature            : {float(opt_cfg['min_top_temp_C']):.1f} C")
-    lines.append("  Hard-constraint residuals            : current, wire temperature, outlet-air temperature,")
-    lines.append("                                         pressure drop, water loss, hole-velocity excess, bottom-temperature shortfall,")
-    lines.append("                                         top-temperature shortfall, and spread excess")
-    lines.append("  Priority order:")
-    for idx, key in enumerate(opt_cfg["priority_order"], start=1):
+    lines.append(f"    maximum bottom temperature         : {float(opt_cfg['max_bottom_temp_C']):.1f} C")
+    lines.append(f"    maximum top temperature            : {float(opt_cfg['max_top_temp_C']):.1f} C")
+    lines.append("  Constraint residuals used by NSGA-II:")
+    for idx, key in enumerate(HEATING_NSGA_CONSTRAINT_KEYS, start=1):
         lines.append(f"    {idx:>2}. {priority_labels.get(key, key)}")
+    lines.append("  Objective set:")
+    for idx, key in enumerate(heating_objective_order(config), start=1):
+        lines.append(f"    {idx:>2}. {objective_labels.get(key, key)}")
+    lines.append("  Reported-design priority inside the feasible Pareto set:")
+    for idx, key in enumerate(heating_report_priority_order(config), start=1):
+        lines.append(f"    {idx:>2}. {priority_labels.get(key, objective_labels.get(key, key))}")
     lines.append("  Wire-diameter study note:")
     lines.append("    The wire plot now distinguishes hard-safe selected points from best-available")
     lines.append("    reference points. If no hard-safe point exists at a sampled diameter, the solid")
@@ -4799,15 +5108,10 @@ def append_optimization_process(lines: list[str], payload: dict, config: dict) -
 
     lines.append("")
     lines.append("Optimization process:")
-    lines.append("  The optimization table is not a separate penalty-score solver.")
-    lines.append("  It is the same lexicographic ranking applied to the active-configuration design-point list.")
-    lines.append("  Hard-safe points rank ahead of violating points. If no hard-safe points exist, the table")
-    lines.append("  reports the least-violating best-available points and labels the active failure mode.")
-    lines.append("  Clean objective inside the hard-safe set:")
-    lines.append("    1. maximize min(T_bottom, T_top)")
-    lines.append("    2. minimize total electrical power")
-    lines.append("    3. minimize |T_bottom - T_top|")
-    lines.append("    4. use mean bed temperature and heat shortfall only as late tie-breakers")
+    lines.append("  The optimization table is now the feasible NSGA-II Pareto set for the active configuration,")
+    lines.append("  ordered by the configured reported-design priority rather than by a single blended score.")
+    lines.append("  Only points that satisfy all heating constraints and meet the full heating load appear here.")
+    lines.append("  The reported design point is the first entry in that ordered feasible Pareto list.")
     lines.append("  Interpretation for a real system:")
     guidance = opt_cfg.get("real_world_guidance", [])
     if guidance:
@@ -5628,6 +5932,8 @@ def write_cooling_summary(payload: dict, config: dict, output_dir: Path) -> None
         f"dP <= {float(limits['maxPressureDrop_Pa']):.0f} Pa, "
         f"water loss <= {float(limits['maxWaterLoss_kg_day']):.1f} kg/24 h, "
         f"hole velocity <= {float(limits['maxHoleVelocity_m_s']):.2f} m/s, "
+        f"T_bottom >= {float(opt['min_bottom_temp_C']):.1f} C, "
+        f"T_top >= {float(opt['min_top_temp_C']):.1f} C, "
         f"T_bottom <= {float(opt['max_bottom_temp_C']):.1f} C, "
         f"T_top <= {float(opt['max_top_temp_C']):.1f} C, "
         f"|T_bottom - T_top| <= {float(opt['spread_limit_C']):.1f} C"
@@ -5649,7 +5955,7 @@ def write_cooling_summary(payload: dict, config: dict, output_dir: Path) -> None
         "    2. pressure drop, substrate water loss, and hole velocity remain below their configured limits;"
     )
     lines.append(
-        "    3. bottom and top bed temperatures remain below their configured summer maxima;"
+        "    3. bottom and top bed temperatures remain within their configured summer minima and maxima;"
     )
     lines.append("    4. bottom-top spread remains below the configured spread limit; and")
     lines.append("    5. net Q_to_bed is negative, so the spot-cooled airflow is actually removing heat from the bed.")
@@ -5969,7 +6275,7 @@ def write_summary(payload: dict, config: dict, output_dir: Path) -> None:
 
     write_design_point_block(
         lines,
-        "Criteria-based recommended design point:",
+        "NSGA-II reported feasible Pareto design point:",
         str(cfg["label"]),
         rec,
         effective_summary_inputs,
@@ -5994,7 +6300,7 @@ def write_summary(payload: dict, config: dict, output_dir: Path) -> None:
     if vent_entry is not None:
         write_design_point_block(
             lines,
-            "Covered-top-plus-vent criteria-based design point:",
+            "Covered-top-plus-vent NSGA-II reported design point:",
             vent_entry["label"],
             vent_entry.get("recommended", {}),
             effective_summary_inputs,
@@ -6017,9 +6323,9 @@ def write_summary(payload: dict, config: dict, output_dir: Path) -> None:
 
     lines.append("")
     if rec:
-        lines.append("Top candidate points for active configuration:")
+        lines.append("Feasible Pareto candidates for active configuration:")
     else:
-        lines.append("Top best-available candidate points for active configuration:")
+        lines.append("No feasible Pareto candidates were found; best-available active references:")
     lines.append("  pitch  V   Qtot(L/min)  Ptot(W)  Vhole  evap(kg/d)  Tair(C)  Twire(C)  Qbed(W)  duty   dP(Pa)  stage")
     for pt in top_list:
         lines.append(
@@ -6031,7 +6337,7 @@ def write_summary(payload: dict, config: dict, output_dir: Path) -> None:
 
     if optimization_list:
         lines.append("")
-        lines.append("Optimization-ranked points:")
+        lines.append("Pareto candidates ordered by reported-design priority:")
         lines.append("  pitch  V   Qtot(L/min)  Ptot(W)  Tb(C)  Tt(C)  dT(C)  Vhole  evap(kg/d)  Tair(C)  Twire(C)  duty  dP(Pa)  state")
         for pt in optimization_list:
             lines.append(
@@ -6059,19 +6365,22 @@ def write_summary(payload: dict, config: dict, output_dir: Path) -> None:
         "  Explicit thermal limits              : "
         f"T_bottom >= {float(opt_cfg['min_bottom_temp_C']):.1f} C, "
         f"T_top >= {float(opt_cfg['min_top_temp_C']):.1f} C, "
+        f"T_bottom <= {float(opt_cfg['max_bottom_temp_C']):.1f} C, "
+        f"T_top <= {float(opt_cfg['max_top_temp_C']):.1f} C, "
         f"|T_bottom - T_top| <= {float(opt_cfg['spread_limit_C']):.1f} C, "
         "Q_to_bed > 0"
     )
     lines.append("  Feasible means hard-safe plus meeting the full heating target:")
     lines.append("                                         Q_to_bed >= lumped heat-loss requirement")
     lines.append("                                         equivalently, dutyNeeded <= 1.00 at full power")
-    lines.append("  Recommended design point             : best lexicographic point among hard-safe candidates only")
-    lines.append("  Best-available reference point       : best lexicographic point in the full sweep when no hard-safe")
-    lines.append("                                         candidate exists; used for plots and fallback diagnostics")
-    lines.append("  Clean ordering inside the hard-safe set")
-    lines.append("                                         : maximize min(T_bottom, T_top), then minimize power,")
-    lines.append("                                           then minimize |T_bottom - T_top|, then break remaining")
-    lines.append("                                           ties with mean bed temperature and heat shortfall")
+    lines.append("  Recommended design point             : first feasible Pareto candidate after applying the")
+    lines.append("                                         configured report-priority order")
+    lines.append("  Best-available reference point       : best lexicographic point in the full sweep when no feasible")
+    lines.append("                                         Pareto candidate exists; used for plots and fallback diagnostics")
+    lines.append("  Pareto objectives                    : minimize power, maximize colder-node bed temperature,")
+    lines.append("                                         minimize bottom-top spread")
+    lines.append("  Report-priority order                : apply the ordered JSON priority list to the feasible")
+    lines.append("                                         Pareto candidates only")
     lines.append("  Failure categorization order         : current, wire temperature, outlet air, pressure drop,")
     lines.append("                                         water loss, hole velocity, bottom temperature, top temperature,")
     lines.append("                                         spread, then residual heat shortfall/nonpositive heat")
@@ -6133,11 +6442,14 @@ def main() -> None:
 
         payload = load_json(data_json)
         payload = apply_config_overrides(payload, config)
+        payload["selection_method"] = "nsga2"
+        payload["pareto_candidates"] = pareto_candidates_for_points(payload, config)
         active_selected = select_recommended_point(payload, config)
         payload["recommended"] = active_selected
         payload["best_available"] = select_best_available_point(payload, config)
         for item in payload.get("configuration_comparisons", []):
             pts = item.get("design_points", [])
+            item["pareto_candidates"] = pareto_candidates_for_points(payload, config, pts)
             selected = select_recommended_point(payload, config, pts)
             item["recommended"] = selected
             item["best_available"] = select_best_available_point(payload, config, pts)
@@ -6145,9 +6457,11 @@ def main() -> None:
         (output_dir / "vessel_configuration_comparison.png").unlink(missing_ok=True)
         (output_dir / "summer_spot_cooler_curves.png").unlink(missing_ok=True)
         (output_dir / "summer_evaporative_cooling_curves.png").unlink(missing_ok=True)
+        (output_dir / "heating_pareto_front.png").unlink(missing_ok=True)
         plot_constraint_maps(payload, output_dir, grid_points, curve_count)
         plot_total_current_curves(payload, output_dir, curve_count)
         plot_moisture_maps(payload, output_dir, grid_points, curve_count)
+        plot_heating_pareto_front(payload, config, output_dir)
         plot_radial_air_cooling_profile(payload, config, output_dir)
         plot_habitat_exclusion_cross_section(payload, config, output_dir)
         plot_wire_trade_study(

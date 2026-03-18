@@ -847,8 +847,8 @@ vent, or forced vent exhaust are not added as independent loss terms.
 
 \subsection{Perforation-Driven Moisture Transfer, Water Make-Up, and Computational Selection}
 
-This section documents the moisture-transfer model, the lexicographic
-optimization rule, and the numerical procedure used by the heater-design
+This section documents the moisture-transfer model, the constrained
+NSGA-II/Pareto heating-selection workflow, and the numerical procedure used by the heater-design
 code. The governing water-property relations follow the IAPWS saturation
 ancillary equations, the hole-scale convection coefficient is obtained from
 the Churchill--Bernstein crossflow correlation, and the heat--mass transfer
@@ -1611,19 +1611,25 @@ N_{\mathrm{tubes}}
 reported in $\mathrm{kg/24\,h}$. This quantity is treated as the sprinkler
 replacement requirement and is also used directly as a design constraint.
 
-\subsection{Lexicographic Optimization and Design-Point Selection}
+\subsection{Constrained NSGA-II Pareto Selection and Design-Point Reporting}
 
-The code does not use a weighted penalty function. Instead, every candidate
-operating point is assigned an ordered criteria vector and candidate points
-are compared lexicographically. Thus the first unequal component decides the
-ordering, and later criteria cannot compensate for an earlier violation.
+The MATLAB model still generates the physics by evaluating a discrete sweep of
+pitch, voltage, flow, and geometry candidates. The current standalone Python
+report layer no longer chooses the final reported heating design point by
+direct lexicographic ranking of the full sweep. Instead, it applies
+constrained NSGA-II to the already evaluated discrete candidate set and then
+reports one point from the feasible Pareto set.
 
-\subsubsection{Candidate Criteria Vector}
+\subsubsection{Candidate Objectives and Constraint Residuals}
 
-For each operating point, the code first computes the full-power two-node bed
+For each operating point, the code computes the full-power two-node bed
 temperatures $T_b$ and $T_t$, their spread
 \begin{equation}
 \Delta T_{\mathrm{bed}} = |T_b - T_t|,
+\end{equation}
+the colder-node temperature
+\begin{equation}
+T_{\mathrm{cold}} = \min(T_b,T_t),
 \end{equation}
 and the duty ratio required to meet the lumped design heat loss,
 \begin{equation}
@@ -1631,98 +1637,103 @@ and the duty ratio required to meet the lumped design heat loss,
 = \frac{Q_{\mathrm{req}}}{Q_{\mathrm{bed,total}}}.
 \end{equation}
 
-It then constructs the ordered criteria vector
+The current heating-objective vector is
 \begin{equation}
-\mathbf{C}
+\mathbf{F}
 =
 \left[
-C_1,C_2,C_3,C_4,C_5,C_6,C_7,C_8,C_9,C_{10},C_{11},C_{12},C_{13}
+P_{\mathrm{tot}},
+-T_{\mathrm{cold}},
+\Delta T_{\mathrm{bed}}
+\right],
+\end{equation}
+so the reported Pareto front minimizes total electrical power, maximizes the
+colder-node bed temperature, and minimizes bottom--top spread.
+
+The inequality-constraint residual vector is
+\begin{equation}
+\mathbf{G}
+=
+\left[
+G_1,G_2,\dots,G_{11}
 \right],
 \end{equation}
 with
 \begin{align}
-C_1 &= \max(I_{\mathrm{tot}} - I_{\max}, 0), \\
-C_2 &= \max(T_{\mathrm{wire}} - T_{\mathrm{wire,max}}, 0), \\
-C_3 &= \max(T_{\mathrm{air,out}} - T_{\mathrm{air,max}}, 0), \\
-C_4 &= \max(\Delta P - \Delta P_{\max}, 0), \\
-C_5 &= \max(\dot{m}_{\mathrm{water,day}} - \dot{m}_{\mathrm{water,max}}, 0), \\
-C_6 &= \max(T_{b,\min} - T_b, 0), \\
-C_7 &= \max(T_{t,\min} - T_t, 0), \\
-C_8 &= \max(\Delta T_{\mathrm{bed}} - \Delta T_{\max}, 0), \\
-C_9 &= -\min(T_b,T_t), \\
-C_{10} &= P_{\mathrm{tot}}, \\
-C_{11} &= \Delta T_{\mathrm{bed}}, \\
-C_{12} &= -\frac{T_b + T_t}{2}, \\
-C_{13} &= \max(\mathrm{dutyNeeded} - 1, 0).
+G_1 &= \max(I_{\mathrm{tot}} - I_{\max}, 0), \\
+G_2 &= \max(T_{\mathrm{wire}} - T_{\mathrm{wire,max}}, 0), \\
+G_3 &= \max(T_{\mathrm{air,out}} - T_{\mathrm{air,max}}, 0), \\
+G_4 &= \max(\Delta P - \Delta P_{\max}, 0), \\
+G_5 &= \max(\dot{m}_{\mathrm{water,day}} - \dot{m}_{\mathrm{water,max}}, 0), \\
+G_6 &= \max(u_{\mathrm{hole}} - u_{\mathrm{hole,max}}, 0), \\
+G_7 &= \max(T_{b,\min} - T_b, 0), \\
+G_8 &= \max(T_{t,\min} - T_t, 0), \\
+G_9 &= \max(\Delta T_{\mathrm{bed}} - \Delta T_{\max}, 0), \\
+G_{10} &= \max(\mathrm{dutyNeeded} - 1, 0), \\
+G_{11} &= \max(-Q_{\mathrm{bed,total}}, 0).
 \end{align}
 
-The first eight entries are hard-constraint residuals. If any of them is
-positive, the point is not hard-safe. Among hard-safe points, the clean
-selection rule is therefore:
+Thus a feasible heating point is one for which every component of
+$\mathbf{G}$ is zero. In particular, the reported design point must satisfy
+the current, wire-temperature, outlet-air, pressure-drop, water-loss,
+hole-velocity, bottom-temperature, top-temperature, spread, and full-load
+heating requirements simultaneously.
+
+\subsubsection{NSGA-II on the Discrete Candidate Grid}
+
+The current implementation uses NSGA-II through \texttt{pymoo}, but it does
+not replace the underlying physics solve. Instead, the algorithm operates on
+integer-valued indices into the already evaluated discrete pitch, voltage, and
+flow arrays. The present default population size in the JSON configuration is
+\begin{equation}
+N_{\mathrm{pop}} = 50.
+\end{equation}
+
+This choice preserves the rigor of the full MATLAB candidate evaluation while
+replacing the old single-score final-selection step with a proper
+multiobjective feasible-Pareto search.
+
+\subsubsection{Reported Design Point from the Feasible Pareto Set}
+
+NSGA-II returns a feasible Pareto candidate set in the objective space above.
+The standalone summary and report then choose one displayed design point from
+that feasible Pareto set by a user-configurable report-priority order. In the
+current default configuration, the reported-point ordering is:
 \begin{enumerate}
-\item maximize the colder-node temperature $\min(T_b,T_t)$;
+\item maximize the colder-node temperature $T_{\mathrm{cold}}$;
 \item minimize total electrical power $P_{\mathrm{tot}}$;
-\item minimize bottom--top spread $\Delta T_{\mathrm{bed}}$; and
-\item use mean bed temperature and residual heat shortfall only as late
-      tie-breakers.
+\item minimize bottom--top spread $\Delta T_{\mathrm{bed}}$;
+\item use mean bed temperature only as a later tie-breaker; and
+\item use residual heat shortfall only as a final tie-breaker.
 \end{enumerate}
-This ordering is more physically transparent than a weighted score because it
-states directly which tradeoffs are acceptable and in what order.
 
-\subsubsection{Formal Lexicographic Rule}
+Accordingly, the reported design point is \emph{not} an arbitrary weighted
+sum. It is the first point in the feasible Pareto set after applying the
+configured report-priority order.
 
-Given two candidate points $A$ and $B$ with criteria vectors
-$\mathbf{C}^{(A)}$ and $\mathbf{C}^{(B)}$, point $A$ is preferred if there
-exists an index $k$ such that
-\begin{equation}
-C^{(A)}_j = C^{(B)}_j \quad \text{for all } j < k,
-\end{equation}
-and
-\begin{equation}
-C^{(A)}_k < C^{(B)}_k.
-\end{equation}
-This is exactly the row-wise ordering used by the implementation.
+\subsubsection{Fallback Reference Point}
 
-\subsubsection{Feasible, Fallback, and Last-Resort Classifications}
+If no fully feasible Pareto point exists, the code reports no recommended
+heating design point. In that case, it retains a best-available reference
+point only for diagnostic plots and fallback summaries. That fallback point is
+still based on a lexicographic least-violation ranking of the full sweep, so
+the user can see which constraint is blocking feasibility without falsely
+presenting an infeasible point as a final recommendation.
 
-The code additionally labels each point by its logical stage:
+\subsubsection{Where the Pareto Workflow Is Used}
+
+The constrained-NSGA-II heating workflow now drives:
 \begin{enumerate}
-\item \textbf{Feasible:} all explicit constraints are satisfied and
-      $\mathrm{dutyNeeded} \le 1$.
-\item \textbf{Fallback:} all hard constraints are satisfied and
-      $Q_{\mathrm{bed,total}} > 0$, but the full heating target is not met.
-\item \textbf{Last resort:} one or more explicit constraints are violated,
-      or the net delivered heat is non-positive.
+\item the reported recommended point for the active vessel configuration;
+\item the configuration-specific recommended point shown in the vessel
+      comparison table; and
+\item the active-configuration Pareto-candidate table and Pareto-front plot.
 \end{enumerate}
-These labels are descriptive only. The actual selection still uses the full
-lexicographic criteria vector above. Thus the recommended point is always the
-best hard-safe point if one exists, even when no fully feasible point exists.
-Separately, the report also carries a configurable duty-reference value
-\texttt{model\_overrides.sweep.targetDuty}. This quantity does \emph{not}
-change the hard-feasibility definition above; instead it controls the
-reported line ``minimum total flow at \ldots duty'' and the summary note about
-whether the selected point can meet that user-specified partial-duty target.
-In the current configuration this report-only duty reference is set to
-$0.75$, i.e. $75\%$ duty.
-The editable geometry/material blocks that change the underlying exported
-physics are \texttt{model\_overrides.bin\_wall},
-\texttt{model\_overrides.heater\_tube}, \texttt{model\_overrides.aeration},
-and \texttt{model\_overrides.heaterTube}; the corresponding
-\texttt{summary\_inputs} entries are fallback report text only.
 
-\subsubsection{Where the Same Rule Is Used}
-
-The exact same comparison rule is applied in four places:
-\begin{enumerate}
-\item selection of the reported recommended point for each vessel
-      configuration;
-\item ranking of the top candidate points for the active configuration;
-\item selection of the single representative point at each sampled wire
-      diameter in the wire-diameter study; and
-\item generation of the optimization-ranked table.
-\end{enumerate}
-Hence the report contains one internally consistent ordering principle rather
-than separate weighted objectives for different figures.
+The report-only duty-reference value
+\texttt{model\_overrides.sweep.targetDuty} is still retained, but it remains a
+display aid for the minimum-flow duty line rather than a replacement for the
+full-feasibility condition above.
 
 \subsection{Numerical Procedure}
 
@@ -2292,7 +2303,11 @@ heater sweep to operate at $V=0$.
 
 The current workflow uses a shared configuration file,
 \texttt{study\_config.json}, to control both the MATLAB export inputs and the
-standalone Python reporting logic.
+standalone Python reporting logic. In the current layout, the main study and
+output controls appear first, the heater-side export inputs are grouped under
+\texttt{model\_overrides} together with the heating \texttt{optimization}
+block, and the cooler-only inputs are grouped later under
+\texttt{cooling\_mode}.
 
 \subsubsection{Model Overrides That Change the Physics}
 
@@ -2308,8 +2323,8 @@ groups are:
 \item \texttt{model\_overrides.limits}, which defines explicit limits such as
       maximum current, wire temperature, outlet-air temperature, pressure
       drop, and water loss;
-\item \texttt{model\_overrides.optimization}, which defines the MATLAB-side
-      lexicographic thermal thresholds such as maximum bottom--top spread and
+\item \texttt{model\_overrides.optimization}, which defines the heating-side
+      thermal feasibility thresholds such as maximum bottom--top spread and
       minimum bottom and top temperatures;
 \item \texttt{model\_overrides.environment}, which exposes the shared heating
       ambient temperature, ambient pressure, and reference plate length used
@@ -2382,8 +2397,8 @@ signature changes.
 \subsubsection{Standalone Ranking and Reporting Controls}
 
 At the top level of the same JSON file, the \texttt{optimization} block
-controls the standalone Python lexicographic ranking and report display, and
-the \texttt{radial\_profile} block controls the standalone worm-safe-distance
+controls the standalone Python NSGA-II / Pareto heating-selection workflow
+and the reported-design priority order, while the \texttt{radial\_profile} block controls the standalone worm-safe-distance
 plot. The \texttt{tube\_layout} block controls the standalone cross-sectional
 tube-placement, spacing, and overlap-aware worm-habitat exclusion-volume
 calculation. The same file also now contains \texttt{run\_modes}, which
@@ -2393,8 +2408,14 @@ standalone summer airflow-only branch, together with the corresponding
 retained only as a backward-compatible fallback if \texttt{run\_modes} is
 omitted. In particular:
 \begin{itemize}
-\item \texttt{priority\_order} sets the ordering of the lexicographic
-      criteria used in the standalone report;
+\item \texttt{method}, \texttt{population}, \texttt{generations}, and
+      \texttt{seed} define the standalone heating NSGA-II settings;
+\item \texttt{objectives} defines the heating objective vector used to build
+      the feasible Pareto set;
+\item \texttt{report\_priority\_order} defines how one displayed heating
+      design point is selected from that feasible Pareto set;
+\item \texttt{priority\_order} is retained for best-available fallback
+      ranking and diagnostics when no feasible Pareto point exists;
 \item \texttt{spread\_limit\_C}, \texttt{min\_bottom\_temp\_C}, and
       \texttt{min\_top\_temp\_C} set the corresponding displayed thermal
       thresholds; and

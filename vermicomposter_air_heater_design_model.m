@@ -45,7 +45,7 @@ function results = vermicomposter_air_heater_design_model(varargin)
 params = defaultParams();
 
 %% USER INPUTS - edit these first
-params.environment.greenhouseAir_C = -15;
+params.environment.greenhouseAir_C = -10;
 params.bin.setpoint_C = 20;
 params.bin.minSafe_C = 15;
 params.bin.maxSafe_C = 25;
@@ -72,7 +72,7 @@ params.heaterTube.manualWireLength_m = NaN;
 params.aeration.ID_m = 0.040;
 params.aeration.OD_m = 0.044;
 params.aeration.length_m = params.bin.length_m;
-params.aeration.nParallelTubes = 4;
+params.aeration.nParallelTubes = 12;
 
 params.wire.gauge = '31 AWG';
 params.wire.diameter_m = 2.27e-4;
@@ -101,7 +101,7 @@ params.sweep.tradeStudyFlowPointCount = 100;
 
 params.limits.maxTotalCurrent_A = 15;
 params.limits.maxWireTemp_C = 300;
-params.limits.maxAirOutletTemp_C = 30;
+params.limits.maxAirOutletTemp_C = 75;
 params.limits.maxPressureDrop_Pa = 1500;
 params.limits.maxWaterLoss_kg_day = 5;
 params.limits.maxHoleVelocity_m_s = 10;
@@ -610,7 +610,7 @@ function params = defaultParams()
 params = struct();
 
 params.environment = struct();
-params.environment.greenhouseAir_C = -15;
+params.environment.greenhouseAir_C = -10;
 params.environment.pressure_Pa = 101325;
 params.environment.referencePlateLength_m = 0.61;
 
@@ -662,7 +662,7 @@ params.aeration.segments = 40;
 params.aeration.bedH_W_m2K = 8;
 params.aeration.releaseFraction = 0.95;
 params.aeration.endMinorK = 1.0;
-params.aeration.nParallelTubes = 4;
+params.aeration.nParallelTubes = 12;
 params.aeration.headerEnabled = true;
 params.aeration.headerID_m = 0.050;
 params.aeration.headerMinorK = 1.0;
@@ -696,7 +696,7 @@ params.sweep.tradeStudyFlowPointCount = 100;
 params.limits = struct();
 params.limits.maxTotalCurrent_A = 15;
 params.limits.maxWireTemp_C = 300;
-params.limits.maxAirOutletTemp_C = 30;
+params.limits.maxAirOutletTemp_C = 75;
 params.limits.maxPressureDrop_Pa = 1500;
 params.limits.maxWaterLoss_kg_day = 5;
 params.limits.maxHoleVelocity_m_s = 10;
