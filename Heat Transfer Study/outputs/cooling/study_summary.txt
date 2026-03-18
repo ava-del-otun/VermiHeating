@@ -111,9 +111,9 @@ Radial air-cooling profile:
   Base sensible coefficient            : 8.00 W/m^2-K
   Mean latent coefficient              : 0.00 W/m^2-K
   Mean combined sink coefficient       : 8.00 W/m^2-K
-  Released mass flow per tube length   : 0.005888 kg/s-m
-  Initial / final plume RH             : 8.5% -> 8.5%
-  Initial / final vapor density        : 0.0019 -> 0.0019 kg/m^3
+  Released mass flow per tube length   : 0.006002 kg/s-m
+  Initial / final plume RH             : 5.8% -> 5.8%
+  Initial / final vapor density        : 0.0013 -> 0.0013 kg/m^3
   Integrated radial sensible / latent  : 0.00 W and 0.00 W
   Safe distance result                 : 0.0 mm because the selected outlet temperature is already
                                          at or below the 26.0 C threshold

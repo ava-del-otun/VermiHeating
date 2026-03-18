@@ -23,15 +23,15 @@ Allocated annual heat-wave days     : 15
 Daily power evaluation              : Heating and cooling electricity are computed from ambient-specific daily reevaluation of the selected operating points, not from fixed -15 C or 37.5 C reference power values.
 
 Reference operating points:
-  Heating reference (design point)  : 553.2 W electric, 123.7 W to bed
+  Heating reference (design point)  : 1038.1 W electric, 139.5 W to bed
   Cooling reference (design point)  : 1461.8 W electric, 38.0 W cooling to bed
 
 Annual totals:
-  Heating electricity               : 953.9 kWh
+  Heating electricity               : 1092.5 kWh
   Cooling electricity               : 546.5 kWh
-  Total electricity                 : 1500.4 kWh
-  Annual operating cost             : 431.36 USD
-  Annual water replacement          : 476.0 kg
+  Total electricity                 : 1639.0 kWh
+  Annual operating cost             : 471.21 USD
+  Annual water replacement          : 627.1 kg
   Annual unmet-load equivalent      : 0.0 kWh-equivalent
 
 Monthly climate/event table:
@@ -51,16 +51,16 @@ Monthly climate/event table:
 
 Monthly operating table:
   Month  Tbottom,mean  Ttop,mean  Tbottom,min  Ttop,max  Duty,mean  Duty,peak  Eheat(kWh)  Ecool(kWh)  Cost(USD)  Water(kg)  Unmet,peak(W)
-  Jan         23.40      20.60        23.30     20.70      0.496      0.505       204.1         0.0      58.69     105.19           0.0
-  Feb         23.31      20.69        23.17     20.84      0.438      0.448       162.6         0.0      46.76      83.55           0.0
-  Mar         23.10      20.90        22.90     21.10      0.318      0.345       130.5         0.0      37.53      65.42           0.0
-  Apr         22.78      21.22        22.58     21.42      0.179      0.259        71.3         0.0      20.50      32.58           0.0
-  May         22.41      21.59        22.27     21.73      0.073      0.112        30.0         0.0       8.62      10.79           0.0
-  Jun         21.89      21.71        19.61     21.96      0.085      0.662         7.3        69.5      22.09       2.99           0.0
-  Jul         20.29      20.62        19.60     22.00      0.296      0.679         0.2       320.4      92.16       5.24           0.0
-  Aug         21.11      21.21        19.63     22.00      0.148      0.637         1.7       156.5      45.49       2.87           0.0
-  Sep         22.23      21.77        22.11     21.89      0.036      0.062        14.2         0.0       4.08       4.11           0.0
-  Oct         22.57      21.43        22.38     21.62      0.115      0.236        47.0         0.0      13.53      19.39           0.0
-  Nov         23.01      20.99        22.75     21.25      0.276      0.314       109.7         0.0      31.53      54.00           0.0
-  Dec         23.29      20.71        23.09     20.91      0.426      0.439       175.2         0.0      50.38      89.92           0.0
+  Jan         23.40      20.60        23.30     20.70      0.320      0.326       246.7         0.0      70.92     149.02           0.0
+  Feb         23.31      20.69        23.17     20.84      0.276      0.283       192.1         0.0      55.24     114.89           0.0
+  Mar         23.10      20.90        22.90     21.10      0.191      0.209       147.2         0.0      42.31      84.35           0.0
+  Apr         22.78      21.22        22.58     21.42      0.102      0.151        76.0         0.0      21.84      38.63           0.0
+  May         22.41      21.59        22.27     21.73      0.040      0.061        30.5         0.0       8.77      11.72           0.0
+  Jun         21.89      21.71        19.61     21.96      0.076      0.662         7.3        69.5      22.09       3.06           0.0
+  Jul         20.29      20.62        19.60     22.00      0.295      0.679         0.2       320.4      92.16       5.24           0.0
+  Aug         21.11      21.21        19.63     22.00      0.146      0.637         1.7       156.5      45.49       2.88           0.0
+  Sep         22.23      21.77        22.11     21.89      0.019      0.033        14.2         0.0       4.09       4.32           0.0
+  Oct         22.57      21.43        22.38     21.62      0.063      0.137        48.8         0.0      14.04      21.98           0.0
+  Nov         23.01      20.99        22.75     21.25      0.163      0.188       121.7         0.0      34.99      68.08           0.0
+  Dec         23.29      20.71        23.09     20.91      0.267      0.277       206.2         0.0      59.27     122.94           0.0
 ============================================================

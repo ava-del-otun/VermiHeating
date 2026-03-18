@@ -2923,7 +2923,22 @@ def cooling_point_metrics(pt: dict, config: dict) -> dict[str, float | str]:
 
 
 def cooling_criteria_sort_key(metrics: dict[str, float | str], config: dict) -> tuple[float, ...]:
-    return tuple(float(metrics.get(name, np.inf)) for name in cooling_mode_config(config)["optimization"]["priority_order"])
+    alias_map = {
+        "water_supply_excess_kg_day": "water_loss_excess_kg_day",
+        "water_supply_kg_day": "waterLoss_kg_day",
+    }
+    order = cooling_mode_config(config)["optimization"]["priority_order"]
+    resolved: list[float] = []
+    for name in order:
+        primary = str(name)
+        secondary = alias_map.get(primary)
+        if primary in metrics:
+            resolved.append(float(metrics[primary]))
+        elif secondary is not None and secondary in metrics:
+            resolved.append(float(metrics[secondary]))
+        else:
+            resolved.append(np.inf)
+    return tuple(resolved)
 
 
 def rank_cooling_points(payload: dict, config: dict, points: list[dict] | None = None) -> list[dict]:
@@ -5177,6 +5192,7 @@ def append_no_feasible_pareto_diagnostics(
     best = ranked_points[0]
     best_metrics = point_metrics(best, payload, config)
     total_points = len(ranked_points)
+    exact_feasible = [pt for pt in ranked_points if bool(pt.get("isFeasibleByCriteria", False))]
     counts = {key: 0 for key in HEATING_NSGA_CONSTRAINT_KEYS}
     minima: dict[str, tuple[float, dict]] = {}
 
@@ -5198,6 +5214,18 @@ def append_no_feasible_pareto_diagnostics(
 
     lines.append("")
     lines.append("No-feasible-Pareto diagnostics:")
+    if exact_feasible:
+        exact_sorted = sorted(exact_feasible, key=lambda pt: pt.get("reportPriorityKey", (np.inf,)))
+        exact_best = exact_sorted[0]
+        lines.append(
+            f"  NSGA-II returned no feasible Pareto candidates, but the evaluated sweep contains {len(exact_feasible)}"
+            " exact feasible point(s)."
+        )
+        lines.append(
+            f"  Best exact feasible sweep point      : pitch {float(exact_best['pitch_mm']):.1f} mm, "
+            f"V {float(exact_best['voltage_V']):.1f}, flow {float(exact_best['totalFlow_Lpm']):.1f} L/min, "
+            f"power {float(exact_best['totalPower_W']):.1f} W"
+        )
     if violated_best:
         lines.append("  Best-available active reference violates:")
         for key, value in violated_best:
@@ -6146,8 +6174,13 @@ def write_summary(payload: dict, config: dict, output_dir: Path) -> None:
     feasible_count = sum(1 for pt in ranked_points if pt.get("selectionStage") == "feasible")
     top_n = int(opt_cfg.get("top_candidate_count", 8))
     top_list = matlab_top_candidates(payload, config, top_n)
+    exact_feasible = [pt for pt in ranked_points if bool(pt.get("isFeasibleByCriteria", False))]
     if not rec and not top_list:
-        top_list = ranked_points[: min(top_n, len(ranked_points))]
+        if exact_feasible:
+            exact_feasible.sort(key=lambda pt: pt.get("reportPriorityKey", (np.inf,)))
+            top_list = exact_feasible[: min(top_n, len(exact_feasible))]
+        else:
+            top_list = ranked_points[: min(top_n, len(ranked_points))]
     optimization_list = optimization_ranked_points(payload, config)
     consistency_warnings = export_consistency_warnings(payload, config)
 
