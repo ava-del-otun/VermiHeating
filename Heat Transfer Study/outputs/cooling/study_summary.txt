@@ -33,21 +33,54 @@ External natural-convection h estimate     : 3.89 W/m^2-K
 Lumped time constant                       : 134.2 h
 Lumped Biot number estimate                : 1.19
 Hard-safe cooling points found             : 0 of 60
+Feasible cooling Pareto points found       : 0 of 60
 
 Summer cooling selection process:
-  Hard-safe means all of the following hold simultaneously:
+  Cooling recommendations now use constrained NSGA-II on the evaluated summer airflow sweep.
+  NSGA-II settings                      : population 50, generations 200, seed 7
+  Step 1: compute the inequality-constraint residuals listed below for every sampled flow point.
+  Step 2: run NSGA-II with those residuals as hard constraints and the objective set listed below.
+  Step 3: keep only fully summer-hard-safe points on the resulting Pareto front.
+  Step 4: report one design point from that feasible Pareto set using the configured cooling report-priority order.
+  No weighted penalty score is used.
+  Summer hard-safe means all of the following hold simultaneously:
     1. the predicted network pressure drop stays below the assist-blower available static pressure at that airflow;
     2. pressure drop, substrate water loss, and hole velocity remain below their configured limits;
     3. bottom and top bed temperatures remain within their configured summer minima and maxima;
     4. bottom-top spread remains below the configured spread limit; and
     5. net Q_to_bed is negative, so the spot-cooled airflow is actually removing heat from the bed.
-  Clean ordering inside the hard-safe set:
-    1. minimize max(T_bottom, T_top)
-    2. minimize mean bed temperature
-    3. minimize total cooling-system electric power
-    4. minimize total airflow
-    5. minimize bottom-top spread
-  No weighted penalty score is used.
+  Constraint residuals used by NSGA-II:
+     1. assist_blower_pressure_excess_Pa
+     2. pressure_drop_excess_Pa
+     3. water_loss_excess_kg_day
+     4. hole_velocity_excess_m_s
+     5. bottom_temp_shortfall_C
+     6. top_temp_shortfall_C
+     7. bottom_temp_excess_C
+     8. top_temp_excess_C
+     9. temp_spread_excess_C
+    10. nonpositive_cooling_excess_W
+  Objective set:
+     1. max_bed_temp_C
+     2. mean_bed_temp_C
+     3. combined_cooling_power_W
+  Reported-design priority inside the feasible Pareto set:
+     1. max_bed_temp_C
+     2. mean_bed_temp_C
+     3. combined_cooling_power_W
+     4. totalFlow_Lpm
+     5. temp_spread_C
+     6. minus_cooling_capacity_W
+  No summer-hard-safe Pareto point exists in the current sweep; the fallback diagnostics below use the best-available ranked sample.
+
+No-feasible-Pareto diagnostics:
+  Best-available summer reference violates:
+    - bottom temperature above 24.0 C: 2.090 C
+    - top temperature above 24.0 C: 3.328 C
+  Closest misses across the full evaluated summer airflow sweep:
+    - assist-blower available static below network pressure drop: closest miss 26.739 Pa; violated by 2 / 60 points; nearest point at flow 4129.5 L/min
+    - bottom temperature above 24.0 C: closest miss 1.996 C; violated by 60 / 60 points; nearest point at flow 4200.0 L/min
+    - top temperature above 24.0 C: closest miss 3.244 C; violated by 60 / 60 points; nearest point at flow 4200.0 L/min
 
 Perforation and moisture process:
   Per-hole release and moisture loss are evaluated explicitly for the aeration tubes.
@@ -144,7 +177,7 @@ Tube layout and worm-habitat exclusion:
                                          aeration-tube length to obtain volume; the final unsafe union
                                          includes both plume exclusion cylinders and 1D wall-return bands
 
-Criteria-based summer cooling point:
+NSGA-II reported feasible Pareto cooling point:
   Result                             : no hard-constraint-safe summer cooling point found in the current sweep
 
 Best-available summer reference point:
@@ -206,17 +239,4 @@ Top best-available summer cooling candidates:
       2155.3       28.1     29.1    1.0         25.2       31.4        0.51     576.3     192.1    1100.0   1.39   115.8  bottom temperature
       2084.7       28.2     29.2    1.0         25.3       30.9        0.50     557.4     185.8    1100.0   1.35   108.3  bottom temperature
       2014.2       28.3     29.3    1.0         25.4       30.5        0.50     538.6     179.5    1100.0   1.30   101.1  bottom temperature
-
-Optimization-ranked summer points:
-  Qtot(L/min)  Tmax(C)  Tmean(C)  dT(C)  cooling(W)  water(kg/d)  Pcool(W)  dP(Pa)  state
-      4059.0     27.3      26.7    1.2       38.0        0.63    1461.8   410.4  bottom temperature
-      3988.5     27.4      26.8    1.2       37.8        0.63    1455.5   396.3  bottom temperature
-      3918.0     27.4      26.8    1.2       37.6        0.62    1449.2   382.4  bottom temperature
-      3847.5     27.5      26.9    1.2       37.4        0.62    1442.9   368.8  bottom temperature
-      3776.9     27.5      26.9    1.2       37.3        0.62    1436.6   355.4  bottom temperature
-      3706.4     27.5      26.9    1.2       37.1        0.62    1430.4   342.3  bottom temperature
-      3635.9     27.6      27.0    1.2       36.9        0.61    1424.1   329.4  bottom temperature
-      3565.4     27.7      27.1    1.2       36.7        0.61    1417.8   316.7  bottom temperature
-      3494.9     27.7      27.1    1.2       36.5        0.60    1411.5   304.3  bottom temperature
-      3424.4     27.8      27.2    1.2       36.3        0.60    1405.2   292.2  bottom temperature
 ============================================================

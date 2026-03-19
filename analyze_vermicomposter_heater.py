@@ -239,7 +239,20 @@ def normalize_matlab_parallel_config(parallel_cfg: dict) -> dict:
         out["workers"] = int(out["workers"])
     if "autoStartPool" in out:
         out["autoStartPool"] = bool(out["autoStartPool"])
+    loops = dict(out.get("loops", {}))
+    loops.setdefault("exportSweepRowsParfor", bool(out.get("enabled", False)))
+    out["loops"] = loops
+    out["enabled"] = bool(out.get("enabled", False)) and bool(loops.get("exportSweepRowsParfor", True))
     return out
+
+
+def matlab_parallel_config(study_config: dict) -> dict:
+    grouped = study_config.get("parallel", {})
+    if isinstance(grouped, dict):
+        raw = grouped.get("matlab", study_config.get("matlab_parallel", {}))
+    else:
+        raw = study_config.get("matlab_parallel", {})
+    return normalize_matlab_parallel_config(raw)
 
 
 def matlab_literal(value) -> str:
@@ -1037,7 +1050,7 @@ def main() -> None:
     study_config_path = args.study_config.resolve() if args.study_config is not None else None
     study_config = load_json(study_config_path)
     study_overrides = normalize_model_overrides_for_matlab(study_config.get("model_overrides", {}))
-    matlab_parallel = normalize_matlab_parallel_config(study_config.get("matlab_parallel", {}))
+    matlab_parallel = matlab_parallel_config(study_config)
     export_json = export_results_json(
         matlab_exe, output_dir, args.model_grid_points, study_overrides, matlab_parallel
     )

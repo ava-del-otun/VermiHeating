@@ -1,0 +1,195 @@
+\documentclass[11pt]{article}
+    \usepackage[margin=1in]{geometry}
+    \usepackage[T1]{fontenc}
+    \usepackage[utf8]{inputenc}
+    \usepackage{amsmath,amssymb,booktabs,longtable,array,siunitx,enumitem,hyperref,xurl}
+    \hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+    \setlist{nosep}
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{0.4em}
+    \newcommand{\srcref}[1]{\texttt{\detokenize{#1}}}
+    \newcommand{\filepath}[1]{\texttt{\detokenize{#1}}}
+    \newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+    \title{Executed File Documentation: vermicomposter_air_heater_design_model.m}
+    \date{Generated 2026-03-19}
+    \begin{document}
+    \maketitle
+    \begin{tabular}{p{0.27\textwidth}p{0.67\textwidth}}
+\toprule
+Field & Value \\
+\midrule
+Repository-relative path & \filepath{vermicomposter_air_heater_design_model.m} \\
+Language & MATLAB \\
+Classification & MATLAB source/model \\
+Invocation mechanism & called from the generated MATLAB helper template \srcref{analyze_vermicomposter_heater.py:L270-L604}; also callable directly in MATLAB \srcref{vermicomposter_air_heater_design_model.m:L1-L149} \\
+Upstream caller(s) & generated runtime MATLAB helper or direct MATLAB users \\
+Downstream callees / dependencies & no other repository \code{.m} files are invoked; all helper routines live inside this file \srcref{vermicomposter_air_heater_design_model.m:L150-L3046} \\
+Execution conditions & only reachable from the audited root path when the export helper successfully launches MATLAB \\
+Verification status & verified directly from source \\
+\bottomrule
+\end{tabular}
+\section{Overview}
+This file is the authoritative heating-side reduced-order model. It owns the electrical topology, the heater and aeration transport solves, the evaporation and pressure-loss closures, the bin-loss model, the configuration-comparison logic, and the MATLAB-native reporting layer \srcref{vermicomposter_air_heater_design_model.m:L1-L3046}.
+\section{Invocation context}
+called from the generated MATLAB helper template \srcref{analyze_vermicomposter_heater.py:L270-L604}; also callable directly in MATLAB \srcref{vermicomposter_air_heater_design_model.m:L1-L149}
+\section{File-level responsibilities}
+\begin{itemize}[leftmargin=*]
+\item define the full MATLAB heating parameter schema and literature/source map \srcref{vermicomposter_air_heater_design_model.m:L1-L149}; \srcref{vermicomposter_air_heater_design_model.m:L609-L745}
+\item evaluate the operating sweep and targeted trade-study subsets \srcref{vermicomposter_air_heater_design_model.m:L1172-L1476}
+\item solve electrical loading, heater transport, aeration transport, evaporation, and two-node bed response \srcref{vermicomposter_air_heater_design_model.m:L1477-L2411}
+\item print summaries and create MATLAB figures when enabled \srcref{vermicomposter_air_heater_design_model.m:L2412-L3046}
+\end{itemize}
+\section{Runtime inputs}
+\begin{itemize}[leftmargin=*]
+\item optional override struct from the caller \srcref{vermicomposter_air_heater_design_model.m:L130-L145}
+\item internal user defaults declared near the top of the file \srcref{vermicomposter_air_heater_design_model.m:L40-L128}
+\item parallel runtime settings when enabled \srcref{vermicomposter_air_heater_design_model.m:L90-L94}; \srcref{vermicomposter_air_heater_design_model.m:L1364-L1406}
+\end{itemize}
+\section{Runtime outputs}
+\begin{itemize}[leftmargin=*]
+\item top-level \code{results} struct \srcref{vermicomposter_air_heater_design_model.m:L150-L221}
+\item optional MATLAB console summary \srcref{vermicomposter_air_heater_design_model.m:L2412-L2627}
+\item optional MATLAB figures \srcref{vermicomposter_air_heater_design_model.m:L2688-L3046}
+\item optional base-workspace variable \code{vermiHeaterResults} \srcref{vermicomposter_air_heater_design_model.m:L145-L149}
+\end{itemize}
+\section{External side effects}
+\begin{itemize}[leftmargin=*]
+\item may start a MATLAB parallel pool \srcref{vermicomposter_air_heater_design_model.m:L1377-L1406}
+\item may print detailed console output \srcref{vermicomposter_air_heater_design_model.m:L2412-L2627}
+\item may create MATLAB figures \srcref{vermicomposter_air_heater_design_model.m:L2688-L3046}
+\end{itemize}
+\section{Segment-by-segment walkthrough}
+\subsection*{Segment 1: defaults, overrides, and dispatch}
+\begin{description}[style=nextline,leftmargin=2.8cm,labelwidth=2.5cm]
+\item[Source range] \srcref{vermicomposter_air_heater_design_model.m:L1-L149}
+\item[What it does] Defines the repository-native source map [R1]-[R12], user defaults, override merge, derived-parameter finalization, and the top-level run/print/plot dispatch \srcref{vermicomposter_air_heater_design_model.m:L1-L149}.
+\item[Why it exists] This is both the callable API and the interactive MATLAB front-end.
+\item[Key inputs] user defaults and optional override struct
+\item[Key outputs] finalized \code{params} and top-level \code{results}
+\item[Side effects] may print, plot, and assign to base workspace
+\item[Assumptions] overrides are assumed schema-compatible after Python-side normalization
+\item[Edge cases] bad overrides can fail only after deeper evaluation
+\item[Downstream use] feeds all later kernels
+\end{description}
+\subsection*{Segment 2: scenario orchestration and trade studies}
+\begin{description}[style=nextline,leftmargin=2.8cm,labelwidth=2.5cm]
+\item[Source range] \srcref{vermicomposter_air_heater_design_model.m:L150-L608}
+\item[What it does] Runs the operating sweep, builds the active scenario, evaluates top-configuration comparisons, constructs geometry trade studies, and provides MATLAB-side lexicographic selection helpers \srcref{vermicomposter_air_heater_design_model.m:L150-L608}.
+\item[Why it exists] This organizes the expensive sweep and the cheaper post-processing comparisons.
+\item[Key inputs] finalized parameter struct
+\item[Key outputs] active scenario, comparisons, and trade-study arrays
+\item[Side effects] none beyond returned structs
+\item[Assumptions] MATLAB-side recommendation remains lexicographic even though the root Python runner now uses NSGA-II
+\item[Edge cases] possible divergence between MATLAB-reported and Python-reported recommendation
+\item[Downstream use] feeds export JSON and MATLAB summaries
+\end{description}
+\subsection*{Segment 3: derived parameters, wetted area, and bin/loss model}
+\begin{description}[style=nextline,leftmargin=2.8cm,labelwidth=2.5cm]
+\item[Source range] \srcref{vermicomposter_air_heater_design_model.m:L609-L1171}
+\item[What it does] Defines the canonical parameter schema, derives electrical stringing and wetted-area fields, builds the bin heat-loss model, and computes the lumped heating requirement and minimum-flow estimate \srcref{vermicomposter_air_heater_design_model.m:L609-L1171}.
+\item[Why it exists] Later kernels assume the parameter struct already contains consistent derived fields.
+\item[Key inputs] user defaults and overrides
+\item[Key outputs] derived \code{params}, \code{binModel}, and \code{lumpedLoss}
+\item[Side effects] none
+\item[Assumptions] the vented-cover top mode is a repository-specific mixed covered/open extension
+\item[Edge cases] Biot validation only flags strict lumped validity; it does not disable the lumped sizing model
+\item[Downstream use] feeds sweep evaluation and summaries
+\end{description}
+\subsection*{Segment 4: sweep engine and parallelization}
+\begin{description}[style=nextline,leftmargin=2.8cm,labelwidth=2.5cm]
+\item[Source range] \srcref{vermicomposter_air_heater_design_model.m:L1172-L1476}
+\item[What it does] Creates the main and targeted sweeps, optionally runs row groups through \code{parfor}, and preserves voltage-order warm starts within each row \srcref{vermicomposter_air_heater_design_model.m:L1172-L1476}.
+\item[Why it exists] This is the runtime-performance control layer for the full heating search.
+\item[Key inputs] sweep grids, trade-study targets, parallel config
+\item[Key outputs] operating-point arrays
+\item[Side effects] may start \code{parpool('local', ...)}
+\item[Assumptions] neighboring voltages are assumed suitable for warm-start reuse
+\item[Edge cases] parallel-pool startup failures are not silently swallowed
+\item[Downstream use] feeds all scenario evaluations
+\end{description}
+\subsection*{Segment 5: operating-point kernel and physical submodels}
+\begin{description}[style=nextline,leftmargin=2.8cm,labelwidth=2.5cm]
+\item[Source range] \srcref{vermicomposter_air_heater_design_model.m:L1477-L2411}
+\item[What it does] Evaluates one operating point, including temperature-dependent electrical loading, wire geometry, heater-tube marching, aeration-tube marching, evaporation, hydraulic losses, the two-node bed solve, and the optional transient controller \srcref{vermicomposter_air_heater_design_model.m:L1477-L2411}.
+\item[Why it exists] This is the actual reduced-order physical model.
+\item[Key inputs] voltage, total flow, ambient temperature, bed temperature, and derived geometry
+\item[Key outputs] full operating-point structs and optional transient trajectories
+\item[Side effects] no external IO
+\item[Assumptions] electrical loading is updated by a fixed-point average-wire-temperature iteration
+\item[Edge cases] invalid wire geometry returns an explicitly penalized point rather than throwing
+\item[Downstream use] feeds summaries, plots, and export JSON
+\end{description}
+\subsection*{Segment 6: MATLAB-native summaries and plots}
+\begin{description}[style=nextline,leftmargin=2.8cm,labelwidth=2.5cm]
+\item[Source range] \srcref{vermicomposter_air_heater_design_model.m:L2412-L3046}
+\item[What it does] Prints the MATLAB console summary, classifies candidate states, and creates MATLAB-native figures for constraints, configurations, trade studies, profiles, cooldown, and optional transient behavior \srcref{vermicomposter_air_heater_design_model.m:L2412-L3046}.
+\item[Why it exists] The file remains usable interactively even though the export path disables this layer.
+\item[Key inputs] fully built \code{results}
+\item[Key outputs] console text and figures
+\item[Side effects] may print and plot
+\item[Assumptions] the export helper explicitly disables this layer
+\item[Edge cases] \code{explicitlySafe(...)} omits max-bottom/max-top checks that the Python root does enforce
+\item[Downstream use] consumed mainly by direct MATLAB users and by the exported result schema
+\end{description}
+\section{Variable and symbol map}
+\begin{longtable}{p{0.14\textwidth}p{0.20\textwidth}p{0.08\textwidth}p{0.16\textwidth}p{0.18\textwidth}p{0.16\textwidth}}
+\toprule
+Code name & Meaning & Units & Defined & Consumed & Notes \\\\
+\midrule
+\endfirsthead
+\toprule
+Code name & Meaning & Units & Defined & Consumed & Notes \\\\
+\midrule
+\endhead
+\code{params} & full model parameter struct & mixed & \srcref{vermicomposter_air_heater_design_model.m:L1-L149} & all later functions & contains defaults, overrides, and derived fields \\\\
+\code{designPoints} & evaluated heating candidate set & struct array & \srcref{vermicomposter_air_heater_design_model.m:L182-L221}; \srcref{vermicomposter_air_heater_design_model.m:L1419-L1476} & selection, summaries, export helper & each point carries electrical, thermal, hydraulic, and moisture outputs \\\\
+\code{wire} & derived coil/helix geometry & mixed & \srcref{vermicomposter_air_heater_design_model.m:L1684-L1727} & operating-point kernel & contains length, turns, surface area, and validity \\\\
+\code{binModel} & reduced-order bin thermal model & mixed & \srcref{vermicomposter_air_heater_design_model.m:L971-L1075} & lumped loss, two-node solve, summaries & stores top-mode areas, UA values, capacitances, and Biot estimate \\\\
+\bottomrule
+\end{longtable}
+\section{Numerical methods / interpolation / optimization details}
+\begin{itemize}[leftmargin=*]
+\item the authoritative heating dataset is a discrete exhaustive sweep, not a continuous optimizer \srcref{vermicomposter_air_heater_design_model.m:L1172-L1476}
+\item each operating point uses a fixed-point style outer iteration on average wire temperature \srcref{vermicomposter_air_heater_design_model.m:L1497-L1536}
+\item heater and aeration transport are explicit axial marches \srcref{vermicomposter_air_heater_design_model.m:L1803-L1969}
+\item the steady bed state is solved as a 2x2 linear system \srcref{vermicomposter_air_heater_design_model.m:L2233-L2248}
+\end{itemize}
+\section{Physics-to-code connections}
+\begin{itemize}[leftmargin=*]
+\item \srcref{vermicomposter_air_heater_design_model.m:L1803-L1969} implements the heater and aeration balances documented as \code{eq:heater_segment_air} and \code{eq:aeration_q_net}.
+\item \srcref{vermicomposter_air_heater_design_model.m:L2000-L2122} implements the evaporation and IAPWS relations \code{eq:evap_selected} and \code{eq:latent_heat_cc}.
+\item \srcref{vermicomposter_air_heater_design_model.m:L971-L1171} implements the top-mode UA model and lumped heat requirement \code{eq:topmode_open}--\code{eq:lumped_required_heat}.
+\end{itemize}
+\section{Failure modes and edge cases}
+\begin{itemize}[leftmargin=*]
+\item invalid wire geometry is handled by an explicit penalty struct \srcref{vermicomposter_air_heater_design_model.m:L1728-L1795}
+\item MATLAB summary helper \code{explicitlySafe(...)} can disagree with the Python hard-safe logic because it omits max-bottom/max-top checks \srcref{vermicomposter_air_heater_design_model.m:L2647-L2659}; \srcref{heat_transfer_study.py:L2075-L2197}
+\item parallel-pool startup failures propagate directly \srcref{vermicomposter_air_heater_design_model.m:L1377-L1406}
+\end{itemize}
+\section{Dependencies read/written}
+\begin{longtable}{p{0.28\textwidth}p{0.11\textwidth}p{0.29\textwidth}p{0.22\textwidth}}
+\toprule
+Path / resource & Direction & Where used & Downstream \\\\
+\midrule
+\endfirsthead
+\toprule
+Path / resource & Direction & Where used & Downstream \\\\
+\midrule
+\endhead
+\filepath{vermicomposter_air_heater_design_model.m} & executed & called by generated helper and/or MATLAB users & export JSON, MATLAB console, MATLAB figures \\\\
+\code{matlab base workspace} & written conditionally & no-output call path & interactive MATLAB users \\\\
+MATLAB figures & written/displayed conditionally & plot layer & interactive MATLAB users \\\\
+\bottomrule
+\end{longtable}
+\section{Downstream consumers of this file's outputs}
+\begin{itemize}[leftmargin=*]
+\item the generated MATLAB export helper simplifies the \code{results} struct into JSON \srcref{analyze_vermicomposter_heater.py:L270-L604}
+\item interactive MATLAB users consume the console summary and figures
+\end{itemize}
+\section{Summary of implementation assumptions}
+\begin{itemize}[leftmargin=*]
+\item this is a reduced-order engineering model rather than a CFD/porous-media solve
+\item the export path disables transient simulation and plotting through the generated helper \srcref{analyze_vermicomposter_heater.py:L294-L304}
+\item electrical topology is represented by grouped equal-resistance strings with temperature-updated average resistance
+\end{itemize}
+    \end{document}

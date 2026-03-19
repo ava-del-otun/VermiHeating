@@ -1,0 +1,231 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,booktabs,longtable,array,siunitx,enumitem,hyperref,xurl}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+\setlist{nosep}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.4em}
+\newcommand{\srcref}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\filepath}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\title{Executed File Documentation: Heat Transfer Study/heat\_transfer\_study.py}
+\date{Generated 2026-03-19}
+\begin{document}
+\maketitle
+
+\begin{tabular}{p{0.27\textwidth}p{0.67\textwidth}}
+\toprule
+Field & Value \\
+\midrule
+Repository-relative path & \filepath{Heat Transfer Study/heat_transfer_study.py} \\
+Language & Python \\
+Classification & entrypoint \\
+Invocation mechanism & direct execution through \code{if \_\_name\_\_ == "\_\_main\_\_": main()} in \srcref{heat_transfer_study.py:L6908-L7020} \\
+Upstream caller(s) & none inside the repository \\
+Downstream callees / dependencies & conditional subprocess to \filepath{analyze_vermicomposter_heater.py} on refresh/export \srcref{heat_transfer_study.py:L318-L372}; in-process heating selection, summer cooling, annual analysis, plotting, and summary writers \srcref{heat_transfer_study.py:L740-L1736}; \srcref{heat_transfer_study.py:L2141-L7020} \\
+Execution conditions & always at direct invocation; heating, cooling, and year-round branches are gated by the loaded config and available payloads inside \srcref{heat_transfer_study.py:L6908-L7020} \\
+Verification status & verified directly from source \\
+\bottomrule
+\end{tabular}
+
+\section{Overview}
+This file is the repository's post-processing root. It coordinates export refresh, applies Python-side NSGA-II heating selection, implements the standalone summer cooling model, synthesizes the annual climate layer, and writes the mode-specific output folders and text summaries \srcref{heat_transfer_study.py:L318-L372}; \srcref{heat_transfer_study.py:L2141-L2499}; \srcref{heat_transfer_study.py:L2534-L3292}; \srcref{heat_transfer_study.py:L5013-L7020}.
+
+\section{Invocation context}
+Direct execution through \code{if \_\_name\_\_ == "\_\_main\_\_": main()} in \srcref{heat_transfer_study.py:L6908-L7020}. The script expects a study configuration JSON, defaults that path to \filepath{Heat Transfer Study/study_config.json}, and then enables or skips the heating, cooling, and year-round branches according to the parsed configuration \srcref{heat_transfer_study.py:L133-L149}; \srcref{heat_transfer_study.py:L6908-L7020}.
+
+\section{File-level responsibilities}
+\begin{itemize}[leftmargin=*]
+\item parse the CLI, load JSON, normalize config aliases, and decide whether a fresh MATLAB-backed heating export is needed \srcref{heat_transfer_study.py:L133-L373}; \srcref{heat_transfer_study.py:L2141-L2199}.
+\item render heating and cooling plots, including Pareto-front, radial-profile, and habitat-exclusion figures \srcref{heat_transfer_study.py:L740-L1736}.
+\item compute heating metrics and run constrained NSGA-II over the discrete heating candidate set \srcref{heat_transfer_study.py:L2220-L2499}.
+\item compute the full summer spot-cooler / assist-blower branch, including summer NSGA-II selection \srcref{heat_transfer_study.py:L2534-L3292}.
+\item provide Python-side copies of the shared reduced-order physics for the annual layer and diagnostic calculations \srcref{heat_transfer_study.py:L3607-L5012}.
+\item write heating, cooling, year-round, and root index summaries \srcref{heat_transfer_study.py:L5198-L6890}.
+\end{itemize}
+
+\section{Runtime inputs}
+\begin{itemize}[leftmargin=*]
+\item CLI \code{--config} path \srcref{heat_transfer_study.py:L133-L149}.
+\item \filepath{Heat Transfer Study/study_config.json} by default \srcref{heat_transfer_study.py:L133-L149}; \srcref{heat_transfer_study.py:L6908-L6914}.
+\item a heating export JSON at the configured \code{data_json} path when heating mode is enabled \srcref{heat_transfer_study.py:L6918-L6927}.
+\item third-party Python packages imported at module load, including \code{numpy}, \code{matplotlib}, and \code{pymoo} \srcref{heat_transfer_study.py:L1-L33}.
+\end{itemize}
+
+\section{Runtime outputs}
+\begin{itemize}[leftmargin=*]
+\item heating-mode PNG plots and \code{outputs/heating/study_summary.txt} \srcref{heat_transfer_study.py:L6916-L6954}; \srcref{heat_transfer_study.py:L6494-L6874}.
+\item cooling-mode PNG plots and \code{outputs/cooling/study_summary.txt} \srcref{heat_transfer_study.py:L6956-L7006}; \srcref{heat_transfer_study.py:L6220-L6493}.
+\item year-round plots and \code{outputs/year_round/study_summary.txt} when both heating and cooling payloads exist and annual analysis is enabled \srcref{heat_transfer_study.py:L7008-L7016}; \srcref{heat_transfer_study.py:L5013-L5496}; \srcref{heat_transfer_study.py:L5198-L5295}.
+\item root \code{outputs/study_summary.txt} index file \srcref{heat_transfer_study.py:L6877-L6907}; \srcref{heat_transfer_study.py:L7018-L7020}.
+\end{itemize}
+
+\section{External side effects}
+\begin{itemize}[leftmargin=*]
+\item creates output directories under the configured root output path \srcref{heat_transfer_study.py:L6911-L6915}; \srcref{heat_transfer_study.py:L6956-L6960}; \srcref{heat_transfer_study.py:L7008-L7011}.
+\item may launch a subprocess to refresh the heating export through \filepath{analyze_vermicomposter_heater.py} \srcref{heat_transfer_study.py:L318-L372}.
+\item may use Python process pools for the cooling sweep and annual simulation \srcref{heat_transfer_study.py:L3238-L3250}; \srcref{heat_transfer_study.py:L5013-L5197}.
+\item deletes stale plot files before regenerating outputs in each enabled mode \srcref{heat_transfer_study.py:L6938-L6953}; \srcref{heat_transfer_study.py:L6962-L6999}.
+\end{itemize}
+
+\section{Segment-by-segment walkthrough}
+\subsection*{Segment 1: imports, argument parsing, configuration loading, and refresh orchestration}
+\begin{description}[style=nextline,leftmargin=2.8cm,labelwidth=2.5cm]
+\item[Source range] \srcref{heat_transfer_study.py:L1-L373}
+\item[What it does] Imports all dependencies, defines CLI parsing and JSON loading, and decides whether the heating export must be refreshed through the subprocess path.
+\item[Why it exists] This separates runtime setup and refresh gating from the physics and reporting branches.
+\item[Key inputs] CLI arguments, config path, current export signature, and refresh settings.
+\item[Key outputs] parsed config, mutated payload metadata, and optional subprocess launch.
+\item[Side effects] may invoke \filepath{analyze_vermicomposter_heater.py}.
+\item[Assumptions] the loaded JSON schema is internally consistent enough for alias normalization to succeed.
+\item[Edge cases / failure modes] malformed JSON aborts early; stale export data can persist if auto-refresh is disabled.
+\item[Downstream dependency] every later branch depends on the normalized config and refresh result.
+\end{description}
+
+\subsection*{Segment 2: plotting and geometry/habitat post-processing}
+\begin{description}[style=nextline,leftmargin=2.8cm,labelwidth=2.5cm]
+\item[Source range] \srcref{heat_transfer_study.py:L555-L1736}
+\item[What it does] Builds heating and cooling plots, computes the radial plume profile, computes overlap-aware habitat exclusion geometry, and renders Pareto, moisture, and configuration graphics.
+\item[Why it exists] This is the engineering visualization layer used by the study outputs.
+\item[Key inputs] active payloads, config thresholds, and plot resolution settings.
+\item[Key outputs] PNG plot files under the heating and cooling output folders.
+\item[Side effects] writes figures to disk.
+\item[Assumptions] interpolation is presentation-only; radial and habitat models are post-processing estimates.
+\item[Edge cases / failure modes] when no recommended point exists, the plotting layer falls back to the best-available reference point.
+\item[Downstream dependency] heating and cooling summaries refer to several of these plots and post-processed quantities.
+\end{description}
+
+\subsection*{Segment 3: heating metrics and constrained NSGA-II}
+\begin{description}[style=nextline,leftmargin=2.8cm,labelwidth=2.5cm]
+\item[Source range] \srcref{heat_transfer_study.py:L2141-L2499}
+\item[What it does] Normalizes the heating optimization config, computes hard-constraint residuals and objective values for each candidate, builds the discrete \code{pymoo} problem, extracts feasible Pareto points, and defines fallback ranking.
+\item[Why it exists] This is the authoritative heating-design selection logic for the rooted execution graph.
+\item[Key inputs] design-point table from the export JSON, effective limits, and optimization settings.
+\item[Key outputs] enriched point dictionaries, feasible Pareto candidates, recommended point, and best-available fallback.
+\item[Side effects] none beyond CPU work.
+\item[Assumptions] the design space is already discretized by the MATLAB export.
+\item[Edge cases / failure modes] NSGA-II can return no feasible Pareto point; the summary layer then reports diagnostic closest-miss information instead of a false recommendation.
+\item[Downstream dependency] heating plots, comparison tables, and text summaries all consume these enriched point selections.
+\end{description}
+
+\subsection*{Segment 4: summer cooling model and constrained NSGA-II}
+\begin{description}[style=nextline,leftmargin=2.8cm,labelwidth=2.5cm]
+\item[Source range] \srcref{heat_transfer_study.py:L2534-L3292}
+\item[What it does] Defines the assist-blower static model, spot-cooler supply-state surrogate, summer evaporation segment model, summer operating-point simulation, cooling metrics, and constrained NSGA-II selection over the summer airflow sweep.
+\item[Why it exists] Cooling mode is fully Python-side and does not reuse the MATLAB heating export.
+\item[Key inputs] cooling-mode config, geometry/material overrides, and summer environment inputs.
+\item[Key outputs] cooling payload, Pareto cooling candidates, recommended cooling point, and best-available fallback.
+\item[Side effects] may use Python multiprocessing for the summer flow sweep.
+\item[Assumptions] the spot cooler is represented by sensible-capacity and condensate-limited psychrometric surrogates; the blower is represented by a linear static curve.
+\item[Edge cases / failure modes] the bed-reference temperature solve can fall back to bracket endpoints; NSGA-II can return no feasible cooling Pareto point, in which case the summary prints cooling-specific constraint diagnostics.
+\item[Downstream dependency] cooling plots, cooling text summaries, and the annual layer consume the resulting payload.
+\end{description}
+
+\subsection*{Segment 5: shared reduced-order physics and annual-layer construction}
+\begin{description}[style=nextline,leftmargin=2.8cm,labelwidth=2.5cm]
+\item[Source range] \srcref{heat_transfer_study.py:L3607-L5496}
+\item[What it does] Reimplements the shared air, convection, evaporation, wall-loss, and two-node bed closures in Python, then uses them to build the representative-year ambient driver and annual duty/electricity/water analysis.
+\item[Why it exists] The year-round model must re-solve the selected heating and cooling reference points at daily ambient conditions without rerunning MATLAB.
+\item[Key inputs] selected heating and cooling reference points, climate config, and effective geometry/material inputs.
+\item[Key outputs] annual payload, daily profiles, monthly aggregates, and year-round summary content.
+\item[Side effects] may use a process pool for annual simulation.
+\item[Assumptions] the Python re-solver is intended to mirror the MATLAB reduced-order physics sufficiently for annual post-processing.
+\item[Edge cases / failure modes] no automated equivalence test between MATLAB and Python physics implementations is present in this file.
+\item[Downstream dependency] year-round plots and the year-round text summary depend on these results.
+\end{description}
+
+\subsection*{Segment 6: summary writers and main dispatch}
+\begin{description}[style=nextline,leftmargin=2.8cm,labelwidth=2.5cm]
+\item[Source range] \srcref{heat_transfer_study.py:L5198-L7020}
+\item[What it does] Writes year-round, cooling, heating, and root-index summaries; dispatches the enabled run modes; and attaches NSGA-II selections to the heating and cooling payloads before writing outputs.
+\item[Why it exists] This is the outward-facing execution root.
+\item[Key inputs] mode payloads, config, and output directory paths.
+\item[Key outputs] text summaries and the final terminal message.
+\item[Side effects] writes all final output files and deletes stale plots before regeneration.
+\item[Assumptions] branch order is fixed as heating, then cooling, then year-round, then root index.
+\item[Edge cases / failure modes] the annual branch is skipped unless both prior payloads exist and the annual layer is enabled.
+\item[Downstream dependency] consumed directly by users and by the repository output tree.
+\end{description}
+
+\section{Variable and symbol map}
+\begin{longtable}{p{0.14\textwidth}p{0.22\textwidth}p{0.08\textwidth}p{0.16\textwidth}p{0.18\textwidth}p{0.14\textwidth}}
+\toprule
+Code name & Meaning & Units & Defined & Consumed & Notes \\
+\midrule
+\endfirsthead
+\toprule
+Code name & Meaning & Units & Defined & Consumed & Notes \\
+\midrule
+\endhead
+\code{config} & parsed study configuration & mixed & \srcref{heat_transfer_study.py:L6908-L6914} & all branches & contains both physics overrides and report controls \\
+\code{payload} & active heating or cooling payload & mixed & heating \srcref{heat_transfer_study.py:L6924-L6933}; cooling \srcref{heat_transfer_study.py:L6958-L6960} & plots, summaries, annual layer & heating payload originates from exported JSON; cooling payload is synthesized in Python \\
+\code{QtoBed_W} & net heat delivered to the bed & \si{\watt} & \srcref{heat_transfer_study.py:L2220-L2368}; \srcref{heat_transfer_study.py:L2707-L2959} & feasibility, capacity, annual layer & negative values imply net cooling \\
+\code{coolingShortfall_W} & gap between required cooling and modeled cooling capacity & \si{\watt} & \srcref{heat_transfer_study.py:L2915-L2959} & cooling diagnostics and summaries & not presently part of the cooling hard-constraint vector \\
+\code{combinedCoolingPower_W} & spot cooler plus assist-blower electric power & \si{\watt} & \srcref{heat_transfer_study.py:L2963-L3112} & cooling objective and report-priority tuples & used by cooling NSGA-II \\
+\code{bin\_model} & reduced-order bin thermal model & mixed & \srcref{heat_transfer_study.py:L4326-L4438} & cooling and annual solvers & stores UA values, capacitances, Biot estimate, and top-mode metadata \\
+\bottomrule
+\end{longtable}
+
+\section{Numerical methods / interpolation / optimization details}
+\begin{itemize}[leftmargin=*]
+\item heating recommendation uses constrained NSGA-II on integer grid indices into the existing export table, not a continuous optimizer \srcref{heat_transfer_study.py:L2410-L2499}.
+\item cooling recommendation now also uses constrained NSGA-II, but on a one-dimensional discrete airflow index rather than on a continuous fan curve \srcref{heat_transfer_study.py:L3123-L3208}.
+\item summer cooling uses a scalar residual solve on the bed-reference temperature in each sampled flow point \srcref{heat_transfer_study.py:L2774-L2899}.
+\item display interpolation is presentation-only \srcref{heat_transfer_study.py:L555-L562}.
+\item annual climate synthesis uses periodic Gaussian-kernel regression plus freeze/heat-wave overrides \srcref{heat_transfer_study.py:L4633-L4858}.
+\end{itemize}
+
+\section{Physics-to-code connections}
+\begin{itemize}[leftmargin=*]
+\item \srcref{heat_transfer_study.py:L2220-L2368} implements the heating hard-constraint residuals documented as \code{eq:heating\_constraint\_residuals}.
+\item \srcref{heat_transfer_study.py:L2410-L2499} implements the discrete heating NSGA-II workflow documented under \code{eq:heating\_objective\_vector} and \code{eq:reported\_design\_selection}.
+\item \srcref{heat_transfer_study.py:L2605-L2705} implements the spot-cooler supply-state and condensate logic described in the summer cooling sections of the physics reference.
+\item \srcref{heat_transfer_study.py:L2963-L3208} implements the cooling hard-constraint vector and the cooling NSGA-II objective/report ordering.
+\item \srcref{heat_transfer_study.py:L4432-L4438} implements the two-node steady bed solve documented as \code{eq:two\_node\_matrix}.
+\item \srcref{heat_transfer_study.py:L4633-L5012} implements the representative-year kernel regression and duty/energy relations documented as \code{eq:kernel\_baseline}, \code{eq:daily\_duty}, and \code{eq:daily\_energy}.
+\end{itemize}
+
+\section{Failure modes and edge cases}
+\begin{itemize}[leftmargin=*]
+\item malformed or missing JSON aborts execution during initial load \srcref{heat_transfer_study.py:L150-L154}; \srcref{heat_transfer_study.py:L6908-L6914}.
+\item subprocess refresh can fail if Python, MATLAB, or the export path is unavailable \srcref{heat_transfer_study.py:L318-L372}.
+\item NSGA-II can return no feasible Pareto point in either heating or cooling mode; the summaries then print closest-miss diagnostics instead of claiming a valid recommendation \srcref{heat_transfer_study.py:L5397-L5568}; \srcref{heat_transfer_study.py:L6258-L6368}.
+\item the annual branch is skipped if either the heating or cooling payload is unavailable \srcref{heat_transfer_study.py:L7008-L7016}.
+\item the Python and MATLAB physics implementations are intended to mirror one another, but no internal self-test in this file proves that equivalence automatically \srcref{heat_transfer_study.py:L3607-L5496}.
+\end{itemize}
+
+\section{Dependencies read/written}
+\begin{longtable}{p{0.28\textwidth}p{0.11\textwidth}p{0.29\textwidth}p{0.22\textwidth}}
+\toprule
+Path / resource & Direction & Where used & Downstream \\
+\midrule
+\endfirsthead
+\toprule
+Path / resource & Direction & Where used & Downstream \\
+\midrule
+\endhead
+\filepath{Heat Transfer Study/study_config.json} & read & initial config load and branch control & all enabled modes \\
+\filepath{Heat Transfer Study/data/model_export_grid100.json} or configured export JSON & read & heating payload source & heating plots, summaries, and annual layer \\
+\filepath{analyze_vermicomposter_heater.py} & executed conditionally & auto-refresh subprocess target & regenerated heating export JSON \\
+\filepath{Heat Transfer Study/outputs/*} & written & main dispatch and summary writers & users and version control \\
+\bottomrule
+\end{longtable}
+
+\section{Downstream consumers of this file's outputs}
+\begin{itemize}[leftmargin=*]
+\item heating, cooling, and year-round plot files under the configured output root.
+\item heating, cooling, year-round, and root-index text summaries.
+\item the execution documentation suite, which traces this file as the rooted entrypoint.
+\end{itemize}
+
+\section{Summary of implementation assumptions}
+\begin{itemize}[leftmargin=*]
+\item the heating design space is the exported discrete candidate table, not a new continuous search space generated in Python.
+\item the summer branch is a reduced-order surrogate built from the same tube, wall, and bed closures rather than a separate CFD or vapor-compression model.
+\item cooling feasibility currently means the cooling point is summer-hard-safe and has positive cooling capacity, not necessarily that it fully meets the lumped required cooling load.
+\item the Python re-solver is intended to preserve the MATLAB model structure closely enough for annual and diagnostic reuse, but it remains a second implementation.
+\end{itemize}
+
+\end{document}

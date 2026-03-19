@@ -94,6 +94,33 @@ DEFAULT_COOLING_PRIORITY_ORDER = (
     "temp_spread_C",
     "minus_cooling_capacity_W",
 )
+DEFAULT_COOLING_OBJECTIVES = (
+    "max_bed_temp_C",
+    "mean_bed_temp_C",
+    "combined_cooling_power_W",
+)
+DEFAULT_COOLING_REPORT_PRIORITY = (
+    "max_bed_temp_C",
+    "mean_bed_temp_C",
+    "combined_cooling_power_W",
+    "totalFlow_Lpm",
+    "temp_spread_C",
+    "minus_cooling_capacity_W",
+)
+COOLING_HARD_CONSTRAINT_KEYS = (
+    "assist_blower_pressure_excess_Pa",
+    "pressure_drop_excess_Pa",
+    "water_loss_excess_kg_day",
+    "hole_velocity_excess_m_s",
+    "bottom_temp_shortfall_C",
+    "top_temp_shortfall_C",
+    "bottom_temp_excess_C",
+    "top_temp_excess_C",
+    "temp_spread_excess_C",
+)
+COOLING_NSGA_CONSTRAINT_KEYS = COOLING_HARD_CONSTRAINT_KEYS + (
+    "nonpositive_cooling_excess_W",
+)
 PARTICLE_SURFACE_KEYS = ("gt40", "mm20to40", "mm10to20", "lt10")
 PARTICLE_SURFACE_LABELS = {
     "gt40": "> 40 mm",
@@ -122,7 +149,29 @@ def parse_args() -> argparse.Namespace:
 
 def load_json(path: Path) -> dict:
     with path.open("r", encoding="utf-8-sig") as fh:
-        return json.load(fh)
+        config = json.load(fh)
+    return synchronize_config_aliases(config)
+
+
+def synchronize_config_aliases(config: dict) -> dict:
+    if not isinstance(config, dict):
+        return config
+
+    model_overrides = config.get("model_overrides", {})
+    if not isinstance(model_overrides, dict):
+        return config
+
+    aeration = model_overrides.get("aeration", {})
+    if not isinstance(aeration, dict) or "nParallelTubes" not in aeration:
+        return config
+
+    synchronized_n_tubes = max(1, int(round(float(aeration["nParallelTubes"]))))
+    summary_inputs = dict(config.get("summary_inputs", {}))
+    summary_aeration = dict(summary_inputs.get("aeration", {}))
+    summary_aeration["nParallelTubes"] = synchronized_n_tubes
+    summary_inputs["aeration"] = summary_aeration
+    config["summary_inputs"] = summary_inputs
+    return config
 
 
 def operating_mode(config: dict) -> str:
@@ -148,11 +197,19 @@ def enabled_run_modes(config: dict) -> dict[str, bool]:
 
 
 def python_parallel_config(config: dict) -> dict:
-    parallel = dict(config.get("python_parallel", {}))
+    grouped = config.get("parallel", {})
+    if isinstance(grouped, dict):
+        parallel = dict(grouped.get("python", config.get("python_parallel", {})))
+    else:
+        parallel = dict(config.get("python_parallel", {}))
     parallel.setdefault("enabled", False)
     parallel.setdefault("workers", 0)
-    parallel.setdefault("coolingSweep", True)
-    parallel.setdefault("yearRound", True)
+    loops = dict(parallel.get("loops", {}))
+    loops.setdefault("coolingFlowSweep", bool(parallel.get("coolingSweep", True)))
+    loops.setdefault("yearRoundDailySimulation", bool(parallel.get("yearRound", True)))
+    parallel["loops"] = loops
+    parallel["coolingSweep"] = bool(loops.get("coolingFlowSweep", True))
+    parallel["yearRound"] = bool(loops.get("yearRoundDailySimulation", True))
     return parallel
 
 
@@ -921,6 +978,114 @@ def plot_summer_cooling_curves(payload: dict, config: dict, output_dir: Path) ->
         wrap=True,
     )
     fig.savefig(output_dir / "summer_spot_cooler_curves.png", dpi=220)
+    plt.close(fig)
+
+
+def plot_cooling_pareto_front(payload: dict, config: dict, output_dir: Path) -> None:
+    ranked = rank_cooling_points(payload, config)
+    if not ranked:
+        return
+
+    feasible = [pt for pt in ranked if bool(pt.get("isFeasibleByCriteria", False))]
+    pareto = list(payload.get("pareto_candidates", []))
+    best = payload.get("best_available", {}) if isinstance(payload.get("best_available", {}), dict) else {}
+    rec = payload.get("recommended", {}) if isinstance(payload.get("recommended", {}), dict) else {}
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+    ax.set_title(
+        "Summer Cooling Pareto Front from Constrained NSGA-II\n"
+        "Objectives: hottest-node bed temperature, mean bed temperature, combined cooling-system power",
+        fontsize=13,
+        fontweight="bold",
+    )
+
+    all_power = np.array([float(pt.get("combinedCoolingPower_W", np.nan)) for pt in ranked], dtype=float)
+    all_tmax = np.array(
+        [max(float(pt.get("TbottomFullPower_C", np.nan)), float(pt.get("TtopFullPower_C", np.nan))) for pt in ranked],
+        dtype=float,
+    )
+    ax.scatter(
+        all_power,
+        all_tmax,
+        s=24,
+        color="#c8c8c8",
+        alpha=0.7,
+        edgecolors="none",
+        label="All sampled cooling points",
+    )
+
+    if feasible:
+        feasible_power = np.array([float(pt.get("combinedCoolingPower_W", np.nan)) for pt in feasible], dtype=float)
+        feasible_tmax = np.array([float(pt.get("maxBedTemp_C", np.nan)) for pt in feasible], dtype=float)
+        ax.scatter(
+            feasible_power,
+            feasible_tmax,
+            s=34,
+            color="#4f8cc9",
+            alpha=0.9,
+            edgecolors="white",
+            linewidths=0.4,
+            label="Summer-hard-safe points",
+        )
+
+    if pareto:
+        pareto_sorted = sorted(pareto, key=lambda pt: float(pt.get("combinedCoolingPower_W", np.nan)))
+        pareto_power = np.array([float(pt.get("combinedCoolingPower_W", np.nan)) for pt in pareto_sorted], dtype=float)
+        pareto_tmax = np.array([float(pt.get("maxBedTemp_C", np.nan)) for pt in pareto_sorted], dtype=float)
+        ax.plot(pareto_power, pareto_tmax, color="black", linewidth=1.4, alpha=0.85)
+        ax.scatter(
+            pareto_power,
+            pareto_tmax,
+            s=46,
+            color="black",
+            alpha=0.95,
+            edgecolors="white",
+            linewidths=0.6,
+            label="NSGA-II Pareto candidates",
+        )
+
+    if best:
+        ax.scatter(
+            [float(best.get("combinedCoolingPower_W", np.nan))],
+            [float(best.get("maxBedTemp_C", np.nan))],
+            s=100,
+            color="#e3a53f",
+            marker="D",
+            edgecolors="black",
+            linewidths=0.8,
+            label="Best-available fallback",
+        )
+    if rec:
+        ax.scatter(
+            [float(rec.get("combinedCoolingPower_W", np.nan))],
+            [float(rec.get("maxBedTemp_C", np.nan))],
+            s=160,
+            color="#c7372f",
+            marker="*",
+            edgecolors="black",
+            linewidths=0.9,
+            label="Reported cooling design",
+            zorder=5,
+        )
+
+    ax.set_xlabel("Combined cooling-system electrical power (W)")
+    ax.set_ylabel("Hottest bed-node temperature (C)")
+    ax.grid(True, alpha=0.25)
+    ax.legend(loc="best", fontsize=8)
+
+    opt = cooling_mode_config(config)["optimization"]
+    note_lines = [
+        f"NSGA-II settings: population = {int(opt.get('population', 50))}, generations = {int(opt.get('generations', 120))}, seed = {int(opt.get('seed', 7))}.",
+        "The Pareto set is filtered by the configured summer hard constraints before report_priority_order is applied.",
+        f"Report priority = {', '.join(cooling_report_priority_order(config))}.",
+    ]
+    if not pareto:
+        note_lines.append(
+            "No summer-hard-safe Pareto point exists for the current flow sweep; the diamond marker is the best-available diagnostic fallback."
+        )
+    fig.text(0.08, 0.02, " ".join(note_lines), fontsize=9, wrap=True)
+    fig.subplots_adjust(bottom=0.18)
+    fig.savefig(output_dir / "cooling_pareto_front.png", dpi=220)
     plt.close(fig)
 
 
@@ -2052,6 +2217,16 @@ def heating_report_priority_order(config: dict) -> tuple[str, ...]:
     return tuple(str(item) for item in raw)
 
 
+def cooling_objective_order(config: dict) -> tuple[str, ...]:
+    raw = cooling_mode_config(config)["optimization"].get("objectives", DEFAULT_COOLING_OBJECTIVES)
+    return tuple(str(item) for item in raw)
+
+
+def cooling_report_priority_order(config: dict) -> tuple[str, ...]:
+    raw = cooling_mode_config(config)["optimization"].get("report_priority_order", DEFAULT_COOLING_REPORT_PRIORITY)
+    return tuple(str(item) for item in raw)
+
+
 def active_design_points_array(payload: dict) -> list[dict]:
     return payload["design_points"]
 
@@ -2841,6 +3016,10 @@ def cooling_point_metrics(pt: dict, config: dict) -> dict[str, float | str]:
     top_excess = max(0.0, top - float(opt["max_top_temp_C"]))
     spread_excess = max(0.0, spread - float(opt["spread_limit_C"]))
     cooling_capacity = max(0.0, -float(pt.get("QtoBed_W", 0.0)))
+    cooling_shortfall = max(0.0, float(pt.get("coolingShortfall_W", np.nan)))
+    if not np.isfinite(cooling_shortfall):
+        cooling_shortfall = 0.0
+    nonpositive_cooling_excess = max(0.0, -cooling_capacity)
     spot_cooler_load = float(pt.get("spotCoolerLoad_W", np.nan))
     spot_cooler_power = float(pt.get("spotCoolerPower_W", np.nan))
     assist_blower_power = float(pt.get("assistBlowerPower_W", np.nan))
@@ -2919,6 +3098,8 @@ def cooling_point_metrics(pt: dict, config: dict) -> dict[str, float | str]:
         "constraintState": state,
         "isConstraintSafeByCriteria": hard_safe,
         "isFeasibleByCriteria": hard_safe,
+        "cooling_shortfall_W": cooling_shortfall,
+        "nonpositive_cooling_excess_W": nonpositive_cooling_excess,
     }
 
 
@@ -2941,29 +3122,96 @@ def cooling_criteria_sort_key(metrics: dict[str, float | str], config: dict) -> 
     return tuple(resolved)
 
 
+def enrich_cooling_point_with_metrics(pt: dict, config: dict) -> dict:
+    metrics = cooling_point_metrics(pt, config)
+    enriched = dict(pt)
+    enriched["criteriaKey"] = cooling_criteria_sort_key(metrics, config)
+    enriched["reportPriorityKey"] = tuple(float(metrics[name]) for name in cooling_report_priority_order(config))
+    enriched["objectiveKey"] = tuple(float(metrics[name]) for name in cooling_objective_order(config))
+    enriched["selectionStage"] = str(metrics["selectionStage"])
+    enriched["constraintState"] = str(metrics["constraintState"])
+    enriched["isConstraintSafeByCriteria"] = bool(metrics["isConstraintSafeByCriteria"])
+    enriched["isFeasibleByCriteria"] = bool(metrics["isFeasibleByCriteria"])
+    enriched["tempSpread_C"] = float(metrics["temp_spread_C"])
+    enriched["TbottomFullPower_C"] = float(metrics["bottom_temp_C"])
+    enriched["TtopFullPower_C"] = float(metrics["top_temp_C"])
+    enriched["maxBedTemp_C"] = float(metrics["max_bed_temp_C"])
+    enriched["meanBedTemp_C"] = float(metrics["mean_bed_temp_C"])
+    enriched["combinedCoolingPower_W"] = float(metrics["combined_cooling_power_W"])
+    enriched["coolingShortfall_W"] = float(metrics["cooling_shortfall_W"])
+    enriched["coolingConstraintVector"] = tuple(float(metrics[name]) for name in COOLING_NSGA_CONSTRAINT_KEYS)
+    return enriched
+
+
 def rank_cooling_points(payload: dict, config: dict, points: list[dict] | None = None) -> list[dict]:
     source = payload["design_points"] if points is None else points
-    ranked: list[dict] = []
-    for pt in source:
-        metrics = cooling_point_metrics(pt, config)
-        enriched = dict(pt)
-        enriched["criteriaKey"] = cooling_criteria_sort_key(metrics, config)
-        enriched["selectionStage"] = str(metrics["selectionStage"])
-        enriched["constraintState"] = str(metrics["constraintState"])
-        enriched["isConstraintSafeByCriteria"] = bool(metrics["isConstraintSafeByCriteria"])
-        enriched["isFeasibleByCriteria"] = bool(metrics["isFeasibleByCriteria"])
-        enriched["tempSpread_C"] = float(metrics["temp_spread_C"])
-        enriched["TbottomFullPower_C"] = float(metrics["bottom_temp_C"])
-        enriched["TtopFullPower_C"] = float(metrics["top_temp_C"])
-        ranked.append(enriched)
+    ranked = [enrich_cooling_point_with_metrics(pt, config) for pt in source]
     ranked.sort(key=lambda pt: pt["criteriaKey"])
     return ranked
 
 
+class CoolingNsgaProblem(ElementwiseProblem):
+    def __init__(self, config: dict, points: list[dict]):
+        self.config = config
+        self.points = list(points)
+        super().__init__(
+            n_var=1,
+            n_obj=len(cooling_objective_order(config)),
+            n_ieq_constr=len(COOLING_NSGA_CONSTRAINT_KEYS),
+            xl=np.array([0]),
+            xu=np.array([max(len(self.points) - 1, 0)]),
+            vtype=int,
+        )
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        idx = int(np.rint(np.atleast_1d(x)[0]))
+        pt = self.points[idx]
+        metrics = cooling_point_metrics(pt, self.config)
+        out["F"] = [float(metrics[name]) for name in cooling_objective_order(self.config)]
+        out["G"] = [float(metrics[name]) for name in COOLING_NSGA_CONSTRAINT_KEYS]
+
+    def point_from_vector(self, x: np.ndarray) -> dict:
+        idx = int(np.rint(np.atleast_1d(x)[0]))
+        return self.points[idx]
+
+
+def cooling_pareto_candidates_for_points(payload: dict, config: dict, points: list[dict] | None = None) -> list[dict]:
+    source = payload["design_points"] if points is None else points
+    opt = cooling_mode_config(config)["optimization"]
+    if not opt.get("enabled", True) or str(opt.get("method", "nsga2")).strip().lower() != "nsga2" or not source:
+        return []
+
+    problem = CoolingNsgaProblem(config, source)
+    algorithm = NSGA2(
+        pop_size=int(opt.get("population", 50)),
+        sampling=IntegerRandomSampling(),
+        crossover=SBX(prob=1.0, eta=12.0, vtype=float, repair=RoundingRepair()),
+        mutation=PM(prob=1.0 / max(problem.n_var, 1), eta=20.0, vtype=float, repair=RoundingRepair()),
+        eliminate_duplicates=True,
+    )
+    result = minimize(
+        problem,
+        algorithm,
+        ("n_gen", int(opt.get("generations", 120))),
+        seed=int(opt.get("seed", 7)),
+        verbose=False,
+    )
+
+    candidate_vectors: list[np.ndarray] = []
+    if getattr(result, "opt", None) is not None and len(result.opt) > 0:
+        candidate_vectors = list(result.opt.get("X"))
+    elif getattr(result, "X", None) is not None:
+        candidate_vectors = list(np.atleast_2d(result.X))
+
+    enriched = [enrich_cooling_point_with_metrics(problem.point_from_vector(np.asarray(vec)), config) for vec in candidate_vectors]
+    feasible = [pt for pt in unique_points_by_signature(enriched) if pt.get("isFeasibleByCriteria", False)]
+    feasible.sort(key=lambda pt: pt["reportPriorityKey"])
+    return feasible
+
+
 def select_recommended_cooling_point(payload: dict, config: dict, points: list[dict] | None = None) -> dict:
-    ranked = rank_cooling_points(payload, config, points)
-    hard_safe = [pt for pt in ranked if bool(pt.get("isConstraintSafeByCriteria", False))]
-    return hard_safe[0] if hard_safe else {}
+    pareto = cooling_pareto_candidates_for_points(payload, config, points)
+    return pareto[0] if pareto else {}
 
 
 def select_best_available_cooling_point(payload: dict, config: dict, points: list[dict] | None = None) -> dict:
@@ -2973,6 +3221,9 @@ def select_best_available_cooling_point(payload: dict, config: dict, points: lis
 
 def cooling_top_candidates(payload: dict, config: dict) -> list[dict]:
     limit = int(cooling_mode_config(config)["optimization"].get("top_candidate_count", 12))
+    pareto = payload.get("pareto_candidates")
+    if isinstance(pareto, list) and pareto:
+        return pareto[: min(limit, len(pareto))]
     ranked = rank_cooling_points(payload, config)
     return ranked[: min(limit, len(ranked))]
 
@@ -2981,8 +3232,10 @@ def cooling_optimization_ranked_points(payload: dict, config: dict) -> list[dict
     opt = cooling_mode_config(config)["optimization"]
     if not opt.get("enabled", True):
         return []
-    ranked = rank_cooling_points(payload, config)
-    return ranked[: int(opt.get("n_top", 10))]
+    pareto = payload.get("pareto_candidates")
+    if isinstance(pareto, list) and pareto:
+        return pareto[: int(opt.get("n_top", 10))]
+    return cooling_pareto_candidates_for_points(payload, config)[: int(opt.get("n_top", 10))]
 
 
 def build_summer_cooling_payload(config: dict) -> dict:
@@ -3000,7 +3253,11 @@ def build_summer_cooling_payload(config: dict) -> dict:
     lumped_loss = lumped_loss_model_from_bin(bin_model, float(env_inputs["greenhouseAir_C"]), design_bed_C)
     required_cooling_W = max(float(env_inputs["greenhouseAir_C"]) - design_bed_C, 0.0) * float(bin_model["UAtotalAmbient_W_K"])
     cooling_flows = cooling_flow_array(cooling_cfg)
-    use_parallel = bool(parallel_cfg.get("enabled", False) and parallel_cfg.get("coolingSweep", True) and cooling_flows.size > 1)
+    use_parallel = bool(
+        parallel_cfg.get("enabled", False)
+        and parallel_cfg.get("loops", {}).get("coolingFlowSweep", True)
+        and cooling_flows.size > 1
+    )
     if use_parallel:
         ctx = mp.get_context("spawn")
         with concurrent.futures.ProcessPoolExecutor(
@@ -3015,15 +3272,19 @@ def build_summer_cooling_payload(config: dict) -> dict:
         "meta": {
             "operatingMode": COOLING_MODE,
             "recommended_definition": (
-                "Recommended = the single hard-constraint-safe summer plenum-fed spot-cooler plus assist-blower point chosen by "
-                "lexicographic criteria. Inside the hard-safe set, the rule is: minimize the hottest bed-node "
-                "temperature, then minimize mean bed temperature, then minimize combined cooling-system electrical power, then minimize airflow."
+                "Recommended = the first fully summer-hard-safe point on the constrained NSGA-II Pareto front after applying "
+                "the configured cooling report_priority_order. The default cooling Pareto objectives are hottest-node bed "
+                "temperature, mean bed temperature, and combined cooling-system electrical power. If no summer-hard-safe "
+                "Pareto point exists, no recommended cooling design point is reported and only the best-available fallback "
+                "reference is retained for diagnostics."
             ),
         },
         "active_configuration": {"label": "Covered top + vent"},
         "design_points": points,
         "recommended": {},
         "best_available": {},
+        "selection_method": "nsga2",
+        "pareto_candidates": [],
         "limits": {
             "maxAssistBlowerDeliverablePressure_Pa": float(cooling_cfg["limits"]["maxAssistBlowerDeliverablePressure_Pa"]),
             "maxPressureDrop_Pa": float(cooling_cfg["limits"]["maxPressureDrop_Pa"]),
@@ -3051,6 +3312,7 @@ def build_summer_cooling_payload(config: dict) -> dict:
         "minimumFlowAt100Duty_Lpm": float("nan"),
         "minimumFlowAtTargetDuty_Lpm": float("nan"),
     }
+    payload["pareto_candidates"] = cooling_pareto_candidates_for_points(payload, config)
     payload["recommended"] = select_recommended_cooling_point(payload, config)
     payload["best_available"] = select_best_available_cooling_point(payload, config)
     return payload
@@ -3255,7 +3517,8 @@ def effective_aeration_inputs(summary_inputs: dict, model_overrides: dict) -> di
         aer_overrides["branchConnectorID_mm"] = 1000.0 * float(aer_overrides["branchConnectorID_m"])
     aer_inputs.update(aer_overrides)
     if "nParallelTubes" in aer_inputs:
-        aer_inputs["splitterOutletCount"] = max(1, int(round(float(aer_inputs["nParallelTubes"]))))
+        aer_inputs["nParallelTubes"] = max(1, int(round(float(aer_inputs["nParallelTubes"]))))
+        aer_inputs["splitterOutletCount"] = aer_inputs["nParallelTubes"]
     return aer_inputs
 
 
@@ -4250,6 +4513,12 @@ def cooling_mode_config(config: dict) -> dict:
     opt.setdefault("enabled", True)
     opt.setdefault("top_candidate_count", 12)
     opt.setdefault("n_top", 10)
+    opt.setdefault("method", "nsga2")
+    opt.setdefault("population", int(config.get("optimization", {}).get("population", 50)))
+    opt.setdefault("generations", int(config.get("optimization", {}).get("generations", 120)))
+    opt.setdefault("seed", int(config.get("optimization", {}).get("seed", 7)))
+    opt.setdefault("objectives", list(DEFAULT_COOLING_OBJECTIVES))
+    opt.setdefault("report_priority_order", list(DEFAULT_COOLING_REPORT_PRIORITY))
     opt.setdefault("min_bottom_temp_C", float(model_overrides.get("bin", {}).get("minSafe_C", -np.inf)))
     opt.setdefault("min_top_temp_C", float(model_overrides.get("bin", {}).get("minSafe_C", -np.inf)))
     opt.setdefault("max_bottom_temp_C", float(model_overrides.get("bin", {}).get("maxSafe_C", 25.0)))
@@ -4808,7 +5077,11 @@ def build_year_round_payload(heating_payload: dict, cooling_payload: dict, confi
         )
         for idx, climate_day in enumerate(climate_payload["daily"])
     ]
-    use_parallel = bool(parallel_cfg.get("enabled", False) and parallel_cfg.get("yearRound", True) and len(day_tasks) > 1)
+    use_parallel = bool(
+        parallel_cfg.get("enabled", False)
+        and parallel_cfg.get("loops", {}).get("yearRoundDailySimulation", True)
+        and len(day_tasks) > 1
+    )
     if use_parallel:
         ctx = mp.get_context("spawn")
         with concurrent.futures.ProcessPoolExecutor(
@@ -5243,6 +5516,110 @@ def append_no_feasible_pareto_diagnostics(
             f"    - {labels.get(key, key)}: closest miss {format_heating_constraint_residual(key, value)}; "
             f"violated by {counts[key]} / {total_points} points; nearest point at pitch {float(pt['pitch_mm']):.1f} mm, "
             f"V {float(pt['voltage_V']):.1f}, flow {float(pt['totalFlow_Lpm']):.1f} L/min"
+        )
+        shown += 1
+        if shown >= max_items:
+            break
+
+
+def cooling_constraint_label_map(config: dict) -> dict[str, str]:
+    cooling_cfg = cooling_mode_config(config)
+    limits = cooling_cfg["limits"]
+    opt_cfg = cooling_cfg["optimization"]
+    return {
+        "assist_blower_pressure_excess_Pa": "assist-blower available static below network pressure drop",
+        "pressure_drop_excess_Pa": f"pressure drop above {float(limits['maxPressureDrop_Pa']):.0f} Pa",
+        "water_loss_excess_kg_day": f"water loss above {float(limits.get('maxWaterLoss_kg_day', np.nan)):.1f} kg/24 h",
+        "hole_velocity_excess_m_s": f"hole velocity above {float(limits.get('maxHoleVelocity_m_s', np.inf)):.2f} m/s",
+        "bottom_temp_shortfall_C": f"bottom temperature below {float(opt_cfg['min_bottom_temp_C']):.1f} C",
+        "top_temp_shortfall_C": f"top temperature below {float(opt_cfg['min_top_temp_C']):.1f} C",
+        "bottom_temp_excess_C": f"bottom temperature above {float(opt_cfg['max_bottom_temp_C']):.1f} C",
+        "top_temp_excess_C": f"top temperature above {float(opt_cfg['max_top_temp_C']):.1f} C",
+        "temp_spread_excess_C": f"bottom-top spread above {float(opt_cfg['spread_limit_C']):.1f} C",
+        "nonpositive_cooling_excess_W": "nonpositive net cooling delivered to the bed",
+    }
+
+
+def format_cooling_constraint_residual(key: str, value: float) -> str:
+    if key.endswith("_Pa"):
+        return f"{value:.3f} Pa"
+    if key.endswith("_kg_day"):
+        return f"{value:.3f} kg/24 h"
+    if key.endswith("_m_s"):
+        return f"{value:.3f} m/s"
+    if key.endswith("_C"):
+        return f"{value:.3f} C"
+    if key == "nonpositive_cooling_excess_W":
+        return f"{value:.6f} W"
+    return f"{value:.6f}"
+
+
+def append_no_feasible_cooling_pareto_diagnostics(
+    lines: list[str],
+    payload: dict,
+    config: dict,
+    ranked_points: list[dict],
+    max_items: int = 10,
+) -> None:
+    if payload.get("recommended"):
+        return
+    if not ranked_points:
+        return
+
+    labels = cooling_constraint_label_map(config)
+    best = ranked_points[0]
+    best_metrics = cooling_point_metrics(best, config)
+    total_points = len(ranked_points)
+    exact_feasible = [pt for pt in ranked_points if bool(pt.get("isFeasibleByCriteria", False))]
+    counts = {key: 0 for key in COOLING_NSGA_CONSTRAINT_KEYS}
+    minima: dict[str, tuple[float, dict]] = {}
+
+    for pt in ranked_points:
+        metrics = cooling_point_metrics(pt, config)
+        for key in COOLING_NSGA_CONSTRAINT_KEYS:
+            value = float(metrics.get(key, 0.0))
+            if value > 1.0e-12:
+                counts[key] += 1
+                current = minima.get(key)
+                if current is None or value < current[0]:
+                    minima[key] = (value, pt)
+
+    violated_best = [
+        (key, float(best_metrics.get(key, 0.0)))
+        for key in COOLING_NSGA_CONSTRAINT_KEYS
+        if float(best_metrics.get(key, 0.0)) > 1.0e-12
+    ]
+
+    lines.append("")
+    lines.append("No-feasible-Pareto diagnostics:")
+    if exact_feasible:
+        exact_sorted = sorted(exact_feasible, key=lambda pt: pt.get("reportPriorityKey", (np.inf,)))
+        exact_best = exact_sorted[0]
+        lines.append(
+            f"  NSGA-II returned no feasible Pareto candidates, but the evaluated summer sweep contains {len(exact_feasible)}"
+            " exact feasible point(s)."
+        )
+        lines.append(
+            f"  Best exact feasible sweep point      : flow {float(exact_best['totalFlow_Lpm']):.1f} L/min, "
+            f"max bed {float(exact_best['maxBedTemp_C']):.2f} C, mean bed {float(exact_best['meanBedTemp_C']):.2f} C, "
+            f"combined cooling power {float(exact_best['combinedCoolingPower_W']):.1f} W"
+        )
+    if violated_best:
+        lines.append("  Best-available summer reference violates:")
+        for key, value in violated_best:
+            lines.append(f"    - {labels.get(key, key)}: {format_cooling_constraint_residual(key, value)}")
+    else:
+        lines.append("  Best-available summer reference satisfies all hard summer constraints.")
+
+    lines.append("  Closest misses across the full evaluated summer airflow sweep:")
+    shown = 0
+    for key in COOLING_NSGA_CONSTRAINT_KEYS:
+        if key not in minima:
+            continue
+        value, pt = minima[key]
+        lines.append(
+            f"    - {labels.get(key, key)}: closest miss {format_cooling_constraint_residual(key, value)}; "
+            f"violated by {counts[key]} / {total_points} points; nearest point at flow {float(pt['totalFlow_Lpm']):.1f} L/min"
         )
         shown += 1
         if shown >= max_items:
@@ -5898,6 +6275,7 @@ def write_cooling_summary(payload: dict, config: dict, output_dir: Path) -> None
     best_available = payload.get("best_available", {})
     ranked = rank_cooling_points(payload, config)
     hard_safe_count = sum(1 for pt in ranked if bool(pt.get("isConstraintSafeByCriteria", False)))
+    pareto_count = len(payload.get("pareto_candidates", []))
     top_list = cooling_top_candidates(payload, config)
     optimization_list = cooling_optimization_ranked_points(payload, config)
     opt = cooling_cfg["optimization"]
@@ -6070,39 +6448,49 @@ def write_cooling_summary(payload: dict, config: dict, output_dir: Path) -> None
     append_line(lines, "Lumped time constant", f"{float(lumped_loss.get('tau_h', np.nan)):.1f} h")
     append_line(lines, "Lumped Biot number estimate", f"{float(lumped_loss.get('Bi_lumped', np.nan)):.2f}")
     append_line(lines, "Hard-safe cooling points found", f"{hard_safe_count} of {len(payload['design_points'])}")
+    append_line(lines, "Feasible cooling Pareto points found", f"{pareto_count} of {len(payload['design_points'])}")
 
     lines.append("")
     lines.append("Summer cooling selection process:")
-    lines.append("  Hard-safe means all of the following hold simultaneously:")
+    lines.append("  Cooling recommendations now use constrained NSGA-II on the evaluated summer airflow sweep.")
     lines.append(
-        "    1. the predicted network pressure drop stays below the assist-blower available static pressure at that airflow;"
+        f"  NSGA-II settings                      : population {int(opt.get('population', 50))}, "
+        f"generations {int(opt.get('generations', 120))}, seed {int(opt.get('seed', 7))}"
     )
-    lines.append(
-        "    2. pressure drop, substrate water loss, and hole velocity remain below their configured limits;"
-    )
-    lines.append(
-        "    3. bottom and top bed temperatures remain within their configured summer minima and maxima;"
-    )
+    lines.append("  Step 1: compute the inequality-constraint residuals listed below for every sampled flow point.")
+    lines.append("  Step 2: run NSGA-II with those residuals as hard constraints and the objective set listed below.")
+    lines.append("  Step 3: keep only fully summer-hard-safe points on the resulting Pareto front.")
+    lines.append("  Step 4: report one design point from that feasible Pareto set using the configured cooling report-priority order.")
+    lines.append("  No weighted penalty score is used.")
+    lines.append("  Summer hard-safe means all of the following hold simultaneously:")
+    lines.append("    1. the predicted network pressure drop stays below the assist-blower available static pressure at that airflow;")
+    lines.append("    2. pressure drop, substrate water loss, and hole velocity remain below their configured limits;")
+    lines.append("    3. bottom and top bed temperatures remain within their configured summer minima and maxima;")
     lines.append("    4. bottom-top spread remains below the configured spread limit; and")
     lines.append("    5. net Q_to_bed is negative, so the spot-cooled airflow is actually removing heat from the bed.")
-    lines.append("  Clean ordering inside the hard-safe set:")
-    lines.append("    1. minimize max(T_bottom, T_top)")
-    lines.append("    2. minimize mean bed temperature")
-    lines.append("    3. minimize total cooling-system electric power")
-    lines.append("    4. minimize total airflow")
-    lines.append("    5. minimize bottom-top spread")
-    lines.append("  No weighted penalty score is used.")
+    lines.append("  Constraint residuals used by NSGA-II:")
+    for idx, key in enumerate(COOLING_NSGA_CONSTRAINT_KEYS, start=1):
+        lines.append(f"    {idx:>2}. {key}")
+    lines.append("  Objective set:")
+    for idx, key in enumerate(cooling_objective_order(config), start=1):
+        lines.append(f"    {idx:>2}. {key}")
+    lines.append("  Reported-design priority inside the feasible Pareto set:")
+    for idx, key in enumerate(cooling_report_priority_order(config), start=1):
+        lines.append(f"    {idx:>2}. {key}")
+    if not rec:
+        lines.append("  No summer-hard-safe Pareto point exists in the current sweep; the fallback diagnostics below use the best-available ranked sample.")
+        append_no_feasible_cooling_pareto_diagnostics(lines, payload, config, ranked)
 
     append_moisture_process(lines, payload, config)
     append_radial_profile_process(lines, payload, config)
     append_tube_layout_process(lines, payload, config, tube_layout)
 
-    write_cooling_design_point_block(lines, "Criteria-based summer cooling point:", rec, config)
+    write_cooling_design_point_block(lines, "NSGA-II reported feasible Pareto cooling point:", rec, config)
     write_cooling_design_point_block(lines, "Best-available summer reference point:", best_available, config)
 
     lines.append("")
     if rec:
-        lines.append("Top summer cooling candidates:")
+        lines.append("Top NSGA-II Pareto summer cooling candidates:")
     else:
         lines.append("Top best-available summer cooling candidates:")
     lines.append("  Qtot(L/min)  Tbottom(C)  Ttop(C)  dT(C)  Tair,out(C)  cooling(W)  water(kg/d)  Qspot(W)  Pspot(W)  Pblow(W)  Vhole  dP(Pa)  state")
@@ -6120,7 +6508,7 @@ def write_cooling_summary(payload: dict, config: dict, output_dir: Path) -> None
 
     if optimization_list:
         lines.append("")
-        lines.append("Optimization-ranked summer points:")
+        lines.append("NSGA-II optimization-ranked summer points:")
         lines.append("  Qtot(L/min)  Tmax(C)  Tmean(C)  dT(C)  cooling(W)  water(kg/d)  Pcool(W)  dP(Pa)  state")
         for pt in optimization_list:
             tmax = max(float(pt['TbottomFullPower_C']), float(pt['TtopFullPower_C']))
@@ -6644,10 +7032,12 @@ def main() -> None:
             "wire_length_trade_study.png",
             "vessel_configuration_comparison.png",
             "summer_spot_cooler_curves.png",
+            "cooling_pareto_front.png",
             "summer_evaporative_cooling_curves.png",
         ):
             (output_dir / stale).unlink(missing_ok=True)
         plot_summer_cooling_curves(payload, config, output_dir)
+        plot_cooling_pareto_front(payload, config, output_dir)
         plot_radial_air_cooling_profile(payload, config, output_dir)
         plot_habitat_exclusion_cross_section(payload, config, output_dir)
         write_cooling_summary(payload, config, output_dir)
