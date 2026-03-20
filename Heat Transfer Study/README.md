@@ -33,8 +33,12 @@ Key config fields:
 - `constraint_curve_count`: number of contour curves per continuous constraint/performance panel
 - `wire_plot_points`: interpolation density for the wire-diameter traces
 - `auto_refresh_export`: automatic MATLAB-export refresh settings used by `heat_transfer_study.py`
-- `matlab_parallel`: runtime-only MATLAB sweep acceleration settings; when enabled, the export uses `parfor` across independent pitch-flow rows while preserving the sequential voltage warm start within each row
-- `python_parallel`: runtime-only Python process-pool settings; when enabled, the standalone script parallelizes the independent cooling flow-point sweep and the independent day solves in the year-round analysis
+- `parallel`: grouped runtime-only pooling controls
+- `parallel.matlab`: MATLAB export acceleration settings; when enabled, the export uses `parfor` across independent pitch-flow rows while preserving the sequential voltage warm start within each row
+- `parallel.matlab.loops.exportSweepRowsParfor`: explicit toggle for the MATLAB sweep-row `parfor`
+- `parallel.python`: Python process-pool settings used by the standalone study runner
+- `parallel.python.loops.coolingFlowSweep`: explicit toggle for the independent summer cooling flow-point sweep
+- `parallel.python.loops.yearRoundDailySimulation`: explicit toggle for the independent day-by-day year-round simulation
 - `model_overrides`: shared study inputs passed into the MATLAB export, including sweep bounds, explicit operating limits, lexicographic thermal thresholds, wire-study flow resolution, perforation geometry, release fraction, moisture assumptions, the water-loss limit, and calibration multipliers
 - `model_overrides.environment`: shared ambient and pressure inputs for the heating export (`greenhouseAir_C`, `pressure_Pa`, `referencePlateLength_m`)
 - `model_overrides.bin`: active vessel geometry/top condition for the MATLAB export; the current default is the closed-top vented case and the widened-bin override now lives here as `width_m`
@@ -105,8 +109,8 @@ Automatic export refresh:
   `model_overrides` block against the signature stored in the export JSON.
 - If the signatures differ, it automatically calls `analyze_vermicomposter_heater.py`
   before generating plots and the `.txt` summary.
-- If `matlab_parallel.enabled` is true and MATLAB Parallel Computing Toolbox is available, the MATLAB export uses `parfor` with the configured worker count (`0` = local-profile default). This changes runtime behavior only; it does not change the physics or the export signature.
-- If `python_parallel.enabled` is true, `heat_transfer_study.py` uses a Windows-safe process pool for the coarse standalone tasks that are actually independent: the summer cooling flow sweep and the representative-year daily solves. This also changes runtime behavior only; it does not change the physics or the export signature.
+- If `parallel.matlab.enabled` is true and `parallel.matlab.loops.exportSweepRowsParfor` is also true, and MATLAB Parallel Computing Toolbox is available, the MATLAB export uses `parfor` with the configured worker count (`0` = local-profile default). This changes runtime behavior only; it does not change the physics or the export signature.
+- If `parallel.python.enabled` is true, `heat_transfer_study.py` uses a Windows-safe process pool only for the explicitly labeled independent loops enabled under `parallel.python.loops`, currently the summer cooling flow sweep and the representative-year daily solves. This also changes runtime behavior only; it does not change the physics or the export signature.
 - The one exception is a pure vessel-top switch handled through the already-exported
   `configuration_comparisons` data: with
   `auto_refresh_export.allow_bin_only_switch_from_export = true`, the standalone study can

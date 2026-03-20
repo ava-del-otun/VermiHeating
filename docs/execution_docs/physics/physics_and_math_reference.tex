@@ -2,15 +2,21 @@
 \usepackage[margin=1in]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
+\usepackage[expansion=false]{microtype}
 \usepackage{amsmath,amssymb,booktabs,longtable,array,siunitx,enumitem,hyperref,xurl}
 \hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
 \setlist{nosep}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.4em}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\setlength{\tabcolsep}{4pt}
+\setlength{\emergencystretch}{2em}
 \allowdisplaybreaks
-\newcommand{\srcref}[1]{\texttt{\detokenize{#1}}}
-\newcommand{\filepath}[1]{\texttt{\detokenize{#1}}}
-\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\srcref}[1]{\nolinkurl{#1}}
+\newcommand{\filepath}[1]{\nolinkurl{#1}}
+\newcommand{\code}[1]{\nolinkurl{#1}}
 \title{Physics and Mathematics Reference}
 \date{Generated 2026-03-19}
 \begin{document}
@@ -145,13 +151,40 @@ I_{\mathrm{tot}}=\sum_g n_{\mathrm{str},g}I_{\mathrm{tube},g},
 \qquad
 P_{\mathrm{tot}}=\sum_g n_{\mathrm{tubes},g}P_{\mathrm{tube},g}.
 \end{equation}
+The heater-tube air inlet is the greenhouse ambient state,
+\begin{equation}
+\label{eq:heater_air_inlet}
+T_{\mathrm{air,in}}=T_{\infty},
+\end{equation}
+and the aeration-tube inlet is the heater-tube outlet,
+\begin{equation}
+\label{eq:aeration_air_inlet}
+T_{\mathrm{air,in,aer}}=T_{\mathrm{air,out,heater}}.
+\end{equation}
+For any tube of outer diameter \(D_o\), the outside perimeter used to convert an axial length to an external heat-transfer area is
+\begin{equation}
+\label{eq:outer_perimeter}
+P_{\mathrm{out}}=\pi D_o,
+\qquad
+A_{\mathrm{seg,out}}=P_{\mathrm{out}}\Delta x.
+\end{equation}
 
-\textbf{Type.} Equations \eqref{eq:volflow_per_tube}--\eqref{eq:electrical_totals} are exact algebraic bookkeeping relations on the reduced-order model state. \\
+\textbf{Type.} Equations \eqref{eq:volflow_per_tube}--\eqref{eq:outer_perimeter} are exact algebraic bookkeeping relations on the reduced-order model state. \\
 \textbf{Repository-native narrative.} The same physical quantities appear in \filepath{Heat Transfer Study/VermiHeatLoss.tex:L961-L1034}, \filepath{Heat Transfer Study/VermiHeatLoss.tex:L1560-L1738}, and \filepath{Heat Transfer Study/VermiHeatLoss.tex:L2302-L2444}. \\
 \textbf{Implementation.} \srcref{vermicomposter_air_heater_design_model.m:L763-L875}; \srcref{vermicomposter_air_heater_design_model.m:L1497-L1677}; \srcref{vermicomposter_air_heater_design_model.m:L1684-L1727}. \\
 \textbf{Deviation note.} The MATLAB implementation permits mixed string sizes for odd tube counts; the equations above are therefore written in grouped summation form rather than assuming a single equivalent series-parallel pattern.
 
 \subsection{Heater-tube energy balance}
+With heater length \(L_{\mathrm{heater}}\) discretized into \(N_{\mathrm{heater}}\) segments,
+\begin{equation}
+\label{eq:heater_dx}
+\Delta x_{\mathrm{heater}}=\frac{L_{\mathrm{heater}}}{N_{\mathrm{heater}}},
+\end{equation}
+and the local generated electrical heat assigned to segment \(i\) is
+\begin{equation}
+\label{eq:heater_segment_generation}
+q_{\mathrm{gen},i}=P_{\mathrm{branch}}\frac{\Delta x_{\mathrm{heater}}}{L_{\mathrm{heater}}}.
+\end{equation}
 For heater segment \(i\), the air-energy update is
 \begin{equation}
 \label{eq:heater_segment_air}
@@ -164,13 +197,28 @@ Wire temperature is then recovered from the local wire-to-air temperature rise
 \qquad
 T_{\mathrm{wire},i}=T_{\mathrm{air},i}+\Delta T_{\mathrm{wire},i}.
 \end{equation}
+The segmentwise heater-shell loss is
+\begin{equation}
+\label{eq:heater_segment_loss}
+q_{\mathrm{loss},i}=U_{\mathrm{heater}}P_{\mathrm{out}}\Delta x_{\mathrm{heater}}\left(T_{\mathrm{air},i}-T_\infty\right).
+\end{equation}
 
-\textbf{Type.} Equation \eqref{eq:heater_segment_air} is a discretized one-dimensional steady energy balance. Equation \eqref{eq:wire_delta_t} is a reduced-order algebraic temperature-drop closure. \\
+\textbf{Type.} Equation \eqref{eq:heater_segment_generation} is exact segment bookkeeping on the reduced model. Equation \eqref{eq:heater_segment_air} is a discretized one-dimensional steady energy balance. Equations \eqref{eq:wire_delta_t} and \eqref{eq:heater_segment_loss} are reduced-order algebraic temperature-drop and shell-loss closures. \\
 \textbf{Repository-native narrative.} \filepath{Heat Transfer Study/VermiHeatLoss.tex:L38-L121}. \\
 \textbf{Implementation.} \srcref{vermicomposter_air_heater_design_model.m:L1803-L1894}; \srcref{heat_transfer_study.py:L3775-L3895}. \\
 \textbf{Deviation note.} The wire-to-air temperature difference is represented by a direct convective drop rather than a resolved wire conduction model.
 
 \subsection{Aeration-tube segment balance}
+With aeration length \(L_{\mathrm{aer}}\) discretized into \(N_{\mathrm{aer}}\) segments,
+\begin{equation}
+\label{eq:aeration_dx}
+\Delta x_{\mathrm{aer}}=\frac{L_{\mathrm{aer}}}{N_{\mathrm{aer}}},
+\end{equation}
+and with a uniform segmentwise released mass,
+\begin{equation}
+\label{eq:released_mass_per_segment}
+\dot m_{\mathrm{rel},i}=\frac{\phi_{\mathrm{rel}}\dot m_{\mathrm{tube,in}}}{N_{\mathrm{aer}}}.
+\end{equation}
 For aeration segment \(i\), the net bed-side energy contribution is
 \begin{equation}
 \label{eq:aeration_q_net}
@@ -186,11 +234,35 @@ and the total bed heat rate across \(N_{\mathrm{tubes}}\) identical branches is
 \label{eq:aeration_total_q}
 Q_{\mathrm{bed,total}}=N_{\mathrm{tubes}}Q_{\mathrm{bed,branch}}.
 \end{equation}
+The winter MATLAB march reduces the in-tube mass flow after each segment by
+\begin{equation}
+\label{eq:aeration_remaining_mdot}
+\dot m_{\mathrm{rem},i+1}=\dot m_{\mathrm{rem},i}-\dot m_{\mathrm{rel},i},
+\end{equation}
+and advances the bulk in-tube air temperature using only the wall-transfer term,
+\begin{equation}
+\label{eq:aeration_air_march}
+T_{\mathrm{air},i+1}=T_{\mathrm{air},i}-\frac{q_{\mathrm{wall},i}}{\dot m_{\mathrm{rem},i+1}c_p}.
+\end{equation}
+The summer Python branch instead applies the same wall exchange through an exponential segment factor,
+\begin{equation}
+\label{eq:cooling_wall_factor}
+\Theta_i=\exp\!\left[-\frac{U_{\mathrm{aer}}P_{\mathrm{out}}\Delta x_{\mathrm{aer}}}{\dot m_{\mathrm{mean},i}c_p}\right],
+\end{equation}
+\begin{equation}
+\label{eq:cooling_air_after_wall}
+T_{\mathrm{air,after\,wall},i}=T_{\mathrm{bed,ref}}+\left(T_{\mathrm{air},i}-T_{\mathrm{bed,ref}}\right)\Theta_i,
+\end{equation}
+with
+\begin{equation}
+\label{eq:cooling_q_wall_exact}
+q_{\mathrm{wall},i}=\dot m_{\mathrm{mean},i}c_p\left(T_{\mathrm{air},i}-T_{\mathrm{air,after\,wall},i}\right).
+\end{equation}
 
 \textbf{Type.} Derived reduced-order balance. \\
 \textbf{Repository-native narrative.} \filepath{Heat Transfer Study/VermiHeatLoss.tex:L151-L205}; \filepath{Heat Transfer Study/VermiHeatLoss.tex:L1586-L1609}; \filepath{Heat Transfer Study/VermiHeatLoss.tex:L2168-L2238}. \\
-\textbf{Implementation.} \srcref{vermicomposter_air_heater_design_model.m:L1895-L1999}; \srcref{heat_transfer_study.py:L2815-L2959}. \\
-\textbf{Deviation note.} The model treats released-air sensible exchange as a lumped enthalpy source rather than resolving jets in the pore space.
+\textbf{Implementation.} \srcref{vermicomposter_air_heater_design_model.m:L1895-L1999}; \srcref{heat_transfer_study.py:L2821-L2899}. \\
+\textbf{Deviation note.} The model treats released-air sensible exchange as a lumped enthalpy source rather than resolving jets in the pore space. The rooted execution graph therefore uses two closely related but not identical march forms: a winter MATLAB explicit wall-only air update and a summer Python exponential wall-factor update.
 
 \subsection{Two-node bed balance}
 The bottom and top bed nodes are solved from the steady \(2\times 2\) linear system
@@ -429,12 +501,7 @@ The direct released-air enthalpy term is
 \label{eq:aeration_q_jet}
 q_{\mathrm{jet},i}=\dot m_{\mathrm{rel},i}c_p\left(T_{\mathrm{air},i}-T_{\mathrm{bed,ref}}\right).
 \end{equation}
-The air temperature is then marched by subtracting the total segment exchange from the stream,
-\begin{equation}
-\label{eq:aeration_air_march}
-T_{\mathrm{air},i+1}=T_{\mathrm{air},i}-\frac{q_{\mathrm{wall},i}+q_{\mathrm{jet},i}-q_{\mathrm{evap},i}}{\dot m_{\mathrm{tube}}c_p},
-\end{equation}
-with sign naturally reversing between heating and cooling because the temperature differences themselves change sign.
+The in-tube air-temperature march is not a single universal formula across the rooted execution graph. The winter MATLAB branch uses the explicit wall-only update in \eqref{eq:aeration_air_march}, whereas the summer Python branch uses the exponential wall-factor form \eqref{eq:cooling_air_after_wall} with the exact wall exchange \eqref{eq:cooling_q_wall_exact}. In both cases, the net bed contribution still follows \eqref{eq:aeration_q_net}, so the sign of \(q_{\mathrm{jet},i}\) and of the total segment contribution naturally reverses between heating and cooling.
 
 \textbf{Type.} Derived reduced-order segment model. \\
 \textbf{Repository-native narrative.} \filepath{Heat Transfer Study/VermiHeatLoss.tex:L151-L205}; \filepath{Heat Transfer Study/VermiHeatLoss.tex:L2168-L2238}. \\
@@ -442,25 +509,7 @@ with sign naturally reversing between heating and cooling because the temperatur
 \textbf{Deviation note.} The air-release fraction is prescribed, not dynamically solved from local perforation pressure and hole discharge coefficients.
 
 \section{Warm-air release / jet-heating treatment}
-The released-air term \eqref{eq:aeration_q_jet} is the model's surrogate for direct pore-space heating or cooling by discharged air. It should be interpreted as an enthalpy source or sink attached to the released fraction \(\dot m_{\mathrm{rel},i}\), not as a resolved jet correlation. In the summer branch, the same equation is reused with \(T_{\mathrm{air}}<T_{\mathrm{bed,ref}}\), so \(q_{\mathrm{jet},i}\) becomes negative and contributes to net cooling.
-
-The radial plume post-processing extends this released-air concept by growing an effective plume radius
-\begin{equation}
-\label{eq:plume_radius}
-b(x)=\min\!\left(b_{\max},\,b_0+\alpha x\right),
-\end{equation}
-assigning a contacted wetted area per radial length
-\begin{equation}
-\label{eq:plume_contact_area}
-A'_{\mathrm{wet}}(x)=\pi a_{\mathrm{wet}}b(x)^2,
-\end{equation}
-and solving
-\begin{equation}
-\label{eq:plume_energy_ode}
-\dot m'_{\mathrm{rel}}c_p\frac{dT}{dx}=-
-\left[q'_{\mathrm{sens}}(x)+q'_{\mathrm{lat}}(x)\right].
-\end{equation}
-This post-processing is used for the radial air-cooling plot and the worm-safe stand-off estimate rather than for the core heating recommendation.
+The released-air term \eqref{eq:aeration_q_jet} is the model's surrogate for direct pore-space heating or cooling by discharged air. It should be interpreted as an enthalpy source or sink attached to the released fraction \(\dot m_{\mathrm{rel},i}\), not as a resolved jet correlation. In the summer branch, the same equation is reused with \(T_{\mathrm{air}}<T_{\mathrm{bed,ref}}\), so \(q_{\mathrm{jet},i}\) becomes negative and contributes to net cooling. The associated radial plume cooling, worm-safe distance, and habitat-exclusion mathematics are documented in full in the later plume/habitat section beginning at \eqref{eq:release_per_length}.
 
 \textbf{Type.} Reduced-order enthalpy model plus repository-specific plume post-processing. \\
 \textbf{Repository-native narrative.} \filepath{Heat Transfer Study/VermiHeatLoss.tex:L1342-L1585}. \\
@@ -542,6 +591,165 @@ q_{\mathrm{evap,seg}}=\dot m_{\mathrm{evap,seg}}h_{fg}.
 \textbf{Implementation.} \srcref{vermicomposter_air_heater_design_model.m:L891-L937}; \srcref{vermicomposter_air_heater_design_model.m:L2000-L2122}; \srcref{heat_transfer_study.py:L2567-L2603}; \srcref{heat_transfer_study.py:L3607-L3708}. \\
 \textbf{Deviation note.} The summer branch computes inlet humidity after spot-cooler condensate removal, so the effective \(\rho_{v,\infty}\) is not always the raw ambient-RH state.
 
+\section{Radial plume, worm-safe stand-off, and habitat-exclusion post-processing}
+The released-air post-processing model starts from the released mass flow rate per unit aeration-tube length,
+\begin{equation}
+\label{eq:release_per_length}
+\dot m'_{\mathrm{rel}}=\frac{\phi_{\mathrm{rel}}\dot m_{\mathrm{tube,in}}}{L_{\mathrm{aer}}},
+\end{equation}
+and the wetted-area density
+\begin{equation}
+\label{eq:wetted_area_density}
+a_{\mathrm{wet}}=\frac{A_{\mathrm{wet}}}{V_{\mathrm{fill}}}.
+\end{equation}
+The local wet-surface sink temperature is clamped between the configured surface temperature, the bed-reference temperature, and the released-air temperature:
+\begin{equation}
+\label{eq:plume_sink_temperature}
+T_{\mathrm{sink}}=\min\!\left(\max(T_{s,\mathrm{set}},T_{\mathrm{bed,ref}}),T_{\mathrm{air,out}}\right).
+\end{equation}
+The plume radius is grown as
+\begin{equation}
+\label{eq:plume_radius}
+b(x)=\min\!\left(b_{\max},\,b_0+\alpha x\right),
+\end{equation}
+so the contacted wetted area per radial length is
+\begin{equation}
+\label{eq:plume_contact_area}
+A'_{\mathrm{wet}}(x)=\pi a_{\mathrm{wet}}b(x)^2.
+\end{equation}
+The sensible and latent radial sink terms are
+\begin{equation}
+\label{eq:plume_sensible_sink}
+q'_{\mathrm{sens}}(x)=h_{\mathrm{sens}}A'_{\mathrm{wet}}(x)\left(T-T_{\mathrm{sink}}\right),
+\end{equation}
+\begin{equation}
+\label{eq:plume_latent_sink}
+q'_{\mathrm{lat}}(x)=\dot m'_{\mathrm{evap}}(x)h_{fg}(T_s),
+\end{equation}
+and the plume temperature satisfies
+\begin{equation}
+\label{eq:plume_energy_ode}
+\dot m'_{\mathrm{rel}}c_p\frac{dT}{dx}=-
+\left[q'_{\mathrm{sens}}(x)+q'_{\mathrm{lat}}(x)\right].
+\end{equation}
+The local mass-transfer coefficient is formed by the Lewis relation using local air properties,
+\begin{equation}
+\label{eq:plume_mass_transfer}
+h_m(x)=\frac{h_{\mathrm{evap}}}{\rho_{\mathrm{air}}(T)c_{p,\mathrm{air}}\mathrm{Le}^{2/3}},
+\end{equation}
+which gives the potential diffusion-driven evaporation rate per radial length,
+\begin{equation}
+\label{eq:plume_evap_potential}
+\dot m'_{\mathrm{evap,pot}}=
+h_m(x)A'_{\mathrm{wet}}(x)\left[\rho_{v,\mathrm{sat}}(T_s)-\rho_{v,\mathrm{bulk}}(x)\right].
+\end{equation}
+The code advances the plume humidity explicitly and caps the bulk vapor density at saturation at the updated plume temperature \srcref{heat_transfer_study.py:L1241-L1292}. If the worm-safety threshold is \(T_{\mathrm{safe}}\), the safe radial offset is the first \(x\) such that
+\begin{equation}
+\label{eq:worm_safe_distance}
+T(x)=T_{\mathrm{safe}},
+\end{equation}
+located in the code by interpolation on the numerically marched profile \srcref{heat_transfer_study.py:L1307-L1332}.
+
+For habitat accounting, the filled-bed height and volume are
+\begin{equation}
+\label{eq:fill_height}
+H_{\mathrm{fill}}=f_{\mathrm{fill}}H,
+\qquad
+V_{\mathrm{fill}}=LWH_{\mathrm{fill}},
+\end{equation}
+with filled-bed cross section
+\begin{equation}
+\label{eq:filled_domain}
+\Omega_{\mathrm{fill}}=\left\{(x,y):0\le x\le W,\ 0\le y\le H_{\mathrm{fill}}\right\}.
+\end{equation}
+If the safe offset is \(x_{\mathrm{safe}}\), the exclusion radius around each tube is
+\begin{equation}
+\label{eq:exclusion_radius}
+R_{\mathrm{exc}}=r_0+x_{\mathrm{safe}}.
+\end{equation}
+The pipe and exclusion indicator functions are
+\begin{equation}
+\label{eq:pipe_indicator}
+I_{\mathrm{pipe}}(x,y)=
+\begin{cases}
+1, & \exists i:\ (x-x_i)^2+(y-y_i)^2\le r_0^2,\\
+0, & \text{otherwise},
+\end{cases}
+\end{equation}
+\begin{equation}
+\label{eq:exclusion_indicator}
+I_{\mathrm{exc}}(x,y)=
+\begin{cases}
+1, & \exists i:\ (x-x_i)^2+(y-y_i)^2\le R_{\mathrm{exc}}^2,\\
+0, & \text{otherwise}.
+\end{cases}
+\end{equation}
+The overlap-aware union areas are
+\begin{equation}
+\label{eq:pipe_union_area}
+A_{\mathrm{pipe,union}}=\iint_{\Omega_{\mathrm{fill}}} I_{\mathrm{pipe}}(x,y)\,dA,
+\end{equation}
+\begin{equation}
+\label{eq:exclusion_union_area}
+A_{\mathrm{exc,union}}=\iint_{\Omega_{\mathrm{fill}}} I_{\mathrm{exc}}(x,y)\,dA,
+\end{equation}
+with volumes obtained by extrusion over aeration-tube length,
+\begin{equation}
+\label{eq:pipe_exclusion_volumes}
+V_{\mathrm{pipe}}=A_{\mathrm{pipe,union}}L_{\mathrm{aer}},
+\qquad
+V_{\mathrm{exc}}=A_{\mathrm{exc,union}}L_{\mathrm{aer}}.
+\end{equation}
+The shell-only unsafe volume and remaining habitable volume are then
+\begin{equation}
+\label{eq:unsafe_shell_volume}
+V_{\mathrm{unsafe,shell}}=V_{\mathrm{exc}}-V_{\mathrm{pipe}},
+\end{equation}
+\begin{equation}
+\label{eq:habitable_volume}
+V_{\mathrm{hab}}=V_{\mathrm{fill}}-V_{\mathrm{unsafe,total}}.
+\end{equation}
+When the radial plume reaches the left, right, or bottom wall, the code computes an inside-wall temperature from the same wall stack used in the main bin-loss model,
+\begin{equation}
+\label{eq:wall_return_flux}
+q''_{\mathrm{wall}}=
+\frac{T_{\mathrm{plume,wall}}-T_\infty}
+{\frac{1}{h_{\mathrm{in}}}+\frac{t_{\mathrm{sheet}}}{k_{\mathrm{sheet}}}+\frac{t_{\mathrm{ins}}}{k_{\mathrm{ins}}}+\frac{1}{h_{\mathrm{ext}}}},
+\end{equation}
+\begin{equation}
+\label{eq:wall_inner_temperature}
+T_{\mathrm{wall,in}}=T_{\mathrm{plume,wall}}-\frac{q''_{\mathrm{wall}}}{h_{\mathrm{in}}},
+\end{equation}
+then converts that to an added unsafe band depth with a linear wall-normal interpolation between the bed temperature and the wall-contact temperature \srcref{heat_transfer_study.py:L1531-L1555}. The final reported unsafe volume is the union of plume exclusion cylinders and wall-return bands:
+\begin{equation}
+\label{eq:unsafe_total_volume}
+V_{\mathrm{unsafe,total}}=V_{\mathrm{union}}.
+\end{equation}
+For overlap reporting, the naive no-overlap sums are
+\begin{equation}
+\label{eq:naive_overlap_sums}
+A_{\mathrm{pipe,sum}}=N_{\mathrm{tubes}}\pi r_0^2,
+\qquad
+A_{\mathrm{exc,sum}}=N_{\mathrm{tubes}}\pi R_{\mathrm{exc}}^2,
+\end{equation}
+with overlap corrections
+\begin{equation}
+\label{eq:overlap_corrections}
+A_{\mathrm{pipe,ov}}=A_{\mathrm{pipe,sum}}-A_{\mathrm{pipe,union}},
+\qquad
+A_{\mathrm{exc,ov}}=A_{\mathrm{exc,sum}}-A_{\mathrm{exc,union}}.
+\end{equation}
+Numerically, the union areas are evaluated on a midpoint grid:
+\begin{equation}
+\label{eq:midpoint_union_area}
+A\approx \left(\frac{WH_{\mathrm{fill}}}{N_g^2}\right)\sum_{j=1}^{N_g}\sum_{k=1}^{N_g} I(x_j^\ast,y_k^\ast).
+\end{equation}
+
+\textbf{Type.} Repository-specific radial thermal/moisture post-processing and overlap-aware geometry bookkeeping. \\
+\textbf{Repository-native narrative.} \filepath{Heat Transfer Study/VermiHeatLoss.tex:L1277-L1571}. \\
+\textbf{Implementation.} \srcref{heat_transfer_study.py:L1119-L1367}; \srcref{heat_transfer_study.py:L1440-L1664}. \\
+\textbf{Deviation note.} The plume model is not part of the core heater or cooling-march solve. It is a post-processing estimator used for the radial cooling plot and the habitat-exclusion metrics.
+
 \section{Bin-wall and ambient heat-loss model}
 The vessel geometry is
 \begin{equation}
@@ -558,6 +766,30 @@ With \(N_{\mathrm{vent}}\) top vent holes of diameter \(d_{\mathrm{vent}}\),
 A_{\mathrm{vent}}=N_{\mathrm{vent}}\frac{\pi d_{\mathrm{vent}}^2}{4},
 \qquad
 A_{\mathrm{top,cov}}=A_{\mathrm{top}}-A_{\mathrm{vent}}.
+\end{equation}
+For open-top convection, the characteristic length is taken as
+\begin{equation}
+\label{eq:top_characteristic_length}
+L_{c,\mathrm{top}}=\frac{A_{\mathrm{top}}}{P_{\mathrm{top}}},
+\qquad
+P_{\mathrm{top}}=2(L+W),
+\end{equation}
+so the top natural-convection coefficient is
+\begin{equation}
+\label{eq:top_convection_h}
+h_{\mathrm{top}}=\frac{Nu_{\mathrm{top}}k}{L_{c,\mathrm{top}}},
+\end{equation}
+with \(Nu_{\mathrm{top}}\) given by \eqref{eq:natural_convection_horizontal}. The total vessel heat-loss forms can then be written explicitly as
+\begin{equation}
+\label{eq:q_loss_closed}
+Q_{\mathrm{loss,closed}}=
+U_{\mathrm{wall}}(A_{\mathrm{side}}+A_{\mathrm{bottom}}+A_{\mathrm{top}})(T_{\mathrm{bin}}-T_\infty),
+\end{equation}
+\begin{equation}
+\label{eq:q_loss_open}
+Q_{\mathrm{loss,open}}=
+U_{\mathrm{wall}}(A_{\mathrm{side}}+A_{\mathrm{bottom}})(T_{\mathrm{bin}}-T_\infty)
++h_{\mathrm{top}}A_{\mathrm{top}}(T_{\mathrm{bin}}-T_\infty).
 \end{equation}
 For an open top, the top-node and total ambient conductances are
 \begin{equation}
@@ -640,6 +872,18 @@ If a coefficient of performance is supplied,
 \label{eq:spot_cop_power}
 P_{\mathrm{spot}}=\frac{\dot Q_{\mathrm{actual,cool}}}{\mathrm{COP}}.
 \end{equation}
+The aeration-network inlet is then reset to the actual spot-cooler supply state,
+\begin{equation}
+\label{eq:summer_air_inlet}
+T_{\mathrm{air,in}}=T_{\mathrm{supply,actual}},
+\end{equation}
+while the electrical heater is disabled:
+\begin{equation}
+\label{eq:summer_zero_heater}
+P_{\mathrm{tot}}=0,
+\qquad
+I_{\mathrm{tot}}=0.
+\end{equation}
 
 The post-cooler condensate calculation uses the dry-air flow rate \(\dot m_{\mathrm{dry}}\) and the saturated outlet humidity ratio \(w_{\mathrm{sat,out}}\):
 \begin{equation}
@@ -674,6 +918,22 @@ The assist blower is represented by a linear static curve. With shutoff pressure
 \Delta p_{\mathrm{shutoff}}
 \left(1-\frac{\dot V}{\dot V_{\mathrm{free}}}\right),\,0
 \right].
+\end{equation}
+The total summer water-loss rate is
+\begin{equation}
+\label{eq:summer_water_loss_day}
+\dot m_{\mathrm{water,day}}=
+86400\,N_{\mathrm{tubes}}\sum_i \dot m_{\mathrm{evap},i},
+\end{equation}
+the reported net cooling is
+\begin{equation}
+\label{eq:summer_cooling_capacity}
+Q_{\mathrm{cool}}=\max\!\left(-Q_{\mathrm{bed,total}},\,0\right),
+\end{equation}
+and the corresponding lumped cooling requirement at the cooling setpoint is
+\begin{equation}
+\label{eq:summer_required_cooling}
+Q_{\mathrm{req,cool}}=UA_{\mathrm{tot}}\left(T_{\infty,\mathrm{summer}}-T_{\mathrm{set,cool}}\right).
 \end{equation}
 
 \textbf{Type.} Repository-specific surrogate model. Equations \eqref{eq:spot_requested_load}--\eqref{eq:spot_cop_power} are simplified sensible-capacity relations; \eqref{eq:psychrometric_condensate}--\eqref{eq:outlet_humidity_ratio} are psychrometric mass-balance relations; \eqref{eq:assist_blower_free_air}--\eqref{eq:assist_blower_linear_curve} are linearized blower approximations. \\
@@ -722,7 +982,7 @@ The current cooling hard-constraint residual vector is
 where \(Q_{\mathrm{cool}}=\max(-Q_{\mathrm{bed,total}},0)\).
 
 \textbf{Type.} Repository-defined feasibility residuals. \\
-\textbf{Repository-native narrative.} Heating constraints appear in \filepath{Heat Transfer Study/VermiHeatLoss.tex:L1614-L1738}. The old summer narrative at \filepath{Heat Transfer Study/VermiHeatLoss.tex:L2238-L2284} documented a lexicographic cooling rule and is now stale with respect to the current Python implementation. \\
+\textbf{Repository-native narrative.} Heating constraints appear in \filepath{Heat Transfer Study/VermiHeatLoss.tex:L1614-L1738}. The historical summer lexicographic block at \filepath{Heat Transfer Study/VermiHeatLoss.tex:L2251-L2279} is intentionally \emph{not} treated as governing because the live Python code now uses constrained NSGA-II for cooling. \\
 \textbf{Implementation.} \srcref{heat_transfer_study.py:L2220-L2451}; \srcref{heat_transfer_study.py:L2963-L3147}. \\
 \textbf{Deviation note.} The cooling NSGA-II constraints require positive cooling capacity, but they do \emph{not} currently enforce \(Q_{\mathrm{cool}}\ge Q_{\mathrm{req,cool}}\). Cooling shortfall is computed for diagnostics, not as a hard feasibility constraint.
 
@@ -773,9 +1033,18 @@ P_{\mathrm{spot}}+P_{\mathrm{blower}}\\
 -Q_{\mathrm{cool}}
 \end{bmatrix}.
 \end{equation}
+If no feasible cooling Pareto point exists, the code falls back to a best-available diagnostic ranking using the configured ordered tuple
+\begin{equation}
+\label{eq:cooling_fallback_selection}
+\pi_{\mathrm{cool,fallback}}=
+\left[
+g_{\sigma(1)},g_{\sigma(2)},\dots,g_{\sigma(m)}
+\right],
+\end{equation}
+where \(\sigma\) is the configured \code{priority\_order} permutation over the implemented cooling metrics and residuals \srcref{heat_transfer_study.py:L3133-L3149}; \srcref{heat_transfer_study.py:L3173-L3177}; \srcref{heat_transfer_study.py:L3244-L3246}. This is a live fallback/reporting rule, not the stale historical summer primary-selection rule described in \filepath{Heat Transfer Study/VermiHeatLoss.tex:L2251-L2279}.
 
 \textbf{Type.} Repository-defined optimization quantities. \\
-\textbf{Repository-native narrative.} Heating NSGA-II is described in \filepath{Heat Transfer Study/VermiHeatLoss.tex:L1614-L1738}. The summer section still describes a lexicographic cooling rule and therefore no longer matches the current code exactly \filepath{Heat Transfer Study/VermiHeatLoss.tex:L2238-L2284}. \\
+\textbf{Repository-native narrative.} Heating NSGA-II is described in \filepath{Heat Transfer Study/VermiHeatLoss.tex:L1614-L1738}. The stale summer lexicographic primary-selection narrative in \filepath{Heat Transfer Study/VermiHeatLoss.tex:L2251-L2279} is intentionally excluded from the governing-equation set here because it is not implemented. \\
 \textbf{Implementation.} \srcref{heat_transfer_study.py:L51-L121}; \srcref{heat_transfer_study.py:L2181-L2499}; \srcref{heat_transfer_study.py:L3148-L3208}; \srcref{heat_transfer_study.py:L6220-L6490}. \\
 \textbf{Deviation note.} NSGA-II is used on an already evaluated discrete set. It is not replacing the physics solve with a continuous surrogate optimizer.
 
@@ -791,8 +1060,53 @@ P_{\mathrm{spot}}+P_{\mathrm{blower}}\\
 \item NSGA-II is applied to integer-valued indices or discrete point indices through \texttt{pymoo}; the optimizer explores the discrete repository candidate set rather than an interpolated continuous space \srcref{heat_transfer_study.py:L2410-L2499}; \srcref{heat_transfer_study.py:L3123-L3208}.
 \end{itemize}
 
-\subsection*{Annual-layer auxiliary equations}
-The representative-year ambient baseline uses circular Gaussian-kernel regression:
+\subsection*{Detailed marching and fixed-point closures}
+The current heating solver uses the temperature-dependent wire resistivity
+\begin{equation}
+\label{eq:wire_resistivity_temperature}
+\rho_{\mathrm{wire}}(T)=\rho_{\mathrm{wire},20}\left[1+\alpha_{\mathrm{wire}}(T-20^\circ\mathrm{C})\right],
+\end{equation}
+which yields a tube or branch resistance of the form already introduced in \eqref{eq:wire_resistance}. The fixed-point iteration updates the average wire temperature by under-relaxation:
+\begin{equation}
+\label{eq:wire_underrelaxation}
+\overline{T}_{\mathrm{wire}}^{(k+1)}
+=0.65\,\overline{T}_{\mathrm{wire}}^{(k)}+0.35\,\overline{T}_{\mathrm{wire,new}}^{(k)},
+\end{equation}
+and stops when
+\begin{equation}
+\label{eq:wire_convergence}
+\left|\overline{T}_{\mathrm{wire,new}}^{(k)}-\overline{T}_{\mathrm{wire}}^{(k)}\right|<0.05^\circ\mathrm{C},
+\end{equation}
+or when the configured iteration cap is reached \srcref{vermicomposter_air_heater_design_model.m:L1497-L1536}. The winter aeration pressure-drop march uses the segment contribution
+\begin{equation}
+\label{eq:segment_pressure_drop}
+\Delta p_{\mathrm{seg}}=
+\left(f\frac{\Delta x}{D}+\frac{K_{\mathrm{minor}}}{N}\right)\frac{\rho u^2}{2},
+\end{equation}
+with the total candidate pressure drop assembled from the marched branch losses plus the distribution-network losses in \eqref{eq:distribution_total_dp} \srcref{vermicomposter_air_heater_design_model.m:L1953-L1956}; \srcref{vermicomposter_air_heater_design_model.m:L2123-L2232}.
+
+The summer branch closes the bed-reference temperature by solving the scalar consistency condition
+\begin{equation}
+\label{eq:summer_bed_reference_residual}
+R(T_{\mathrm{bed,ref}})=\frac{T_b(T_{\mathrm{bed,ref}})+T_t(T_{\mathrm{bed,ref}})}{2}-T_{\mathrm{bed,ref}}=0,
+\end{equation}
+where \(T_b\) and \(T_t\) are obtained from the two-node bed solve using the branch heat rate predicted at that trial reference temperature \srcref{heat_transfer_study.py:L2910-L2917}. If the lower and upper trial bounds bracket a sign change, the code applies bisection:
+\begin{equation}
+\label{eq:summer_bisection_midpoint}
+T_{\mathrm{mid}}=\frac{T_{\mathrm{lo}}+T_{\mathrm{hi}}}{2},
+\end{equation}
+updating the bracket by the sign of \(R(T_{\mathrm{mid}})\) until either
+\begin{equation}
+\label{eq:summer_bisection_stop}
+\left|R(T_{\mathrm{mid}})\right|<0.02
+\qquad \text{or} \qquad
+\left|T_{\mathrm{hi}}-T_{\mathrm{lo}}\right|<0.02,
+\end{equation}
+otherwise the closer endpoint is retained \srcref{heat_transfer_study.py:L2918-L2947}. These are repository numerical constructs rather than textbook closed forms.
+
+\section{Annual climate and year-round operating layer}
+\subsection{Climate anchors and regression baseline}
+The annual layer stores for each month \(m\) a Connecticut monthly mean temperature \(\bar T_m\) and monthly standard deviation \(\sigma_m\) derived from the NOAA series described in \filepath{Heat Transfer Study/VermiHeatLoss.tex:L2576-L2616}. The representative-year ambient baseline uses circular Gaussian-kernel regression:
 \begin{equation}
 \label{eq:kernel_baseline}
 \hat y(d)=\frac{\sum_i w_i(d)y_i}{\sum_i w_i(d)},
@@ -804,7 +1118,94 @@ with wraparound day distance
 \label{eq:circular_day_distance}
 \delta_i(d)=\min\!\left(|d-d_i|,\ P-|d-d_i|\right).
 \end{equation}
-The daily duty application is
+This same periodic Gaussian regression is applied both to the monthly mean anchors and to the monthly standard-deviation anchors \srcref{heat_transfer_study.py:L4794-L4808}; \srcref{heat_transfer_study.py:L4866-L4879}.
+
+\subsection{Freeze-day allocation and anomaly override}
+Expected monthly freeze-day counts are converted to representative integer counts by largest-remainder allocation:
+\begin{equation}
+\label{eq:largest_remainder}
+n_{f,m}=\mathrm{LR}(F_m).
+\end{equation}
+Within each month, day-of-month weights are centered on the observed mean freeze day \(\mu_{f,m}\):
+\begin{equation}
+\label{eq:freeze_weight}
+w_{f,m}(i)=\exp\!\left[-\frac{(i-\mu_{f,m})^2}{2s_{f,m}^2}\right],
+\end{equation}
+and sequential selection applies a repulsion modifier
+\begin{equation}
+\label{eq:freeze_repulsion}
+\tilde w_{f,m}(i)=
+w_{f,m}(i)\prod_{j\in\mathcal{S}_{f,m}}
+\left[1-0.65\exp\!\left(-\frac{(i-j)^2}{2r_{f,m}^2}\right)\right].
+\end{equation}
+On the selected freeze days, the ambient profile is overridden by
+\begin{equation}
+\label{eq:freeze_override}
+T_m(d)=\min\!\left(T_{\mathrm{base},m}(d),\,\bar T_m-\Delta T_{f,m}\right).
+\end{equation}
+These relations correspond to \srcref{heat_transfer_study.py:L4683-L4732}; \srcref{heat_transfer_study.py:L4893-L4906}.
+
+\subsection{Heat-wave allocation and anomaly override}
+Monthly spell starts and total heat-wave days are likewise allocated by largest-remainder rounding:
+\begin{equation}
+\label{eq:heatwave_alloc}
+n_{s,m}=\mathrm{LR}(S_m),
+\qquad
+n_{h,m}=\mathrm{LR}(H_m).
+\end{equation}
+The start-day weighting is
+\begin{equation}
+\label{eq:heatwave_weight}
+w_{h,m}(i)=\exp\!\left[-\frac{(i-\mu_{h,m})^2}{2s_{h,m}^2}\right],
+\end{equation}
+with repulsion-modified score
+\begin{equation}
+\label{eq:heatwave_repulsion}
+\tilde w_{h,m}(i)=
+w_{h,m}(i)\prod_{j\in\mathcal{S}_{h,m}}
+\left[1-0.65\exp\!\left(-\frac{(i-j)^2}{2r_{h,m}^2}\right)\right].
+\end{equation}
+Each selected heat-wave spell is forced to last at least three days in the code, and the ambient override is
+\begin{equation}
+\label{eq:heatwave_override}
+T_m(d)=\max\!\left(T_m(d),\,\bar T_m+\Delta T_{h,m}\right).
+\end{equation}
+These relations correspond to \srcref{heat_transfer_study.py:L4735-L4791}; \srcref{heat_transfer_study.py:L4907-L4911}.
+
+\subsection{Daily heating and cooling loads}
+For each representative day \(d\), the required heating and cooling loads are
+\begin{equation}
+\label{eq:daily_required_heating}
+Q_{\mathrm{req},h}(d)=UA_{\mathrm{bin}}\max\!\left(T_{h,\mathrm{set}}-T_\infty(d),\,0\right),
+\end{equation}
+\begin{equation}
+\label{eq:daily_required_cooling}
+Q_{\mathrm{req},c}(d)=UA_{\mathrm{bin}}\max\!\left(T_\infty(d)-T_{c,\mathrm{set}},\,0\right),
+\end{equation}
+which are implemented by rebuilding the bin model at the day's ambient and calling the same lumped-loss routine used elsewhere \srcref{heat_transfer_study.py:L4977-L4983}.
+
+\subsection{Reference-point capacity re-solve and duty application}
+The annual layer re-solves the selected heating and cooling operating points at each day’s ambient temperature to obtain
+\begin{equation}
+\label{eq:annual_heating_capacity}
+Q_{h,\mathrm{cap}}(d)=Q_{\mathrm{to\,bed},h}\!\left(T_\infty(d)\right),
+\qquad
+P_{h,\mathrm{elec}}(d)=P_h\!\left(T_\infty(d)\right),
+\end{equation}
+\begin{equation}
+\label{eq:annual_cooling_capacity}
+Q_{c,\mathrm{cap}}(d)=-Q_{\mathrm{to\,bed},c}\!\left(T_\infty(d)\right),
+\qquad
+P_{c,\mathrm{elec}}(d)=P_{\mathrm{spot\,cooler}}(d)+P_{\mathrm{assist\,blower}}(d).
+\end{equation}
+The required duty fractions are
+\begin{equation}
+\label{eq:daily_duty_required}
+D_h^\ast(d)=\frac{Q_{\mathrm{req},h}(d)}{Q_{h,\mathrm{cap}}(d)},
+\qquad
+D_c^\ast(d)=\frac{Q_{\mathrm{req},c}(d)}{Q_{c,\mathrm{cap}}(d)},
+\end{equation}
+and the applied duties are clipped at unity:
 \begin{equation}
 \label{eq:daily_duty}
 f_{\mathrm{day}}=
@@ -814,12 +1215,65 @@ f_{\mathrm{day}}=
 1, & \dot Q_{\mathrm{nom}}=0\ \text{and}\ \dot Q_{\mathrm{load}}>0,
 \end{cases}
 \end{equation}
-and the day electrical energy is
+which, in mode-specific notation, are exactly
+\begin{equation}
+\label{eq:daily_duty_clipped}
+D_h(d)=\min(\max(D_h^\ast(d),0),1),
+\qquad
+D_c(d)=\min(\max(D_c^\ast(d),0),1).
+\end{equation}
+The applied bed load is therefore
+\begin{equation}
+\label{eq:daily_applied_bed_load}
+Q_{\mathrm{bed}}(d)=
+\begin{cases}
+D_h(d)\,Q_{h,\mathrm{cap}}(d), & \text{heating day},\\
+-D_c(d)\,Q_{c,\mathrm{cap}}(d), & \text{cooling day},\\
+0, & \text{idle day}.
+\end{cases}
+\end{equation}
+
+\subsection{Daily bed temperatures, electricity, cost, and water}
+The daily bed temperatures are obtained from the same two-node steady system:
+\begin{equation}
+\label{eq:daily_two_node_matrix}
+\begin{bmatrix}
+UA_{b,\infty}+UA_{bt} & -UA_{bt}\\
+-UA_{bt} & UA_{t,\infty}+UA_{bt}
+\end{bmatrix}
+\begin{bmatrix}
+T_b(d)\\
+T_t(d)
+\end{bmatrix}
+=
+\begin{bmatrix}
+f_bQ_{\mathrm{bed}}(d)+UA_{b,\infty}T_\infty(d)\\
+(1-f_b)Q_{\mathrm{bed}}(d)+UA_{t,\infty}T_\infty(d)
+\end{bmatrix}.
+\end{equation}
+Daily heating and cooling electricity are
+\begin{equation}
+\label{eq:daily_energy_modes}
+E_h(d)=\frac{P_{h,\mathrm{elec}}(d)\,D_h(d)\,24}{1000},
+\qquad
+E_c(d)=\frac{P_{c,\mathrm{elec}}(d)\,D_c(d)\,24}{1000},
+\end{equation}
+so the total day electrical energy is
 \begin{equation}
 \label{eq:daily_energy}
-E_{\mathrm{day}}=\dot W_{\mathrm{nom}}f_{\mathrm{day}}\frac{24}{1000}.
+E_{\mathrm{day}}=E_h(d)+E_c(d).
 \end{equation}
-These are repository numerical constructs, not literature correlations.
+With electricity price \(c_{\mathrm{elec}}\), the daily cost is
+\begin{equation}
+\label{eq:daily_cost}
+C(d)=c_{\mathrm{elec}}E_{\mathrm{day}},
+\end{equation}
+and the daily water-replacement estimate is
+\begin{equation}
+\label{eq:daily_water}
+m_{\mathrm{water}}(d)=\dot m_{\mathrm{water},24h}\,D(d),
+\end{equation}
+where \(D(d)\) is the active heating or cooling duty fraction for that day. These are repository numerical constructs driven by the same daily re-solved heating/cooling reference points \srcref{heat_transfer_study.py:L4966-L5072}.
 
 \section{Implementation notes and deviations from the written model}
 \begin{itemize}[leftmargin=*]
@@ -832,7 +1286,9 @@ These are repository numerical constructs, not literature correlations.
 \end{itemize}
 
 \section{Symbol glossary with units}
-\begin{longtable}{p{0.18\textwidth}p{0.56\textwidth}p{0.16\textwidth}}
+\begingroup
+\small
+\begin{longtable}{@{}L{0.16\textwidth}L{0.60\textwidth}L{0.14\textwidth}@{}}
 \toprule
 Symbol & Meaning & Units \\
 \midrule
@@ -865,6 +1321,7 @@ Symbol & Meaning & Units \\
 \(\dot V_{\mathrm{tot}}\) & total imposed volumetric flow rate & \si{\meter\cubed\per\second} \\
 \bottomrule
 \end{longtable}
+\endgroup
 
 \section{Bibliography / source notes}
 \begin{itemize}[leftmargin=*]
@@ -881,25 +1338,65 @@ Symbol & Meaning & Units \\
 \end{itemize}
 
 \section*{Implementation topic map}
-\begin{longtable}{p{0.18\textwidth}p{0.16\textwidth}p{0.18\textwidth}p{0.24\textwidth}p{0.14\textwidth}}
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.08}
+\begin{longtable}{@{}L{0.16\textwidth}L{0.28\textwidth}L{0.48\textwidth}@{}}
 \toprule
-Concept & Equation label(s) & Source status & Implementation & Notes \\
+Concept & Governing equations and source status & Implementation mapping and notes \\
 \midrule
 \endfirsthead
 \toprule
-Concept & Equation label(s) & Source status & Implementation & Notes \\
+Concept & Governing equations and source status & Implementation mapping and notes \\
 \midrule
 \endhead
-Tube flow, perforations, electrical grouping & \code{eq:volflow\_per\_tube}--\code{eq:electrical\_totals} & repository derivation & \srcref{vermicomposter_air_heater_design_model.m:L763-L875}; \srcref{vermicomposter_air_heater_design_model.m:L1497-L1677} & series-parallel grouping allowed \\
-Internal convection and friction & \code{eq:internal\_laminar\_nu}, \code{eq:internal\_turbulent\_nu}, \code{eq:churchill\_friction\_full} & [R2], [R3], [R5] & \srcref{vermicomposter_air_heater_design_model.m:L2382-L2407}; \srcref{heat_transfer_study.py:L3755-L3774} & used in both heater and aeration branches \\
-Heater axial energy balance & \code{eq:heater\_segment\_air}, \code{eq:wire\_delta\_t} & [R1], [R5] plus repository discretization & \srcref{vermicomposter_air_heater_design_model.m:L1803-L1894}; \srcref{heat_transfer_study.py:L3775-L3895} & explicit marching \\
-Aeration wall/jet/latent coupling & \code{eq:aeration\_q\_wall}--\code{eq:aeration\_air\_march} & repository reduction of sensible + latent paths & \srcref{vermicomposter_air_heater_design_model.m:L1895-L1999}; \srcref{heat_transfer_study.py:L2815-L2959} & same structure in heating and cooling \\
-Evaporation and latent heat & \code{eq:sauter\_diameter}--\code{eq:evap\_selected} & [R1], [R9], [R10], [R11] & \srcref{vermicomposter_air_heater_design_model.m:L891-L937}; \srcref{vermicomposter_air_heater_design_model.m:L2000-L2122}; \srcref{heat_transfer_study.py:L2567-L2603}; \srcref{heat_transfer_study.py:L3607-L3708} & minimum of three limiting rates \\
-Bin loss model and two-node bed & \code{eq:topmode\_open}--\code{eq:two\_node\_split} & [R4], [R5] plus repository vented-cover extension & \srcref{vermicomposter_air_heater_design_model.m:L971-L1171}; \srcref{heat_transfer_study.py:L4326-L4438} & lumped bed closure \\
-Cooling spot cooler and assist blower & cooling and condensate relations in Sections 12--15 & repository surrogate model & \srcref{heat_transfer_study.py:L2534-L3292} & includes condensate-limited RH update \\
-Heating and cooling NSGA-II & \code{eq:heating\_constraint\_residuals}--\code{eq:cooling\_report\_selection} & repository implementation & \srcref{heat_transfer_study.py:L51-L121}; \srcref{heat_transfer_study.py:L2181-L2499}; \srcref{heat_transfer_study.py:L3148-L3208}; \srcref{heat_transfer_study.py:L6220-L6490} & cooling now also NSGA-II \\
-Annual climate and duty layer & \code{eq:kernel\_baseline}, \code{eq:daily\_duty}, \code{eq:daily\_energy} & repository numerical construct plus NOAA/EIA inputs & \srcref{heat_transfer_study.py:L4633-L5012} & not a literature first-principles climate model \\
+Tube flow, perforations, electrical grouping &
+Equations: \code{eq:volflow\_per\_tube}--\code{eq:electrical\_totals}. \newline
+Source status: repository derivation. &
+Implementation: \srcref{vermicomposter_air_heater_design_model.m:L763-L875}; \srcref{vermicomposter_air_heater_design_model.m:L1497-L1677}. \newline
+Notes: series-parallel grouping allowed. \\
+Internal convection and friction &
+Equations: \code{eq:internal\_laminar\_nu}, \code{eq:internal\_turbulent\_nu}, \code{eq:churchill\_friction\_full}. \newline
+Source status: [R2], [R3], [R5]. &
+Implementation: \srcref{vermicomposter_air_heater_design_model.m:L2382-L2407}; \srcref{heat_transfer_study.py:L3755-L3774}. \newline
+Notes: used in both heater and aeration branches. \\
+Heater axial energy balance &
+Equations: \code{eq:heater\_segment\_air}, \code{eq:wire\_delta\_t}. \newline
+Source status: [R1], [R5] plus repository discretization. &
+Implementation: \srcref{vermicomposter_air_heater_design_model.m:L1803-L1894}; \srcref{heat_transfer_study.py:L3775-L3895}. \newline
+Notes: explicit marching. \\
+Aeration wall/jet/latent coupling &
+Equations: \code{eq:aeration\_q\_wall}--\code{eq:aeration\_air\_march}. \newline
+Source status: repository reduction of sensible plus latent paths. &
+Implementation: \srcref{vermicomposter_air_heater_design_model.m:L1895-L1999}; \srcref{heat_transfer_study.py:L2815-L2959}. \newline
+Notes: same structure in heating and cooling. \\
+Evaporation and latent heat &
+Equations: \code{eq:sauter\_diameter}--\code{eq:evap\_selected}. \newline
+Source status: [R1], [R9], [R10], [R11]. &
+Implementation: \srcref{vermicomposter_air_heater_design_model.m:L891-L937}; \srcref{vermicomposter_air_heater_design_model.m:L2000-L2122}; \srcref{heat_transfer_study.py:L2567-L2603}; \srcref{heat_transfer_study.py:L3607-L3708}. \newline
+Notes: minimum of three limiting rates. \\
+Bin loss model and two-node bed &
+Equations: \code{eq:topmode\_open}--\code{eq:two\_node\_split}. \newline
+Source status: [R4], [R5] plus repository vented-cover extension. &
+Implementation: \srcref{vermicomposter_air_heater_design_model.m:L971-L1171}; \srcref{heat_transfer_study.py:L4326-L4438}. \newline
+Notes: lumped bed closure. \\
+Cooling spot cooler and assist blower &
+Equations: cooling and condensate relations in Sections 12--15. \newline
+Source status: repository surrogate model. &
+Implementation: \srcref{heat_transfer_study.py:L2534-L3292}. \newline
+Notes: includes condensate-limited RH update. \\
+Heating and cooling NSGA-II &
+Equations: \code{eq:heating\_constraint\_residuals}--\code{eq:cooling\_report\_selection}. \newline
+Source status: repository implementation. &
+Implementation: \srcref{heat_transfer_study.py:L51-L121}; \srcref{heat_transfer_study.py:L2181-L2499}; \srcref{heat_transfer_study.py:L3148-L3208}; \srcref{heat_transfer_study.py:L6220-L6490}. \newline
+Notes: cooling now also NSGA-II. \\
+Annual climate and duty layer &
+Equations: \code{eq:kernel\_baseline}, \code{eq:daily\_duty}, \code{eq:daily\_energy}. \newline
+Source status: repository numerical construct plus NOAA/EIA inputs. &
+Implementation: \srcref{heat_transfer_study.py:L4633-L5012}. \newline
+Notes: not a literature first-principles climate model. \\
 \bottomrule
 \end{longtable}
+\endgroup
 
 \end{document}

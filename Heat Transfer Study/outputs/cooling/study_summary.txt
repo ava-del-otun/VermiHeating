@@ -8,13 +8,13 @@ Active vessel configuration                : closed top with vents
 Design specifications:
   Vessel interior                         : 1.22 m x 1.22 m x 0.61 m, fill fraction 0.90
   Vent specification                     : 1 vent hole(s), 25.0 mm diameter each, area per hole 0.000491 m^2, total vent area 0.000491 m^2
-  Vessel wall stack                       : 1.5 mm steel (k = 50.0 W/m-K) + 50.8 mm insulation (k = 0.040 W/m-K)
+  Vessel wall stack                       : 1.5 mm steel (k = 50.0 W/m-K) + 150.0 mm insulation (k = 0.040 W/m-K)
   Heater tube hardware                    : L 0.300 m, ID 15.0 mm, OD 19.0 mm, insulation 10.0 mm
-  Aeration network                        : 12 tubes, each L 1.22 m, ID 50.0 mm, OD 53.0 mm
-  Distribution manifold                  : no separate header; 12-way splitter(s), splitter inlet ID 19.0 mm, branch connector ID 19.0 mm, connector length 0.000 m
+  Aeration network                        : 8 tubes, each L 1.22 m, ID 50.0 mm, OD 53.0 mm
+  Distribution manifold                  : no separate header; 8-way splitter(s), splitter inlet ID 19.0 mm, branch connector ID 19.0 mm, connector length 0.000 m
   Contraction model                      : Idel'chik conical converging bellmouth without end wall, 60 deg
-  Tube layout                             : nearest center spacing 146.4 mm, nearest clear OD gap 93.4 mm
-  Perforations                            : 100 holes/tube, 5.0 mm dia, total holes 1200, total open area 0.023562 m^2
+  Tube layout                             : nearest center spacing 219.6 mm, nearest clear OD gap 166.6 mm
+  Perforations                            : 100 holes/tube, 5.0 mm dia, total holes 800, total open area 0.015708 m^2
   Spot cooler                            : target supply air derived from rated specs, max sensible capacity unlimited by config, COP 3.00
   Cooling-air architecture               : spot cooler discharges into an insulated metal plenum; a downstream assist blower draws from the plenum and pushes air through the bed network
   Assist blower                          : Goorui GHBH 1D7 34 1R5 side channel blower, 150.1 CFM @ 0.0 in. H2O, shutoff 56.2 in. H2O, 1100.0 W
@@ -26,18 +26,18 @@ Design specifications:
   Assist-blower source note             : Goorui GHBH 1D7 34 1R5 side channel blower basis: 255 m^3/h maximum airflow (= about 150.1 CFM), 140 mbar maximum pressure (= about 56.2 in H2O), 1.1 kW motor, 3-phase, converter-operation capable, about $640. The current model treats 255 m^3/h as the free-air endpoint and 140 mbar as the shutoff-pressure endpoint until a full fan curve is available.
   Bed moisture model                      : ambient RH 35%, surface temp 20.0 C, wetted area 612.297 m^2
   Cooling sweep                           : flow = 40.0:70.5:4200.0 L/min, electrical heater power fixed at 0 W
-  Summer hard constraints                 : assist-blower available static >= network dP at the selected flow, dP <= 1500 Pa, water loss <= 10.0 kg/24 h, hole velocity <= 10.00 m/s, T_bottom >= 18.0 C, T_top >= 18.0 C, T_bottom <= 24.0 C, T_top <= 24.0 C, |T_bottom - T_top| <= 10.0 C
-Lumped cooling requirement at 20.0 C bed   : 61.5 W
-Overall UA to ambient air                  : 3.517 W/K
+  Summer hard constraints                 : assist-blower available static >= network dP at the selected flow, dP <= 1500 Pa, water loss <= 10.0 kg/24 h, hole velocity <= 10.00 m/s, T_bottom >= 18.0 C, T_top >= 18.0 C, T_bottom <= 25.0 C, T_top <= 25.0 C, |T_bottom - T_top| <= 10.0 C
+Lumped cooling requirement at 20.0 C bed   : 25.0 W
+Overall UA to ambient air                  : 1.429 W/K
 External natural-convection h estimate     : 3.89 W/m^2-K
-Lumped time constant                       : 134.2 h
+Lumped time constant                       : 330.4 h
 Lumped Biot number estimate                : 1.19
-Hard-safe cooling points found             : 0 of 60
-Feasible cooling Pareto points found       : 0 of 60
+Hard-safe cooling points found             : 4 of 60
+Feasible cooling Pareto points found       : 2 of 60
 
 Summer cooling selection process:
   Cooling recommendations now use constrained NSGA-II on the evaluated summer airflow sweep.
-  NSGA-II settings                      : population 50, generations 200, seed 7
+  NSGA-II settings                      : population 100, generations 500, seed 7
   Step 1: compute the inequality-constraint residuals listed below for every sampled flow point.
   Step 2: run NSGA-II with those residuals as hard constraints and the objective set listed below.
   Step 3: keep only fully summer-hard-safe points on the resulting Pareto front.
@@ -71,16 +71,6 @@ Summer cooling selection process:
      4. totalFlow_Lpm
      5. temp_spread_C
      6. minus_cooling_capacity_W
-  No summer-hard-safe Pareto point exists in the current sweep; the fallback diagnostics below use the best-available ranked sample.
-
-No-feasible-Pareto diagnostics:
-  Best-available summer reference violates:
-    - bottom temperature above 24.0 C: 2.090 C
-    - top temperature above 24.0 C: 3.328 C
-  Closest misses across the full evaluated summer airflow sweep:
-    - assist-blower available static below network pressure drop: closest miss 26.739 Pa; violated by 2 / 60 points; nearest point at flow 4129.5 L/min
-    - bottom temperature above 24.0 C: closest miss 1.996 C; violated by 60 / 60 points; nearest point at flow 4200.0 L/min
-    - top temperature above 24.0 C: closest miss 3.244 C; violated by 60 / 60 points; nearest point at flow 4200.0 L/min
 
 Perforation and moisture process:
   Per-hole release and moisture loss are evaluated explicitly for the aeration tubes.
@@ -137,15 +127,15 @@ Radial air-cooling profile:
   Initial plume radius                 : 2.5 mm
   Plume spreading rate                 : 0.150 m plume radius per m radial distance
   Maximum plume radius                 : none; plume radius grows linearly across the plotted range
-  Selected outlet temperature          : 24.3 C
-  Sink temperature used                : 24.3 C
-  Bed reference temperature            : 26.1 C
+  Selected outlet temperature          : 23.7 C
+  Sink temperature used                : 23.7 C
+  Bed reference temperature            : 24.2 C
   Wetted-area density                  : 749.3 m^2/m^3
   Base sensible coefficient            : 8.00 W/m^2-K
   Mean latent coefficient              : 0.00 W/m^2-K
   Mean combined sink coefficient       : 8.00 W/m^2-K
-  Released mass flow per tube length   : 0.006002 kg/s-m
-  Initial / final plume RH             : 5.8% -> 5.8%
+  Released mass flow per tube length   : 0.008222 kg/s-m
+  Initial / final plume RH             : 6.0% -> 6.0%
   Initial / final vapor density        : 0.0013 -> 0.0013 kg/m^3
   Integrated radial sensible / latent  : 0.00 W and 0.00 W
   Safe distance result                 : 0.0 mm because the selected outlet temperature is already
@@ -156,21 +146,21 @@ Tube layout and worm-habitat exclusion:
                                          using 10% of the filled-bed width/height as the wall offset
   Filled-bed cross section             : 1220.0 mm wide x 549.0 mm high
   Tube center height above floor       : 54.9 mm
-  Tube center x positions              : 122.0, 122.0, 122.0, 122.0, 1098.0, 1098.0, 1098.0, 1098.0, 317.2, 512.4, 707.6, 902.8 mm
-  Center-to-center pitch               : 195.2, 195.2, 195.2, 195.2, 195.2 mm
-  Clear gap between tube OD surfaces   : 142.2, 142.2, 142.2, 142.2, 142.2 mm
-  Nearest tube-center spacing          : 146.4 mm
-  Nearest clear tube-to-tube gap       : 93.4 mm
+  Tube center x positions              : 122.0, 122.0, 122.0, 1098.0, 1098.0, 1098.0, 447.3, 772.7 mm
+  Center-to-center pitch               : 325.3, 325.3, 325.3 mm
+  Clear gap between tube OD surfaces   : 272.3, 272.3, 272.3 mm
+  Nearest tube-center spacing          : 219.6 mm
+  Nearest clear tube-to-tube gap       : 166.6 mm
   Side clearances to tube OD           : left 95.5 mm, right 95.5 mm
   Safe-distance exclusion radius       : tube radius + safe offset = 26.5 + 0.0 = 26.5 mm
-  Pipe solid volume                    : 0.0323 m^3 (3.95% of filled-bed volume)
-  Pipe exclusion-cylinder union volume : 0.0323 m^3 (3.95% of filled-bed volume)
+  Pipe solid volume                    : 0.0215 m^3 (2.63% of filled-bed volume)
+  Pipe exclusion-cylinder union volume : 0.0215 m^3 (2.63% of filled-bed volume)
   Added wall-return unsafe volume      : 0.0000 m^3 before overlap with the tube exclusion cylinders
-  Total worm-unsafe union volume       : 0.0323 m^3 (3.95% of filled-bed volume)
+  Total worm-unsafe union volume       : 0.0215 m^3 (2.63% of filled-bed volume)
   Worm-unsafe shell volume             : 0.0000 m^3 (0.00% of filled-bed volume)
-  Remaining habitable bed volume       : 0.7848 m^3 (96.05% of filled-bed volume)
-  Pipe-overlap correction              : 0.0000 m^3 removed from the naive sum of 12 pipe cylinders
-  Exclusion-overlap correction         : 0.0000 m^3 removed from the naive sum of 12
+  Remaining habitable bed volume       : 0.7956 m^3 (97.37% of filled-bed volume)
+  Pipe-overlap correction              : 0.0000 m^3 removed from the naive sum of 8 pipe cylinders
+  Exclusion-overlap correction         : 0.0000 m^3 removed from the naive sum of 8
                                          safe-distance exclusion cylinders
   Overlap evaluation method            : overlap-aware union area on a 700 x 700 midpoint grid
                                          clipped to the filled-bed rectangle, then extruded over the
@@ -178,65 +168,66 @@ Tube layout and worm-habitat exclusion:
                                          includes both plume exclusion cylinders and 1D wall-return bands
 
 NSGA-II reported feasible Pareto cooling point:
-  Result                             : no hard-constraint-safe summer cooling point found in the current sweep
-
-Best-available summer reference point:
-  Total flow                         : 4059.0 L/min
+  Total flow                         : 3706.4 L/min
   Spot-cooler target supply air      : 23.5 C
   Spec-derived middle-case supply    : 23.5 C
   Spot-cooler actual supply air      : 23.5 C
   Spot-cooler supply RH              : 78.1 %
-  Spot-cooler sensible load          : 1085.3 W
-  Spot-cooler electric power         : 361.8 W
+  Spot-cooler sensible load          : 991.1 W
+  Spot-cooler electric power         : 330.4 W
   Assist-blower electric power       : 1100.0 W
-  Assist-blower available static     : 630.3 Pa
+  Assist-blower available static     : 1791.4 Pa
   Spot-cooler condensate output      : 0.00 kg/24 h
-  Aeration outlet temperature        : 24.3 C
-  Net cooling to bed                 : 38.0 W
-  Signed Q_to_bed                    : -38.0 W
-  Bottom-node steady temperature     : 26.1 C
-  Top-node steady temperature        : 27.3 C
-  Bottom-top spread                  : 1.2 C
-  Released flow per hole             : 3.07 L/min
-  Hole velocity                      : 2.61 m/s
-  Substrate water loss               : 0.63 kg/24 h
-  Latent evaporation load            : 17.9 W
-  Total pressure drop                : 410.4 Pa
-  Distribution manifold dP          : 407.4 Pa
-  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 235.2, connector friction 0.0, connector->branch 172.2 Pa
-  Assist-blower static-pressure margin: 219.9 Pa
-  Status                             : best-available only; it violates one or more summer hard constraints
+  Aeration outlet temperature        : 23.7 C
+  Net cooling to bed                 : 18.5 W
+  Signed Q_to_bed                    : -18.5 W
+  Bottom-node steady temperature     : 24.2 C
+  Top-node steady temperature        : 24.9 C
+  Bottom-top spread                  : 0.7 C
+  Released flow per hole             : 4.20 L/min
+  Hole velocity                      : 3.57 m/s
+  Substrate water loss               : 0.31 kg/24 h
+  Latent evaporation load            : 8.8 W
+  Total pressure drop                : 769.8 Pa
+  Distribution manifold dP          : 764.4 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 441.3, connector friction 0.0, connector->branch 323.1 Pa
+  Assist-blower static-pressure margin: 1021.6 Pa
+  Status                             : meets all summer hard constraints and provides net bed cooling
 
-Top best-available summer cooling candidates:
+Best-available summer reference point:
+  Total flow                         : 3706.4 L/min
+  Spot-cooler target supply air      : 23.5 C
+  Spec-derived middle-case supply    : 23.5 C
+  Spot-cooler actual supply air      : 23.5 C
+  Spot-cooler supply RH              : 78.1 %
+  Spot-cooler sensible load          : 991.1 W
+  Spot-cooler electric power         : 330.4 W
+  Assist-blower electric power       : 1100.0 W
+  Assist-blower available static     : 1791.4 Pa
+  Spot-cooler condensate output      : 0.00 kg/24 h
+  Aeration outlet temperature        : 23.7 C
+  Net cooling to bed                 : 18.5 W
+  Signed Q_to_bed                    : -18.5 W
+  Bottom-node steady temperature     : 24.2 C
+  Top-node steady temperature        : 24.9 C
+  Bottom-top spread                  : 0.7 C
+  Released flow per hole             : 4.20 L/min
+  Hole velocity                      : 3.57 m/s
+  Substrate water loss               : 0.31 kg/24 h
+  Latent evaporation load            : 8.8 W
+  Total pressure drop                : 769.8 Pa
+  Distribution manifold dP          : 764.4 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 441.3, connector friction 0.0, connector->branch 323.1 Pa
+  Assist-blower static-pressure margin: 1021.6 Pa
+  Status                             : meets all summer hard constraints and provides net bed cooling
+
+Top NSGA-II Pareto summer cooling candidates:
   Qtot(L/min)  Tbottom(C)  Ttop(C)  dT(C)  Tair,out(C)  cooling(W)  water(kg/d)  Qspot(W)  Pspot(W)  Pblow(W)  Vhole  dP(Pa)  state
-      4059.0       26.1     27.3    1.2         24.3       38.0        0.63    1085.3     361.8    1100.0   2.61   410.4  bottom temperature
-      3988.5       26.1     27.4    1.2         24.3       37.8        0.63    1066.5     355.5    1100.0   2.57   396.3  bottom temperature
-      3918.0       26.2     27.4    1.2         24.3       37.6        0.62    1047.6     349.2    1100.0   2.52   382.4  bottom temperature
-      3847.5       26.2     27.5    1.2         24.3       37.4        0.62    1028.8     342.9    1100.0   2.48   368.8  bottom temperature
-      3776.9       26.3     27.5    1.2         24.4       37.3        0.62    1009.9     336.6    1100.0   2.43   355.4  bottom temperature
-      3706.4       26.3     27.5    1.2         24.4       37.1        0.62     991.1     330.4    1100.0   2.39   342.3  bottom temperature
-      3635.9       26.4     27.6    1.2         24.4       36.9        0.61     972.2     324.1    1100.0   2.34   329.4  bottom temperature
-      3565.4       26.5     27.7    1.2         24.4       36.7        0.61     953.4     317.8    1100.0   2.29   316.7  bottom temperature
-      3494.9       26.5     27.7    1.2         24.5       36.5        0.60     934.5     311.5    1100.0   2.25   304.3  bottom temperature
-      3424.4       26.6     27.8    1.2         24.5       36.3        0.60     915.7     305.2    1100.0   2.20   292.2  bottom temperature
-      3353.9       26.6     27.8    1.2         24.5       36.2        0.60     896.8     298.9    1100.0   2.16   280.3  bottom temperature
-      3283.4       26.7     27.9    1.2         24.5       35.9        0.59     878.0     292.7    1100.0   2.11   268.6  bottom temperature
-      3212.9       26.8     27.9    1.2         24.6       35.7        0.59     859.1     286.4    1100.0   2.07   257.2  bottom temperature
-      3142.4       26.8     28.0    1.2         24.6       35.5        0.59     840.2     280.1    1100.0   2.02   246.1  bottom temperature
-      3071.9       26.9     28.1    1.1         24.6       35.2        0.58     821.4     273.8    1100.0   1.98   235.1  bottom temperature
-      3001.4       27.0     28.1    1.1         24.7       35.0        0.58     802.5     267.5    1100.0   1.93   224.5  bottom temperature
-      2930.8       27.0     28.2    1.1         24.7       34.8        0.57     783.7     261.2    1100.0   1.89   214.1  bottom temperature
-      2860.3       27.1     28.3    1.1         24.7       34.5        0.57     764.8     254.9    1100.0   1.84   203.9  bottom temperature
-      2789.8       27.2     28.3    1.1         24.8       34.2        0.56     746.0     248.7    1100.0   1.80   194.0  bottom temperature
-      2719.3       27.3     28.4    1.1         24.8       34.0        0.56     727.1     242.4    1100.0   1.75   184.3  bottom temperature
-      2648.8       27.4     28.5    1.1         24.8       33.7        0.55     708.3     236.1    1100.0   1.71   174.9  bottom temperature
-      2578.3       27.5     28.5    1.1         24.9       33.4        0.55     689.4     229.8    1100.0   1.66   165.7  bottom temperature
-      2507.8       27.6     28.6    1.1         24.9       33.1        0.54     670.6     223.5    1100.0   1.62   156.7  bottom temperature
-      2437.3       27.7     28.7    1.1         25.0       32.7        0.53     651.7     217.2    1100.0   1.57   148.1  bottom temperature
-      2366.8       27.7     28.8    1.1         25.0       32.5        0.53     632.9     211.0    1100.0   1.53   139.6  bottom temperature
-      2296.3       27.9     28.9    1.0         25.1       32.0        0.52     614.0     204.7    1100.0   1.48   131.4  bottom temperature
-      2225.8       28.0     29.0    1.0         25.2       31.7        0.52     595.2     198.4    1100.0   1.44   123.5  bottom temperature
-      2155.3       28.1     29.1    1.0         25.2       31.4        0.51     576.3     192.1    1100.0   1.39   115.8  bottom temperature
-      2084.7       28.2     29.2    1.0         25.3       30.9        0.50     557.4     185.8    1100.0   1.35   108.3  bottom temperature
-      2014.2       28.3     29.3    1.0         25.4       30.5        0.50     538.6     179.5    1100.0   1.30   101.1  bottom temperature
+      3706.4       24.2     24.9    0.7         23.7       18.5        0.31     991.1     330.4    1100.0   3.57   769.8  cooling-safe
+      3635.9       24.2     25.0    0.7         23.7       18.4        0.31     972.2     324.1    1100.0   3.50   740.8  cooling-safe
+
+NSGA-II optimization-ranked summer points:
+  Qtot(L/min)  Tmax(C)  Tmean(C)  dT(C)  cooling(W)  water(kg/d)  Pcool(W)  dP(Pa)  state
+      3706.4     24.9      24.5    0.7       18.5        0.31    1430.4   769.8  cooling-safe
+      3635.9     25.0      24.6    0.7       18.4        0.31    1424.1   740.8  cooling-safe
 ============================================================

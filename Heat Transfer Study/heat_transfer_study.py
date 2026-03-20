@@ -153,6 +153,22 @@ def load_json(path: Path) -> dict:
     return synchronize_config_aliases(config)
 
 
+def record_runtime_warning(config: dict, message: str) -> None:
+    warnings = config.setdefault("_runtime_warnings", [])
+    if isinstance(warnings, list) and message not in warnings:
+        warnings.append(message)
+
+
+def append_runtime_warnings(lines: list[str], config: dict) -> None:
+    warnings = config.get("_runtime_warnings", [])
+    if not isinstance(warnings, list) or not warnings:
+        return
+    lines.append("")
+    lines.append("Runtime warnings:")
+    for item in warnings:
+        lines.append(f"  - {item}")
+
+
 def synchronize_config_aliases(config: dict) -> dict:
     if not isinstance(config, dict):
         return config
@@ -397,7 +413,18 @@ def auto_refresh_export_if_needed(config_path: Path, config: dict) -> None:
         command.extend(["--matlab", str(Path(str(auto_cfg["matlab"])).expanduser())])
 
     print("Detected model_overrides change; refreshing MATLAB export before plotting...")
-    subprocess.run(command, cwd=str(analysis_script.parent), check=True)
+    try:
+        subprocess.run(command, cwd=str(analysis_script.parent), check=True)
+    except subprocess.CalledProcessError as exc:
+        if payload is not None and data_json.exists():
+            message = (
+                "MATLAB auto-refresh failed; continuing with the existing export JSON. "
+                "Outputs may be stale relative to the current model_overrides."
+            )
+            print(f"{message} Refresh command exit status: {exc.returncode}.")
+            record_runtime_warning(config, message)
+            return
+        raise
 
 
 def apply_config_overrides(payload: dict, config: dict) -> dict:
@@ -783,50 +810,203 @@ def plot_heating_pareto_front(payload: dict, config: dict, output_dir: Path) -> 
     feasible_colder = np.array([float(pt["colderNodeTemp_C"]) for pt in feasible], dtype=float)
     feasible_spread = np.array([float(pt["tempSpread_C"]) for pt in feasible], dtype=float)
 
-    fig, ax = plt.subplots(figsize=(10.5, 7.0))
-    fig.subplots_adjust(left=0.11, right=0.97, top=0.88, bottom=0.18)
-    fig.suptitle(
-        "Heating Pareto Front from Constrained NSGA-II\n"
-        "Objectives: minimize power, maximize colder-node bed temperature, minimize bed-temperature spread",
-        fontsize=15,
-        fontweight="bold",
-    )
-
-    ax.scatter(all_power, all_colder, s=12, color="#b8b8b8", alpha=0.22, label="All evaluated points")
-    if feasible:
-        scatter = ax.scatter(
-            feasible_power,
-            feasible_colder,
-            c=feasible_spread,
-            cmap="viridis",
-            s=28,
-            alpha=0.78,
-            edgecolors="none",
-            label="Feasible points",
-        )
-        cb = fig.colorbar(scatter, ax=ax, fraction=0.046, pad=0.03)
-        cb.set_label("Bottom-top spread (C)")
-
+    pareto_power = np.array([], dtype=float)
+    pareto_colder = np.array([], dtype=float)
     if pareto:
         pareto_sorted = sorted(pareto, key=lambda pt: float(pt["totalPower_W"]))
         pareto_power = np.array([float(pt["totalPower_W"]) for pt in pareto_sorted], dtype=float)
         pareto_colder = np.array([float(pt["colderNodeTemp_C"]) for pt in pareto_sorted], dtype=float)
-        ax.plot(pareto_power, pareto_colder, color="black", linewidth=1.4, alpha=0.85)
-        ax.scatter(
+
+    recommended_power = np.array([], dtype=float)
+    recommended_colder = np.array([], dtype=float)
+    if recommended:
+        recommended_power = np.array([float(recommended["totalPower_W"])], dtype=float)
+        recommended_colder = np.array(
+            [
+                float(
+                    recommended.get(
+                        "colderNodeTemp_C",
+                        min(recommended.get("TbottomFullPower_C", np.nan), recommended.get("TtopFullPower_C", np.nan)),
+                    )
+                )
+            ],
+            dtype=float,
+        )
+
+    best_power = np.array([], dtype=float)
+    best_colder = np.array([], dtype=float)
+    if best_available and not recommended:
+        best_power = np.array([float(best_available["totalPower_W"])], dtype=float)
+        best_colder = np.array(
+            [
+                float(
+                    best_available.get(
+                        "colderNodeTemp_C",
+                        min(best_available.get("TbottomFullPower_C", np.nan), best_available.get("TtopFullPower_C", np.nan)),
+                    )
+                )
+            ],
+            dtype=float,
+        )
+
+    fig, (ax_all, ax_zoom) = plt.subplots(
+        1,
+        2,
+        figsize=(13.5, 7.4),
+        gridspec_kw={"width_ratios": [1.0, 1.15]},
+    )
+    fig.subplots_adjust(left=0.08, right=0.95, top=0.84, bottom=0.20, wspace=0.22)
+    fig.suptitle("Heating Pareto Front from Constrained NSGA-II", fontsize=16, fontweight="bold")
+    fig.text(
+        0.5,
+        0.91,
+        "Objectives: minimize total electrical power, maximize the colder-node bed temperature, minimize bed-temperature spread",
+        ha="center",
+        fontsize=11,
+    )
+
+    density = ax_all.hexbin(
+        all_power,
+        all_colder,
+        gridsize=55,
+        mincnt=1,
+        cmap="Greys",
+        bins="log",
+        linewidths=0.0,
+    )
+    density_cb = fig.colorbar(density, ax=ax_all, fraction=0.048, pad=0.03)
+    density_cb.set_label("Evaluated-point density (log10 count)")
+
+    if feasible:
+        ax_all.scatter(
+            feasible_power,
+            feasible_colder,
+            s=12,
+            color="#7a3b8f",
+            alpha=0.45,
+            edgecolors="none",
+            label="Feasible points",
+            zorder=3,
+        )
+    if pareto_power.size:
+        ax_all.plot(pareto_power, pareto_colder, color="black", linewidth=1.2, alpha=0.85, zorder=4)
+        ax_all.scatter(
             pareto_power,
             pareto_colder,
-            s=70,
+            s=34,
             facecolors="#f2f2f2",
             edgecolors="black",
-            linewidths=1.3,
+            linewidths=0.9,
+            label="NSGA-II Pareto candidates",
+            zorder=5,
+        )
+    if recommended_power.size:
+        ax_all.scatter(
+            recommended_power,
+            recommended_colder,
+            s=150,
+            marker="*",
+            color="#d95f02",
+            edgecolors="black",
+            linewidths=0.9,
+            label="Reported design point",
+            zorder=6,
+        )
+    elif best_power.size:
+        ax_all.scatter(
+            best_power,
+            best_colder,
+            s=80,
+            marker="D",
+            color="#7570b3",
+            edgecolors="black",
+            linewidths=0.8,
+            label="Best available reference",
+            zorder=6,
+        )
+
+    ax_all.set_title("All evaluated points (density view)", fontsize=11)
+    ax_all.set_xlabel("Total electrical power (W)")
+    ax_all.set_ylabel("Colder-node bed temperature (C)")
+    ax_all.grid(True, alpha=0.18)
+    ax_all.text(
+        0.02,
+        0.98,
+        f"{len(ranked):,} evaluated\n{len(feasible):,} feasible",
+        transform=ax_all.transAxes,
+        va="top",
+        ha="left",
+        fontsize=9,
+        bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "#cccccc", "alpha": 0.92},
+    )
+
+    zoom_power_parts = []
+    zoom_temp_parts = []
+    for arr in (feasible_power, pareto_power, recommended_power, best_power):
+        if arr.size:
+            zoom_power_parts.append(arr)
+    for arr in (feasible_colder, pareto_colder, recommended_colder, best_colder):
+        if arr.size:
+            zoom_temp_parts.append(arr)
+    if not zoom_power_parts:
+        zoom_power_parts.append(all_power[np.isfinite(all_power)])
+    if not zoom_temp_parts:
+        zoom_temp_parts.append(all_colder[np.isfinite(all_colder)])
+
+    zoom_power = np.concatenate(zoom_power_parts)
+    zoom_temp = np.concatenate(zoom_temp_parts)
+    zoom_power = zoom_power[np.isfinite(zoom_power)]
+    zoom_temp = zoom_temp[np.isfinite(zoom_temp)]
+
+    if feasible:
+        spread_min = float(np.nanmin(feasible_spread))
+        spread_max = float(np.nanmax(feasible_spread))
+        if np.isclose(spread_min, spread_max):
+            spread_max = spread_min + 1e-6
+        scatter = ax_zoom.scatter(
+            feasible_power,
+            feasible_colder,
+            c=feasible_spread,
+            cmap="viridis",
+            vmin=spread_min,
+            vmax=spread_max,
+            s=40,
+            alpha=0.88,
+            edgecolors="white",
+            linewidths=0.25,
+            label="Feasible points",
+            zorder=2,
+        )
+        spread_cb = fig.colorbar(scatter, ax=ax_zoom, fraction=0.048, pad=0.03)
+        spread_cb.set_label("Bottom-top spread (C)")
+    else:
+        ax_zoom.scatter(
+            all_power,
+            all_colder,
+            s=18,
+            color="#b8b8b8",
+            alpha=0.30,
+            edgecolors="none",
+            label="All evaluated points",
+            zorder=1,
+        )
+
+    if pareto_power.size:
+        ax_zoom.plot(pareto_power, pareto_colder, color="black", linewidth=1.5, alpha=0.90, zorder=3)
+        ax_zoom.scatter(
+            pareto_power,
+            pareto_colder,
+            s=74,
+            facecolors="#f2f2f2",
+            edgecolors="black",
+            linewidths=1.2,
             label="NSGA-II Pareto candidates",
             zorder=4,
         )
-
-    if recommended:
-        ax.scatter(
-            [float(recommended["totalPower_W"])],
-            [float(recommended.get("colderNodeTemp_C", min(recommended.get("TbottomFullPower_C", np.nan), recommended.get("TtopFullPower_C", np.nan))))],
+    if recommended_power.size:
+        ax_zoom.scatter(
+            recommended_power,
+            recommended_colder,
             s=180,
             marker="*",
             color="#d95f02",
@@ -835,11 +1015,10 @@ def plot_heating_pareto_front(payload: dict, config: dict, output_dir: Path) -> 
             label="Reported design point",
             zorder=5,
         )
-
-    if best_available and not recommended:
-        ax.scatter(
-            [float(best_available["totalPower_W"])],
-            [float(best_available.get("colderNodeTemp_C", min(best_available.get("TbottomFullPower_C", np.nan), best_available.get("TtopFullPower_C", np.nan))))],
+    elif best_power.size:
+        ax_zoom.scatter(
+            best_power,
+            best_colder,
             s=90,
             marker="D",
             color="#7570b3",
@@ -849,21 +1028,33 @@ def plot_heating_pareto_front(payload: dict, config: dict, output_dir: Path) -> 
             zorder=5,
         )
 
+    power_min = float(np.nanmin(zoom_power))
+    power_max = float(np.nanmax(zoom_power))
+    temp_min = float(np.nanmin(zoom_temp))
+    temp_max = float(np.nanmax(zoom_temp))
+    power_span = max(power_max - power_min, 1.0)
+    temp_span = max(temp_max - temp_min, 1.0)
+    ax_zoom.set_xlim(power_min - max(10.0, 0.10 * power_span), power_max + max(10.0, 0.10 * power_span))
+    ax_zoom.set_ylim(temp_min - max(0.5, 0.20 * temp_span), temp_max + max(0.5, 0.20 * temp_span))
+    ax_zoom.set_title("Feasible region and reported selection", fontsize=11)
+    ax_zoom.set_xlabel("Total electrical power (W)")
+    ax_zoom.set_ylabel("Colder-node bed temperature (C)")
+    ax_zoom.grid(True, alpha=0.22)
+    ax_zoom.legend(loc="best", fontsize=9)
+
     opt_cfg = optimization_config(config)
     fig.text(
         0.02,
         0.05,
         f"NSGA-II settings: population = {int(opt_cfg.get('population', 50))}, "
         f"generations = {int(opt_cfg.get('generations', 120))}, "
-        f"report priority = {', '.join(heating_report_priority_order(config))}. "
-        "Only fully feasible points appear on the Pareto front used for the reported design point.",
+        f"seed = {int(opt_cfg.get('seed', 7))}. "
+        "Left panel: full evaluated design space shown as a log-density map. "
+        "Right panel: only the feasible region, Pareto candidates, and the reported design point. "
+        f"Report priority = {', '.join(heating_report_priority_order(config))}.",
         fontsize=9,
         wrap=True,
     )
-    ax.set_xlabel("Total electrical power (W)")
-    ax.set_ylabel("Colder-node bed temperature (C)")
-    ax.grid(True, alpha=0.22)
-    ax.legend(loc="best", fontsize=9)
     fig.savefig(output_dir / "heating_pareto_front.png", dpi=220)
     plt.close(fig)
 
@@ -6286,6 +6477,7 @@ def write_cooling_summary(payload: dict, config: dict, output_dir: Path) -> None
     lines.append("============================================================")
     lines.append("VERMICOMPOSTER SUMMER SPOT-COOLER + ASSIST-BLOWER STUDY")
     lines.append("============================================================")
+    append_runtime_warnings(lines, config)
     append_line(lines, "Operating mode", "summer plenum-fed spot cooler + assist blower")
     append_line(lines, "Hot-weather ambient air temperature", f"{float(cooling_cfg['ambientAir_C']):.1f} C")
     append_line(lines, "Active vessel configuration", "closed top with vents")
@@ -6576,6 +6768,7 @@ def write_summary(payload: dict, config: dict, output_dir: Path) -> None:
     lines.append("============================================================")
     lines.append("VERMICOMPOSTER AIR-HEATER DESIGN MODEL")
     lines.append("============================================================")
+    append_runtime_warnings(lines, config)
     append_line(lines, "Greenhouse air design temperature", f"{float(env_inputs['greenhouseAir_C']):.1f} C")
     append_line(lines, "Active vessel configuration", display_configuration_label(str(cfg["label"])))
     lines.append("")
@@ -6913,7 +7106,7 @@ def write_summary(payload: dict, config: dict, output_dir: Path) -> None:
     (output_dir / "study_summary.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def write_root_summary_index(root_output_dir: Path, mode_outputs: dict[str, Path]) -> None:
+def write_root_summary_index(root_output_dir: Path, mode_outputs: dict[str, Path], config: dict | None = None) -> None:
     lines = [
         "============================================================",
         "HEAT TRANSFER STUDY OUTPUT INDEX",
@@ -6921,6 +7114,11 @@ def write_root_summary_index(root_output_dir: Path, mode_outputs: dict[str, Path
         "This root summary points to the mode-specific output folders.",
         "",
     ]
+
+    if config is not None:
+        append_runtime_warnings(lines, config)
+        if lines[-1] != "":
+            lines.append("")
 
     if "heating" in mode_outputs:
         lines.append("Heating mode:")
@@ -7052,7 +7250,7 @@ def main() -> None:
         write_year_round_summary(annual_payload, output_dir)
         mode_outputs["year_round"] = output_dir
 
-    write_root_summary_index(root_output_dir, mode_outputs)
+    write_root_summary_index(root_output_dir, mode_outputs, config)
     print(f"Wrote standalone heat-transfer study outputs to {root_output_dir}")
 
 

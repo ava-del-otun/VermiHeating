@@ -117,8 +117,8 @@ Code name & Meaning & Units & Defined & Consumed & Notes \\\\
 Code name & Meaning & Units & Defined & Consumed & Notes \\\\
 \midrule
 \endhead
-\code{study_overrides} & normalized MATLAB override source & mixed & \srcref{analyze_vermicomposter_heater.py:L1038-L1040} & helper template & converted to MATLAB literal syntax \\\\
-\code{matlab_parallel} & normalized MATLAB parallel config & mixed & \srcref{analyze_vermicomposter_heater.py:L1039-L1040} & helper template & not a physics override \\\\
+\code{study_overrides} & normalized MATLAB override source & mixed & \srcref{analyze_vermicomposter_heater.py:L1051-L1053} & helper template & converted to MATLAB literal syntax \\\\
+\code{parallel.matlab} / \code{matlab\_parallel} & grouped MATLAB runtime parallel block and its normalized helper copy & mixed & \srcref{analyze_vermicomposter_heater.py:L231-L255}, \srcref{analyze_vermicomposter_heater.py:L1051-L1055} & helper template & runtime-only export acceleration; not a physics override \\\\
 \code{export_json} & tracked export JSON path & path & \srcref{analyze_vermicomposter_heater.py:L607-L661} & annotation, sync, plots & always named \code{model_export.json} \\\\
 \bottomrule
 \end{longtable}
