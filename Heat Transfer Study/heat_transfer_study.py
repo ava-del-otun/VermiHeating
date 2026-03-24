@@ -27,6 +27,12 @@ from scipy.interpolate import interp1d
 
 
 ROOT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = ROOT_DIR.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+import IAPWS_95 as iapws95
+
 DEFAULT_CONFIG = ROOT_DIR / "study_config.json"
 HEATING_MODE = "heating"
 COOLING_MODE = "summer_spot_cooler"
@@ -782,7 +788,7 @@ def plot_moisture_maps(payload: dict, output_dir: Path, grid_points: int, curve_
     fig.text(
         0.02,
         0.06,
-        "Hole velocity is computed from released flow divided by total perforation area. "
+        "Hole velocity is the peak local perforation-exit velocity from the pressure-coupled closed-end tube solve. "
         "Water loss is the modeled sprinkler make-up requirement; the dashed red contour is the configured 24 h water-loss "
         "limit boundary, so its position on the hole-velocity panel shows the condition-dependent allowable velocity envelope. "
         "The wetted area in this study is derived from the Frederickson et al. (2007) Table 3 particle-size distribution "
@@ -1337,11 +1343,10 @@ def compute_radial_profile(payload: dict, config: dict) -> dict:
 
     n_tubes = max(1.0, float(aer_inputs.get("nParallelTubes", 1.0)))
     aer_len_m = max(1e-9, float(aer_inputs.get("length_m", 1.0)))
-    release_fraction = float(aeration_overrides.get("releaseFraction", 1.0))
     q_total_m3_s = float(rec.get("totalFlow_Lpm", 0.0)) / 60000.0
     air_in = air_props(greenhouse_air_C, pressure_Pa)
     mdot_tube_kg_s = air_in["rho_kg_m3"] * q_total_m3_s / n_tubes
-    mdot_release_per_length_kg_s_m = release_fraction * mdot_tube_kg_s / aer_len_m
+    mdot_release_per_length_kg_s_m = mdot_tube_kg_s / aer_len_m
     if mdot_release_per_length_kg_s_m <= 0:
         return {}
 
@@ -2785,6 +2790,74 @@ def assist_blower_state(cooling_cfg: dict, total_flow_m3_s: float) -> dict:
     }
 
 
+def solve_assist_blower_operating_flow(
+    cooling_cfg: dict,
+    requested_flow_m3_s: float,
+    system_state_fn,
+) -> tuple[float, dict, dict, float, bool]:
+    requested_flow_m3_s = max(float(requested_flow_m3_s), 0.0)
+    state_cache: dict[float, dict] = {}
+    assist_cache: dict[float, dict] = {}
+
+    def cached_state(flow_m3_s: float) -> dict:
+        flow_m3_s = max(float(flow_m3_s), 0.0)
+        if flow_m3_s not in state_cache:
+            state_cache[flow_m3_s] = system_state_fn(flow_m3_s)
+        return state_cache[flow_m3_s]
+
+    def cached_assist(flow_m3_s: float) -> dict:
+        flow_m3_s = max(float(flow_m3_s), 0.0)
+        if flow_m3_s not in assist_cache:
+            assist_cache[flow_m3_s] = assist_blower_state(cooling_cfg, flow_m3_s)
+        return assist_cache[flow_m3_s]
+
+    requested_state = cached_state(requested_flow_m3_s)
+    requested_assist = cached_assist(requested_flow_m3_s)
+    available_req = float(requested_assist.get("availablePressure_Pa", np.nan))
+    residual_req = float(requested_state.get("delta_p_Pa", np.nan)) - available_req
+    if (
+        not bool(requested_assist.get("enabled", False))
+        or not np.isfinite(available_req)
+        or requested_flow_m3_s <= 0.0
+        or not np.isfinite(residual_req)
+        or residual_req <= 0.0
+    ):
+        return requested_flow_m3_s, requested_state, requested_assist, residual_req, False
+
+    lo = 0.0
+    hi = requested_flow_m3_s
+    state_lo = cached_state(lo)
+    assist_lo = cached_assist(lo)
+    available_lo = float(assist_lo.get("availablePressure_Pa", np.nan))
+    residual_lo = float(state_lo.get("delta_p_Pa", np.nan)) - available_lo
+    if not np.isfinite(residual_lo) or residual_lo > 0.0:
+        return 0.0, state_lo, assist_lo, residual_lo, True
+
+    best_flow = lo
+    best_state = state_lo
+    best_assist = assist_lo
+    best_residual = residual_lo
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        state_mid = cached_state(mid)
+        assist_mid = cached_assist(mid)
+        available_mid = float(assist_mid.get("availablePressure_Pa", np.nan))
+        residual_mid = float(state_mid.get("delta_p_Pa", np.nan)) - available_mid
+        if not np.isfinite(residual_mid):
+            hi = mid
+        elif residual_mid <= 0.0:
+            lo = mid
+            best_flow = mid
+            best_state = state_mid
+            best_assist = assist_mid
+            best_residual = residual_mid
+        else:
+            hi = mid
+        if hi - lo <= max(1.0e-9, 1.0e-6 * max(requested_flow_m3_s, 1.0)):
+            break
+    return best_flow, best_state, best_assist, best_residual, True
+
+
 def summer_evaporation_loss_segment(
     dm_release_kg_s: float,
     tair_C: float,
@@ -2821,6 +2894,309 @@ def summer_evaporation_loss_segment(
     m_heat = q_avail_W / max(hfg, 1e-12)
     m_evap = max(0.0, min(m_diff, m_capacity, m_heat))
     return m_evap, m_evap * hfg
+
+
+def perforation_discharge_mass_flow_kg_s(
+    gauge_pressure_Pa: float,
+    rho_kg_m3: float,
+    discharge_coefficient: float,
+    total_hole_area_m2: float,
+    backpressure_gauge_Pa: float = 0.0,
+) -> float:
+    delta_p_Pa = max(gauge_pressure_Pa - backpressure_gauge_Pa, 0.0)
+    return (
+        max(discharge_coefficient, 0.0)
+        * max(total_hole_area_m2, 0.0)
+        * np.sqrt(2.0 * max(rho_kg_m3, 0.0) * delta_p_Pa)
+    )
+
+
+def default_representative_tube_center_height_m(fill_height_m: float, tube_od_m: float) -> float:
+    tube_radius_m = max(0.5 * max(tube_od_m, 0.0), 0.0)
+    return min(max(0.10 * max(fill_height_m, 0.0), tube_radius_m), max(fill_height_m - tube_radius_m, tube_radius_m))
+
+
+def build_segmentwise_bed_pressure_model(
+    summary_inputs: dict,
+    model_overrides: dict,
+    bin_inputs: dict,
+    aer_inputs: dict,
+    length_m: float,
+    segments: int,
+    tube_od_m: float,
+) -> dict:
+    segments = max(int(segments), 1)
+    length_m = max(float(length_m), 1e-12)
+    boundary_gauge_offset_pa = float(aer_inputs.get("bedSideGaugePressure_Pa", 0.0))
+    porosity = float(aer_inputs.get("bedPorosity", 0.80))
+    particle_diameter_raw = aer_inputs.get("bedParticleDiameter_m", None)
+    particle_diameter_m = float("nan")
+    particle_diameter_is_override = False
+    particle_diameter_source = "fallback_constant"
+    if particle_diameter_raw not in (None, ""):
+        particle_diameter_m = float(particle_diameter_raw)
+        particle_diameter_is_override = np.isfinite(particle_diameter_m) and particle_diameter_m > 0.0
+    if particle_diameter_is_override:
+        particle_diameter_source = "aeration_override"
+    if not np.isfinite(particle_diameter_m) or particle_diameter_m <= 0.0:
+        table3_details = particle_surface_details(summary_inputs, model_overrides)
+        particle_diameter_m = float(table3_details.get("d32_m", np.nan))
+        if np.isfinite(particle_diameter_m) and particle_diameter_m > 0.0:
+            particle_diameter_source = "table3_d32_default"
+    if not np.isfinite(particle_diameter_m) or particle_diameter_m <= 0.0:
+        particle_diameter_m = 0.015
+        particle_diameter_source = "fallback_constant"
+    n_tubes = max(1, int(round(float(aer_inputs.get("nParallelTubes", 1)))))
+    bin_length_m = max(float(bin_inputs.get("length_m", length_m)), 1e-12)
+    width_m = max(float(bin_inputs.get("width_m", 1.22)), 1e-12)
+    fill_height_m = max(float(bin_inputs.get("height_m", 0.61)) * float(bin_inputs.get("fillFraction", 0.80)), 1e-12)
+    representative_center_height_m = aer_inputs.get("representativeTubeCenterHeight_m", None)
+    if representative_center_height_m in (None, ""):
+        representative_center_height_m = default_representative_tube_center_height_m(fill_height_m, tube_od_m)
+    representative_center_height_m = float(representative_center_height_m)
+    tube_radius_m = max(0.5 * max(tube_od_m, 0.0), 0.0)
+    representative_center_height_m = min(
+        max(representative_center_height_m, tube_radius_m),
+        max(fill_height_m - tube_radius_m, tube_radius_m),
+    )
+    vertical_escape_distance_m = max(fill_height_m - representative_center_height_m, 1e-6)
+    dx_m = length_m / segments
+    tributary_area_m2 = max(dx_m * width_m / max(n_tubes, 1), 1e-12)
+    segment_centers_m = dx_m * (np.arange(segments, dtype=float) + 0.5)
+    open_top = bool(bin_inputs.get("openTop", True))
+    vent_count = max(0, int(round(float(bin_inputs.get("ventHoleCount", 0)))))
+    vent_diameter_m = max(0.0, float(bin_inputs.get("ventHoleDiameter_m", 0.0)))
+    derived_boundary_enabled = False
+    outlet_area_per_branch_m2 = np.nan
+    outlet_discharge_coefficient = np.nan
+
+    if open_top:
+        path_lengths_m = np.full(segments, vertical_escape_distance_m, dtype=float)
+        mode = "open_top"
+        enabled = 0.0 < porosity < 1.0 and particle_diameter_m > 0.0
+        derived_boundary_enabled = False
+    elif vent_count > 0 and vent_diameter_m > 0.0:
+        vent_centers_m = length_m * (np.arange(vent_count, dtype=float) + 0.5) / vent_count
+        axial_offsets_m = np.min(np.abs(segment_centers_m[:, None] - vent_centers_m[None, :]), axis=1)
+        path_lengths_m = np.hypot(vertical_escape_distance_m, axial_offsets_m)
+        mode = "covered_top_plus_vent"
+        enabled = 0.0 < porosity < 1.0 and particle_diameter_m > 0.0
+        derived_boundary_enabled = True
+        outlet_area_per_branch_m2 = max(
+            vent_count * np.pi * vent_diameter_m**2 / 4.0 / max(n_tubes, 1),
+            1e-12,
+        )
+        outlet_discharge_coefficient = 0.63
+    else:
+        path_lengths_m = np.zeros(segments, dtype=float)
+        mode = "configured_boundary_only"
+        enabled = False
+
+    return {
+        "enabled": bool(enabled),
+        "mode": mode,
+        "boundaryGaugePressure_Pa": float(boundary_gauge_offset_pa),
+        "boundaryGaugeOffset_Pa": float(boundary_gauge_offset_pa),
+        "derivedBoundaryEnabled": bool(derived_boundary_enabled),
+        "outletAreaPerBranch_m2": float(outlet_area_per_branch_m2) if np.isfinite(outlet_area_per_branch_m2) else float("nan"),
+        "outletDischargeCoefficient": float(outlet_discharge_coefficient) if np.isfinite(outlet_discharge_coefficient) else float("nan"),
+        "openTopAreaPerBranch_m2": float(max(bin_length_m * width_m / max(n_tubes, 1), 1e-12)),
+        "porosity": float(porosity),
+        "particleDiameter_m": float(max(particle_diameter_m, 1e-12)),
+        "particleDiameterSource": particle_diameter_source,
+        "representativeTubeCenterHeight_m": float(representative_center_height_m),
+        "verticalEscapeDistance_m": float(vertical_escape_distance_m),
+        "tributaryArea_m2": float(tributary_area_m2),
+        "segmentPathLengths_m": np.asarray(path_lengths_m, dtype=float),
+        "segmentCenters_m": np.asarray(segment_centers_m, dtype=float),
+    }
+
+
+def derived_outlet_boundary_gauge_pa(
+    branch_mdot_kg_s: float,
+    rho_boundary_kg_m3: float,
+    bed_pressure_model: dict,
+) -> float:
+    boundary_offset_pa = float(
+        bed_pressure_model.get(
+            "boundaryGaugeOffset_Pa",
+            bed_pressure_model.get("boundaryGaugePressure_Pa", 0.0),
+        )
+    )
+    if branch_mdot_kg_s <= 0.0:
+        return boundary_offset_pa
+    if not bool(bed_pressure_model.get("derivedBoundaryEnabled", False)):
+        return boundary_offset_pa
+    outlet_area_m2 = max(float(bed_pressure_model.get("outletAreaPerBranch_m2", np.nan)), 0.0)
+    discharge_coefficient = max(float(bed_pressure_model.get("outletDischargeCoefficient", np.nan)), 0.0)
+    if outlet_area_m2 <= 0.0 or discharge_coefficient <= 0.0:
+        return boundary_offset_pa
+    return float(
+        boundary_offset_pa
+        + 0.5
+        * (max(branch_mdot_kg_s, 0.0) / max(discharge_coefficient * outlet_area_m2, 1e-12)) ** 2
+        / max(rho_boundary_kg_m3, 1e-12)
+    )
+
+
+def ergun_segment_bed_pressure_drop_pa(
+    mdot_release_kg_s: float,
+    rho_kg_m3: float,
+    mu_Pa_s: float,
+    bed_pressure_model: dict,
+    segment_index: int,
+) -> float:
+    if not bool(bed_pressure_model.get("enabled", False)) or mdot_release_kg_s <= 0.0:
+        return 0.0
+    porosity = float(bed_pressure_model.get("porosity", 0.80))
+    eps3 = max(porosity**3, 1e-12)
+    one_minus_eps = max(1.0 - porosity, 0.0)
+    particle_diameter_m = max(float(bed_pressure_model.get("particleDiameter_m", 0.015)), 1e-12)
+    flow_area_m2 = max(float(bed_pressure_model.get("tributaryArea_m2", 1e-12)), 1e-12)
+    path_lengths_m = np.asarray(bed_pressure_model.get("segmentPathLengths_m", []), dtype=float)
+    if path_lengths_m.size == 0:
+        return 0.0
+    idx = max(0, min(int(segment_index), path_lengths_m.size - 1))
+    path_length_m = max(float(path_lengths_m[idx]), 0.0)
+    superficial_velocity_m_s = max(mdot_release_kg_s, 0.0) / max(max(rho_kg_m3, 1e-12) * flow_area_m2, 1e-12)
+    dpdx_pa_m = (
+        150.0 * (one_minus_eps**2) / eps3 * max(mu_Pa_s, 0.0) * superficial_velocity_m_s / (particle_diameter_m**2)
+        + 1.75 * one_minus_eps / eps3 * max(rho_kg_m3, 0.0) * superficial_velocity_m_s**2 / particle_diameter_m
+    )
+    return float(dpdx_pa_m * path_length_m)
+
+
+def solve_segment_release_with_bed_backpressure(
+    gauge_pressure_Pa: float,
+    rho_kg_m3: float,
+    mu_Pa_s: float,
+    discharge_coefficient: float,
+    total_hole_area_m2: float,
+    remaining_mdot_kg_s: float,
+    bed_pressure_model: dict,
+    segment_index: int,
+    boundary_gauge_pa: float,
+) -> tuple[float, float]:
+    remaining_mdot_kg_s = max(float(remaining_mdot_kg_s), 0.0)
+    if (
+        remaining_mdot_kg_s <= 0.0
+        or max(discharge_coefficient, 0.0) <= 0.0
+        or max(total_hole_area_m2, 0.0) <= 0.0
+        or gauge_pressure_Pa <= boundary_gauge_pa
+    ):
+        return 0.0, boundary_gauge_pa
+    if not bool(bed_pressure_model.get("enabled", False)):
+        return (
+            min(
+                perforation_discharge_mass_flow_kg_s(
+                    gauge_pressure_Pa,
+                    rho_kg_m3,
+                    discharge_coefficient,
+                    total_hole_area_m2,
+                    boundary_gauge_pa,
+                ),
+                remaining_mdot_kg_s,
+            ),
+            boundary_gauge_pa,
+        )
+
+    def discharge_residual(mdot_trial_kg_s: float) -> tuple[float, float]:
+        bed_gauge_pa = boundary_gauge_pa + ergun_segment_bed_pressure_drop_pa(
+            mdot_trial_kg_s,
+            rho_kg_m3,
+            mu_Pa_s,
+            bed_pressure_model,
+            segment_index,
+        )
+        predicted_mdot_kg_s = perforation_discharge_mass_flow_kg_s(
+            gauge_pressure_Pa,
+            rho_kg_m3,
+            discharge_coefficient,
+            total_hole_area_m2,
+            bed_gauge_pa,
+        )
+        return predicted_mdot_kg_s - mdot_trial_kg_s, bed_gauge_pa
+
+    residual_hi, bed_gauge_hi_pa = discharge_residual(remaining_mdot_kg_s)
+    if residual_hi >= 0.0:
+        return remaining_mdot_kg_s, float(bed_gauge_hi_pa)
+
+    lo_kg_s = 0.0
+    hi_kg_s = remaining_mdot_kg_s
+    bed_gauge_mid_pa = boundary_gauge_pa
+    for _ in range(24):
+        mid_kg_s = 0.5 * (lo_kg_s + hi_kg_s)
+        residual_mid, bed_gauge_mid_pa = discharge_residual(mid_kg_s)
+        if residual_mid >= 0.0:
+            lo_kg_s = mid_kg_s
+        else:
+            hi_kg_s = mid_kg_s
+    mdot_release_kg_s = 0.5 * (lo_kg_s + hi_kg_s)
+    bed_gauge_pa = boundary_gauge_pa + ergun_segment_bed_pressure_drop_pa(
+        mdot_release_kg_s,
+        rho_kg_m3,
+        mu_Pa_s,
+        bed_pressure_model,
+        segment_index,
+    )
+    return float(mdot_release_kg_s), float(bed_gauge_pa)
+
+
+def solve_closed_end_inlet_gauge_pressure(
+    mdot_in_kg_s: float,
+    total_hole_area_m2: float,
+    rho_ref_kg_m3: float,
+    discharge_coefficient: float,
+    march_state_fn,
+) -> dict:
+    cd_area = max(discharge_coefficient, 0.0) * max(total_hole_area_m2, 0.0)
+    mass_balance_tol = max(1.0e-9, 1.0e-4 * max(mdot_in_kg_s, 0.0))
+    if mdot_in_kg_s <= 0.0 or cd_area <= 0.0:
+        state = march_state_fn(0.0)
+        state["inlet_gauge_pressure_Pa"] = 0.0
+        state["pressureSolveBracketFound"] = True
+        state["pressureSolveConverged"] = True
+        state["pressureSolveMassBalanceTolerance_kg_s"] = float(mass_balance_tol)
+        state["pressureSolveResidual_kg_s"] = float(state.get("remaining_mdot_kg_s", 0.0))
+        return state
+
+    hi = max((mdot_in_kg_s / max(cd_area, 1.0e-12)) ** 2 / max(2.0 * max(rho_ref_kg_m3, 1.0e-12), 1.0e-12), 1.0)
+    state_hi = march_state_fn(hi)
+    for _ in range(40):
+        if state_hi["remaining_mdot_kg_s"] <= mass_balance_tol:
+            break
+        hi *= 2.0
+        state_hi = march_state_fn(hi)
+
+    if state_hi["remaining_mdot_kg_s"] > mass_balance_tol:
+        state_hi["inlet_gauge_pressure_Pa"] = hi
+        state_hi["pressureSolveBracketFound"] = False
+        state_hi["pressureSolveConverged"] = False
+        state_hi["pressureSolveMassBalanceTolerance_kg_s"] = float(mass_balance_tol)
+        state_hi["pressureSolveResidual_kg_s"] = float(state_hi.get("remaining_mdot_kg_s", np.nan))
+        return state_hi
+
+    lo = 0.0
+    best_pressure = hi
+    best_state = state_hi
+    for _ in range(80):
+        mid = 0.5 * (lo + hi)
+        state_mid = march_state_fn(mid)
+        if state_mid["remaining_mdot_kg_s"] <= mass_balance_tol:
+            hi = mid
+            best_pressure = mid
+            best_state = state_mid
+        else:
+            lo = mid
+        if hi - lo <= max(1.0e-6, 1.0e-6 * max(best_pressure, 1.0)):
+            break
+
+    best_state["inlet_gauge_pressure_Pa"] = best_pressure
+    best_state["pressureSolveBracketFound"] = True
+    best_state["pressureSolveConverged"] = True
+    best_state["pressureSolveMassBalanceTolerance_kg_s"] = float(mass_balance_tol)
+    best_state["pressureSolveResidual_kg_s"] = float(best_state.get("remaining_mdot_kg_s", np.nan))
+    return best_state
 
 
 def spot_cooler_supply_state(
@@ -2952,97 +3328,43 @@ def simulate_summer_cooling_point(
     wall_k = float(aer_inputs.get("wallK_W_mK", 16.0))
     segments = max(1, int(round(float(aer_inputs.get("segments", 40)))))
     bed_h = float(aer_inputs.get("bedH_W_m2K", 8.0)) * float(calibration.get("bedHTMultiplier", 1.0))
-    release_fraction = float(aer_inputs.get("releaseFraction", 0.95))
-    end_minor_k = float(aer_inputs.get("endMinorK", 1.0))
-
-    hole_diameter_m = max(1e-12, float(model_overrides.get("perforation", {}).get("holeDiameter_m", 0.005)))
-    holes_per_tube = max(1, int(round(float(model_overrides.get("perforation", {}).get("holesPerTube", 60)))))
+    perforation_inputs = model_overrides.get("perforation", {})
+    hole_diameter_m = max(1e-12, float(perforation_inputs.get("holeDiameter_m", 0.005)))
+    holes_per_tube = max(1, int(round(float(perforation_inputs.get("holesPerTube", 60)))))
+    discharge_coefficient = max(float(perforation_inputs.get("dischargeCoefficient", 0.60)), 0.0)
     ambient_relative_humidity = float(cooling_cfg.get("inletRelativeHumidity", evaporation_inputs.get("relativeHumidity", 0.80)))
     surface_temp_C = float(cooling_cfg.get("surfaceTemp_C", evaporation_inputs.get("surfaceTemp_C", design_bed_C)))
     lewis_factor = float(evaporation_inputs.get("lewisFactor", 1.0))
     evaporation_multiplier = float(calibration.get("evaporationHMultiplier", 1.0))
     bottom_fraction = float(bin_inputs.get("heatToBottomFraction", 0.60))
 
-    total_flow_m3_s = flow_Lpm / 60000.0
-    air_in = air_props(ambient_air_C, pressure_Pa)
-    mdot_tube_kg_s = air_in["rho_kg_m3"] * total_flow_m3_s / n_tubes
-    spot = spot_cooler_supply_state(cooling_cfg, total_flow_m3_s, ambient_air_C, pressure_Pa)
-    assist = assist_blower_state(cooling_cfg, total_flow_m3_s)
-    supply_air_C = float(spot["actualSupplyAir_C"])
-    supply_relative_humidity = float(spot.get("supplyRelativeHumidity", ambient_relative_humidity))
-    supply_props = air_props(supply_air_C, pressure_Pa)
+    requested_flow_m3_s = max(float(flow_Lpm) / 60000.0, 0.0)
     atube_m2 = np.pi * aer_id_m**2 / 4.0
     pout_m = np.pi * aer_od_m
     dx_m = aer_len_m / segments
-    released_total = mdot_tube_kg_s * release_fraction
     hole_area_m2 = np.pi * hole_diameter_m**2 / 4.0
     holes_per_segment = max(float(holes_per_tube) / max(segments, 1), 1e-12)
-    vol_release_m3_s = released_total / max(supply_props["rho_kg_m3"], 1e-12)
-    flow_per_hole_lpm = vol_release_m3_s * 60000.0 / holes_per_tube
-    hole_velocity_m_s = vol_release_m3_s / max(holes_per_tube * hole_area_m2, 1e-12)
+    segment_hole_area_m2 = holes_per_segment * hole_area_m2
+    total_hole_area_m2 = max(float(holes_per_tube), 1.0) * hole_area_m2
     seg_area_m2 = wetted_area_m2 / max(n_tubes * segments, 1)
+    bed_pressure_model = build_segmentwise_bed_pressure_model(
+        summary_inputs,
+        model_overrides,
+        bin_inputs,
+        aer_inputs,
+        aer_len_m,
+        segments,
+        aer_od_m,
+    )
 
-    def branch_response(bed_ref_C: float) -> dict:
-        remaining_mdot = mdot_tube_kg_s
-        dm_release = released_total / segments
-        tair_C = supply_air_C
-        q_to_bed = 0.0
-        latent_evap = 0.0
-        water_loss_kg_s = 0.0
-        dp_tube = 0.0
-        local_hole_velocity = hole_velocity_m_s
-        air_profile = np.zeros(segments + 1, dtype=float)
-        air_profile[0] = tair_C
-
-        for idx in range(segments):
-            props = air_props(tair_C, pressure_Pa)
-            u_bulk = remaining_mdot / max(props["rho_kg_m3"] * atube_m2, 1e-12)
-            re_tube = props["rho_kg_m3"] * u_bulk * aer_id_m / max(props["mu_Pa_s"], 1e-12)
-            nu_tube = internal_tube_nu(re_tube, props["Pr"], aer_id_m, aer_len_m)
-            h_inside = nu_tube * props["k_W_mK"] / aer_id_m
-            u_tube = 1.0 / max(
-                1.0 / max(h_inside, 1e-12)
-                + (aer_od_m - aer_id_m) / (2.0 * max(wall_k, 1e-12))
-                + 1.0 / max(bed_h, 1e-12),
-                1e-12,
-            )
-            dm_kg_s = min(dm_release, remaining_mdot)
-            remaining_after = max(remaining_mdot - dm_kg_s, 1e-12)
-            mdot_mean = max(remaining_mdot - 0.5 * dm_kg_s, 1e-12)
-            ua_seg_W_K = u_tube * pout_m * dx_m
-            wall_factor = np.exp(-ua_seg_W_K / max(mdot_mean * props["cp_J_kgK"], 1e-12))
-            tair_after_wall_C = bed_ref_C + (tair_C - bed_ref_C) * wall_factor
-            q_wall = mdot_mean * props["cp_J_kgK"] * (tair_C - tair_after_wall_C)
-            t_release_C = 0.5 * (tair_C + tair_after_wall_C)
-            q_jet = dm_kg_s * props["cp_J_kgK"] * (t_release_C - bed_ref_C)
-            release_props = air_props(t_release_C, pressure_Pa)
-            vol_release_seg_m3_s = dm_kg_s / max(release_props["rho_kg_m3"], 1e-12)
-            local_hole_velocity = vol_release_seg_m3_s / max(holes_per_segment * hole_area_m2, 1e-12)
-            q_avail = dm_kg_s * release_props["cp_J_kgK"] * abs(t_release_C - bed_ref_C)
-            m_evap, q_evap = summer_evaporation_loss_segment(
-                dm_kg_s,
-                t_release_C,
-                bed_ref_C,
-                q_avail,
-                local_hole_velocity,
-                seg_area_m2,
-                pressure_Pa,
-                supply_relative_humidity,
-                surface_temp_C,
-                lewis_factor,
-                evaporation_multiplier,
-                hole_diameter_m,
-                supply_air_C,
-            )
-            q_to_bed += q_wall + q_jet - q_evap
-            latent_evap += q_evap
-            water_loss_kg_s += m_evap
-            tair_C = tair_after_wall_C
-            remaining_mdot = remaining_after
-            air_profile[idx + 1] = tair_C
-            f = churchill_friction_factor(re_tube)
-            dp_tube += (f * dx_m / aer_id_m + end_minor_k / segments) * 0.5 * props["rho_kg_m3"] * u_bulk**2
-
+    def evaluate_state_at_flow(total_flow_m3_s: float) -> dict:
+        total_flow_m3_s = max(float(total_flow_m3_s), 0.0)
+        air_in = air_props(ambient_air_C, pressure_Pa)
+        mdot_tube_kg_s = air_in["rho_kg_m3"] * total_flow_m3_s / n_tubes
+        spot = spot_cooler_supply_state(cooling_cfg, total_flow_m3_s, ambient_air_C, pressure_Pa)
+        supply_air_C = float(spot["actualSupplyAir_C"])
+        supply_relative_humidity = float(spot.get("supplyRelativeHumidity", ambient_relative_humidity))
+        supply_props = air_props(supply_air_C, pressure_Pa)
         distribution_dp = branch_distribution_losses(
             total_flow_m3_s,
             total_flow_m3_s / max(n_tubes, 1),
@@ -3052,70 +3374,200 @@ def simulate_summer_cooling_point(
             aer_inputs,
             aer_id_m,
         )
-        return {
-            "q_to_bed_W": float(q_to_bed),
-            "latent_evap_W": float(latent_evap),
-            "water_loss_kg_s": float(water_loss_kg_s),
-            "delta_p_Pa": float(dp_tube + distribution_dp["total_Pa"]),
-            "air_profile_C": air_profile,
-            "air_outlet_C": float(tair_C),
-            "hole_velocity_m_s": float(local_hole_velocity),
-            "distributionDeltaP_Pa": float(distribution_dp["total_Pa"]),
-            "distributionHeader_Pa": float(distribution_dp["header_Pa"]),
-            "distributionHeaderToSplitter_Pa": float(distribution_dp["header_to_splitter_Pa"]),
-            "distributionSplitterBody_Pa": float(distribution_dp["splitter_body_Pa"]),
-            "distributionConnectorFriction_Pa": float(distribution_dp["connector_friction_Pa"]),
-            "distributionConnectorToBranch_Pa": float(distribution_dp["connector_to_branch_Pa"]),
-        }
 
-    lower_bed_ref_C = min(design_bed_C, supply_air_C, ambient_air_C)
-    upper_bed_ref_C = max(design_bed_C, supply_air_C, ambient_air_C)
+        def branch_response(bed_ref_C: float) -> dict:
+            boundary_props = air_props(bed_ref_C, pressure_Pa)
+            bed_boundary_gauge_pa = derived_outlet_boundary_gauge_pa(
+                mdot_tube_kg_s,
+                boundary_props["rho_kg_m3"],
+                bed_pressure_model,
+            )
 
-    def bed_reference_residual(bed_ref_trial_C: float) -> tuple[float, dict, float, float]:
-        trial_state = branch_response(bed_ref_trial_C)
-        tb_trial_C, tt_trial_C = two_node_steady_state_python(
-            bin_model, ambient_air_C, trial_state["q_to_bed_W"], bottom_fraction
-        )
-        mean_trial_C = 0.5 * (tb_trial_C + tt_trial_C)
-        return mean_trial_C - bed_ref_trial_C, trial_state, tb_trial_C, tt_trial_C
+            def march_branch(inlet_gauge_pressure_pa: float) -> dict:
+                remaining_mdot = mdot_tube_kg_s
+                tair_C = supply_air_C
+                q_to_bed = 0.0
+                latent_evap = 0.0
+                water_loss_kg_s = 0.0
+                dp_tube = 0.0
+                peak_hole_velocity_m_s = 0.0
+                peak_flow_per_hole_lpm = 0.0
+                pressure_profile_gauge_pa = np.zeros(segments + 1, dtype=float)
+                pressure_profile_gauge_pa[0] = inlet_gauge_pressure_pa
+                bed_pressure_profile_gauge_pa = np.zeros(segments, dtype=float)
+                air_profile = np.zeros(segments + 1, dtype=float)
+                air_profile[0] = tair_C
+                local_gauge_pressure_pa = inlet_gauge_pressure_pa
 
-    res_lo, state_lo, tb_lo, tt_lo = bed_reference_residual(lower_bed_ref_C)
-    res_hi, state_hi, tb_hi, tt_hi = bed_reference_residual(upper_bed_ref_C)
+                for idx in range(segments):
+                    local_pressure_pa = pressure_Pa + max(local_gauge_pressure_pa, bed_boundary_gauge_pa)
+                    props = air_props(tair_C, local_pressure_pa)
+                    u_bulk = remaining_mdot / max(props["rho_kg_m3"] * atube_m2, 1e-12)
+                    re_tube = props["rho_kg_m3"] * u_bulk * aer_id_m / max(props["mu_Pa_s"], 1e-12)
+                    nu_tube = internal_tube_nu(re_tube, props["Pr"], aer_id_m, aer_len_m)
+                    h_inside = nu_tube * props["k_W_mK"] / aer_id_m
+                    u_tube = 1.0 / max(
+                        1.0 / max(h_inside, 1e-12)
+                        + (aer_od_m - aer_id_m) / (2.0 * max(wall_k, 1e-12))
+                        + 1.0 / max(bed_h, 1e-12),
+                        1e-12,
+                    )
+                    dm_kg_s, local_bed_gauge_pressure_pa = solve_segment_release_with_bed_backpressure(
+                        local_gauge_pressure_pa,
+                        props["rho_kg_m3"],
+                        props["mu_Pa_s"],
+                        discharge_coefficient,
+                        segment_hole_area_m2,
+                        remaining_mdot,
+                        bed_pressure_model,
+                        idx,
+                        bed_boundary_gauge_pa,
+                    )
+                    bed_pressure_profile_gauge_pa[idx] = local_bed_gauge_pressure_pa
+                    remaining_after = max(remaining_mdot - dm_kg_s, 1e-12)
+                    mdot_mean = max(remaining_mdot - 0.5 * dm_kg_s, 1e-12)
+                    ua_seg_W_K = u_tube * pout_m * dx_m
+                    wall_factor = np.exp(-ua_seg_W_K / max(mdot_mean * props["cp_J_kgK"], 1e-12))
+                    tair_after_wall_C = bed_ref_C + (tair_C - bed_ref_C) * wall_factor
+                    q_wall = mdot_mean * props["cp_J_kgK"] * (tair_C - tair_after_wall_C)
+                    t_release_C = 0.5 * (tair_C + tair_after_wall_C)
+                    q_jet = dm_kg_s * props["cp_J_kgK"] * (t_release_C - bed_ref_C)
+                    release_props = air_props(t_release_C, local_pressure_pa)
+                    vol_release_seg_m3_s = dm_kg_s / max(release_props["rho_kg_m3"], 1e-12)
+                    local_flow_per_hole_lpm = vol_release_seg_m3_s * 60000.0 / max(holes_per_segment, 1e-12)
+                    local_hole_velocity = vol_release_seg_m3_s / max(segment_hole_area_m2, 1e-12)
+                    peak_flow_per_hole_lpm = max(peak_flow_per_hole_lpm, local_flow_per_hole_lpm)
+                    peak_hole_velocity_m_s = max(peak_hole_velocity_m_s, local_hole_velocity)
+                    q_avail = dm_kg_s * release_props["cp_J_kgK"] * abs(t_release_C - bed_ref_C)
+                    m_evap, q_evap = summer_evaporation_loss_segment(
+                        dm_kg_s,
+                        t_release_C,
+                        bed_ref_C,
+                        q_avail,
+                        local_hole_velocity,
+                        seg_area_m2,
+                        local_pressure_pa,
+                        supply_relative_humidity,
+                        surface_temp_C,
+                        lewis_factor,
+                        evaporation_multiplier,
+                        hole_diameter_m,
+                        supply_air_C,
+                    )
+                    q_to_bed += q_wall + q_jet - q_evap
+                    latent_evap += q_evap
+                    water_loss_kg_s += m_evap
+                    tair_C = tair_after_wall_C
+                    remaining_mdot = remaining_after
+                    air_profile[idx + 1] = tair_C
 
-    if np.sign(res_lo) == np.sign(res_hi):
-        candidates = [
-            (abs(res_lo), lower_bed_ref_C, state_lo, tb_lo, tt_lo),
-            (abs(res_hi), upper_bed_ref_C, state_hi, tb_hi, tt_hi),
-        ]
-        _, bed_ref_C, state, tb_C, tt_C = min(candidates, key=lambda item: item[0])
-    else:
-        state = state_lo
-        tb_C = tb_lo
-        tt_C = tt_lo
-        lo = lower_bed_ref_C
-        hi = upper_bed_ref_C
-        for _ in range(60):
-            mid = 0.5 * (lo + hi)
-            res_mid, state_mid, tb_mid, tt_mid = bed_reference_residual(mid)
-            bed_ref_C = mid
-            state = state_mid
-            tb_C = tb_mid
-            tt_C = tt_mid
-            if abs(res_mid) < 0.02 or abs(hi - lo) < 0.02:
-                break
-            if np.sign(res_mid) == np.sign(res_lo):
-                lo = mid
-                res_lo = res_mid
-            else:
-                hi = mid
-                res_hi = res_mid
+                    f = churchill_friction_factor(re_tube)
+                    seg_dp_pa = f * dx_m / aer_id_m * 0.5 * props["rho_kg_m3"] * u_bulk**2
+                    dp_tube += seg_dp_pa
+                    local_gauge_pressure_pa = max(local_gauge_pressure_pa - seg_dp_pa, local_bed_gauge_pressure_pa)
+                    pressure_profile_gauge_pa[idx + 1] = local_gauge_pressure_pa
+
+                return {
+                    "q_to_bed_W": float(q_to_bed),
+                    "latent_evap_W": float(latent_evap),
+                    "water_loss_kg_s": float(water_loss_kg_s),
+                    "air_profile_C": air_profile,
+                    "air_outlet_C": float(tair_C),
+                    "flow_per_hole_Lpm": float(peak_flow_per_hole_lpm),
+                    "hole_velocity_m_s": float(peak_hole_velocity_m_s),
+                    "pressure_profile_gauge_Pa": pressure_profile_gauge_pa,
+                    "bed_pressure_profile_gauge_Pa": bed_pressure_profile_gauge_pa,
+                    "tube_friction_drop_Pa": float(dp_tube),
+                    "remaining_mdot_kg_s": float(remaining_mdot),
+                    "bed_boundary_gauge_Pa": float(bed_boundary_gauge_pa),
+                    "max_bed_gauge_pressure_Pa": float(np.max(bed_pressure_profile_gauge_pa)) if bed_pressure_profile_gauge_pa.size else float(bed_boundary_gauge_pa),
+                }
+
+            state = solve_closed_end_inlet_gauge_pressure(
+                mdot_tube_kg_s,
+                total_hole_area_m2,
+                supply_props["rho_kg_m3"],
+                discharge_coefficient,
+                march_branch,
+            )
+            state["delta_p_Pa"] = float(state["inlet_gauge_pressure_Pa"] + distribution_dp["total_Pa"])
+            state["distributionDeltaP_Pa"] = float(distribution_dp["total_Pa"])
+            state["distributionHeader_Pa"] = float(distribution_dp["header_Pa"])
+            state["distributionHeaderToSplitter_Pa"] = float(distribution_dp["header_to_splitter_Pa"])
+            state["distributionSplitterBody_Pa"] = float(distribution_dp["splitter_body_Pa"])
+            state["distributionConnectorFriction_Pa"] = float(distribution_dp["connector_friction_Pa"])
+            state["distributionConnectorToBranch_Pa"] = float(distribution_dp["connector_to_branch_Pa"])
+            return state
+
+        lower_bed_ref_C = min(design_bed_C, supply_air_C, ambient_air_C)
+        upper_bed_ref_C = max(design_bed_C, supply_air_C, ambient_air_C)
+
+        def bed_reference_residual(bed_ref_trial_C: float) -> tuple[float, dict, float, float]:
+            trial_state = branch_response(bed_ref_trial_C)
+            tb_trial_C, tt_trial_C = two_node_steady_state_python(
+                bin_model, ambient_air_C, trial_state["q_to_bed_W"], bottom_fraction
+            )
+            mean_trial_C = 0.5 * (tb_trial_C + tt_trial_C)
+            return mean_trial_C - bed_ref_trial_C, trial_state, tb_trial_C, tt_trial_C
+
+        res_lo, state_lo, tb_lo, tt_lo = bed_reference_residual(lower_bed_ref_C)
+        res_hi, state_hi, tb_hi, tt_hi = bed_reference_residual(upper_bed_ref_C)
+
+        if np.sign(res_lo) == np.sign(res_hi):
+            candidates = [
+                (abs(res_lo), lower_bed_ref_C, state_lo, tb_lo, tt_lo),
+                (abs(res_hi), upper_bed_ref_C, state_hi, tb_hi, tt_hi),
+            ]
+            _, bed_ref_C, state, tb_C, tt_C = min(candidates, key=lambda item: item[0])
+        else:
+            state = state_lo
+            tb_C = tb_lo
+            tt_C = tt_lo
+            bed_ref_C = lower_bed_ref_C
+            lo = lower_bed_ref_C
+            hi = upper_bed_ref_C
+            for _ in range(60):
+                mid = 0.5 * (lo + hi)
+                res_mid, state_mid, tb_mid, tt_mid = bed_reference_residual(mid)
+                bed_ref_C = mid
+                state = state_mid
+                tb_C = tb_mid
+                tt_C = tt_mid
+                if abs(res_mid) < 0.02 or abs(hi - lo) < 0.02:
+                    break
+                if np.sign(res_mid) == np.sign(res_lo):
+                    lo = mid
+                    res_lo = res_mid
+                else:
+                    hi = mid
+                    res_hi = res_mid
+
+        state["bedReferenceSolved_C"] = float(bed_ref_C)
+        state["TbottomFullPower_C"] = float(tb_C)
+        state["TtopFullPower_C"] = float(tt_C)
+        state["spot"] = spot
+        return state
+
+    achieved_flow_m3_s, state, assist, operating_residual_pa, blower_limited = solve_assist_blower_operating_flow(
+        cooling_cfg,
+        requested_flow_m3_s,
+        evaluate_state_at_flow,
+    )
+    total_flow_m3_s = achieved_flow_m3_s
+    spot = dict(state.get("spot", {}))
+    supply_air_C = float(spot.get("actualSupplyAir_C", ambient_air_C))
+    supply_relative_humidity = float(spot.get("supplyRelativeHumidity", ambient_relative_humidity))
     q_to_bed = float(state["q_to_bed_W"])
     latent_evap = float(state["latent_evap_W"])
     water_loss_kg_s = float(state["water_loss_kg_s"])
     delta_p = float(state["delta_p_Pa"])
     tair_C = float(state["air_outlet_C"])
     air_profile = state["air_profile_C"]
+    flow_per_hole_lpm = float(state["flow_per_hole_Lpm"])
     hole_velocity_m_s = float(state["hole_velocity_m_s"])
+    bed_ref_C = float(state.get("bedReferenceSolved_C", np.nan))
+    tb_C = float(state.get("TbottomFullPower_C", np.nan))
+    tt_C = float(state.get("TtopFullPower_C", np.nan))
 
     cooling_capacity_W = max(-q_to_bed, 0.0)
     cooling_shortfall = max(required_cooling_W - cooling_capacity_W, 0.0)
@@ -3124,7 +3576,12 @@ def simulate_summer_cooling_point(
     return {
         "pitch_mm": 0.0,
         "voltage_V": 0.0,
-        "totalFlow_Lpm": float(flow_Lpm),
+        "requestedTotalFlow_Lpm": float(flow_Lpm),
+        "achievedTotalFlow_Lpm": float(total_flow_m3_s * 60000.0),
+        "totalFlow_Lpm": float(total_flow_m3_s * 60000.0),
+        "assistBlowerFlowShortfall_Lpm": float(max(requested_flow_m3_s - total_flow_m3_s, 0.0) * 60000.0),
+        "assistBlowerFlowLimited": bool(blower_limited and total_flow_m3_s + 1.0e-12 < requested_flow_m3_s),
+        "assistBlowerOperatingResidual_Pa": float(operating_residual_pa),
         "totalPower_W": 0.0,
         "totalCurrent_A": 0.0,
         "wireMax_C": ambient_air_C,
@@ -3140,6 +3597,18 @@ def simulate_summer_cooling_point(
         "distributionSplitterBody_Pa": float(state.get("distributionSplitterBody_Pa", np.nan)),
         "distributionConnectorFriction_Pa": float(state.get("distributionConnectorFriction_Pa", np.nan)),
         "distributionConnectorToBranch_Pa": float(state.get("distributionConnectorToBranch_Pa", np.nan)),
+        "aerationInletGaugePressure_Pa": float(state.get("inlet_gauge_pressure_Pa", np.nan)),
+        "aerationTubeFrictionDrop_Pa": float(state.get("tube_friction_drop_Pa", np.nan)),
+        "bedPressureModelMode": str(bed_pressure_model.get("mode", "")),
+        "bedPressureBoundaryGauge_Pa": float(state.get("bed_boundary_gauge_Pa", np.nan)),
+        "bedPressureRepresentativeTubeCenterHeight_m": float(bed_pressure_model.get("representativeTubeCenterHeight_m", np.nan)),
+        "bedPressureVerticalEscapeDistance_m": float(bed_pressure_model.get("verticalEscapeDistance_m", np.nan)),
+        "bedPressureProfileGauge_Pa": np.asarray(state.get("bed_pressure_profile_gauge_Pa", np.array([], dtype=float)), dtype=float).tolist(),
+        "bedPressureMaxGauge_Pa": float(state.get("max_bed_gauge_pressure_Pa", np.nan)),
+        "pressureSolveBracketFound": bool(state.get("pressureSolveBracketFound", True)),
+        "pressureSolveConverged": bool(state.get("pressureSolveConverged", True)),
+        "pressureSolveMassBalanceTolerance_kg_s": float(state.get("pressureSolveMassBalanceTolerance_kg_s", np.nan)),
+        "pressureSolveResidual_kg_s": float(state.get("pressureSolveResidual_kg_s", np.nan)),
         "flowPerHole_Lpm": float(flow_per_hole_lpm),
         "holeVelocity_m_s": float(hole_velocity_m_s),
         "waterLoss_kg_day": float(water_loss_kg_s * 86400.0),
@@ -3185,6 +3654,8 @@ def cooling_point_metrics(pt: dict, config: dict) -> dict[str, float | str]:
     cooling_cfg = cooling_mode_config(config)
     limits = cooling_cfg["limits"]
     opt = cooling_cfg["optimization"]
+    pressure_solve_converged = bool(pt.get("pressureSolveConverged", True))
+    pressure_solve_unresolved = 0.0 if pressure_solve_converged else 1.0
     bottom = float(pt.get("TbottomFullPower_C", np.nan))
     top = float(pt.get("TtopFullPower_C", np.nan))
     if not np.isfinite(bottom):
@@ -3219,6 +3690,8 @@ def cooling_point_metrics(pt: dict, config: dict) -> dict[str, float | str]:
         if np.isfinite(value):
             combined_cooling_power += value
     hard_safe = (
+        pressure_solve_unresolved == 0.0
+        and
         assist_blower_pressure_excess == 0.0
         and pressure_excess == 0.0
         and water_excess == 0.0
@@ -3230,7 +3703,10 @@ def cooling_point_metrics(pt: dict, config: dict) -> dict[str, float | str]:
         and spread_excess == 0.0
         and cooling_capacity > 0.0
     )
-    if hard_safe:
+    if pressure_solve_unresolved > 0.0:
+        stage = "last_resort"
+        state = "pressure solve unresolved"
+    elif hard_safe:
         stage = "feasible"
         state = "cooling-safe"
     elif assist_blower_pressure_excess > 0.0:
@@ -3264,6 +3740,7 @@ def cooling_point_metrics(pt: dict, config: dict) -> dict[str, float | str]:
         stage = "last_resort"
         state = "nonpositive cooling"
     return {
+        "pressure_solve_unresolved": pressure_solve_unresolved,
         "assist_blower_pressure_excess_Pa": assist_blower_pressure_excess,
         "pressure_drop_excess_Pa": pressure_excess,
         "water_loss_excess_kg_day": water_excess,
@@ -3300,7 +3777,7 @@ def cooling_criteria_sort_key(metrics: dict[str, float | str], config: dict) -> 
         "water_supply_kg_day": "waterLoss_kg_day",
     }
     order = cooling_mode_config(config)["optimization"]["priority_order"]
-    resolved: list[float] = []
+    resolved: list[float] = [float(metrics.get("pressure_solve_unresolved", 0.0))]
     for name in order:
         primary = str(name)
         secondary = alias_map.get(primary)
@@ -3368,6 +3845,7 @@ class CoolingNsgaProblem(ElementwiseProblem):
 
 def cooling_pareto_candidates_for_points(payload: dict, config: dict, points: list[dict] | None = None) -> list[dict]:
     source = payload["design_points"] if points is None else points
+    source = [pt for pt in source if bool(pt.get("pressureSolveConverged", True))]
     opt = cooling_mode_config(config)["optimization"]
     if not opt.get("enabled", True) or str(opt.get("method", "nsga2")).strip().lower() != "nsga2" or not source:
         return []
@@ -3844,59 +4322,34 @@ def air_props(T_C: float, pressure_Pa: float = 101325.0) -> dict:
 
 
 def saturation_pressure_water_Pa(T_K: float) -> float:
-    Tc_K = 647.096
-    pc_Pa = 22.064e6
-    tau = 1.0 - T_K / Tc_K
-    coeffs = (-7.85951783, 1.84408259, -11.7866497, 22.6807411, -15.9618719, 1.80122502)
-    exponents = (1.0, 1.5, 3.0, 3.5, 4.0, 7.5)
-    series = sum(a * tau**b for a, b in zip(coeffs, exponents))
-    return pc_Pa * np.exp((Tc_K / max(T_K, 1e-12)) * series)
+    return float(iapws95.saturation_pressure_ancillary_Pa(float(T_K)))
 
 
 def saturation_pressure_slope_water_Pa_K(T_K: float) -> float:
-    Tc_K = 647.096
-    pc_Pa = 22.064e6
-    tau = 1.0 - T_K / Tc_K
-    coeffs = (-7.85951783, 1.84408259, -11.7866497, 22.6807411, -15.9618719, 1.80122502)
-    exponents = (1.0, 1.5, 3.0, 3.5, 4.0, 7.5)
-    sum_series = sum(a * tau**b for a, b in zip(coeffs, exponents))
-    sum_deriv = sum(a * b * tau ** (b - 1.0) for a, b in zip(coeffs, exponents))
-    lnp = (Tc_K / max(T_K, 1e-12)) * sum_series
-    psat = pc_Pa * np.exp(lnp)
-    dln_dT = -(Tc_K / max(T_K, 1e-12) ** 2) * sum_series - sum_deriv / max(T_K, 1e-12)
-    return psat * dln_dT
+    T_K = float(T_K)
+    dT_K = max(1.0e-4, 1.0e-6 * max(T_K, 1.0))
+    T_lo = max(T_K - dT_K, 1.0)
+    T_hi = T_K + dT_K
+    return (saturation_pressure_water_Pa(T_hi) - saturation_pressure_water_Pa(T_lo)) / max(T_hi - T_lo, 1e-12)
 
 
 def saturation_liquid_density_water_kg_m3(T_K: float) -> float:
-    Tc_K = 647.096
-    rhoc_kg_m3 = 322.0
-    tau = 1.0 - T_K / Tc_K
-    coeffs = (1.99274064, 1.09965342, -0.510839303, -1.75493479, -45.5170352, -6.74694450e5)
-    exponents = (1.0 / 3.0, 2.0 / 3.0, 5.0 / 3.0, 16.0 / 3.0, 43.0 / 3.0, 110.0 / 3.0)
-    series = 1.0 + sum(a * tau**b for a, b in zip(coeffs, exponents))
-    return rhoc_kg_m3 * series
+    return float(iapws95.saturated_liquid_density_kg_m3(float(T_K)))
 
 
 def saturation_vapor_density_water_kg_m3(T_K: float) -> float:
-    Tc_K = 647.096
-    rhoc_kg_m3 = 322.0
-    tau = 1.0 - T_K / Tc_K
-    coeffs = (-2.03150240, -2.68302940, -5.38626492, -17.2991605, -44.7586581, -63.9201063)
-    exponents = (2.0 / 6.0, 4.0 / 6.0, 8.0 / 6.0, 18.0 / 6.0, 37.0 / 6.0, 71.0 / 6.0)
-    series = sum(a * tau**b for a, b in zip(coeffs, exponents))
-    return rhoc_kg_m3 * np.exp(series)
+    return float(iapws95.saturated_vapor_density_kg_m3(float(T_K)))
 
 
 def water_vapor_density_at_saturation_kg_m3(T_K: float) -> float:
-    Rv_J_kgK = 461.526
-    return saturation_pressure_water_Pa(T_K) / max(Rv_J_kgK * T_K, 1e-12)
+    # In humid-air psychrometrics, vapor-component density follows the vapor partial pressure,
+    # so the saturation vapor density used here is p_sat(T)/(R_v T), with p_sat(T) supplied
+    # by the imported IAPWS_95 saturation ancillary.
+    return saturation_pressure_water_Pa(T_K) / max(float(iapws95.R_95) * float(T_K), 1e-12)
 
 
 def latent_heat_vaporization_water_J_kg(T_K: float) -> float:
-    rho_l = saturation_liquid_density_water_kg_m3(T_K)
-    rho_v = saturation_vapor_density_water_kg_m3(T_K)
-    dpdT = saturation_pressure_slope_water_Pa_K(T_K)
-    return T_K * dpdT * (1.0 / max(rho_v, 1e-12) - 1.0 / max(rho_l, 1e-12))
+    return float(iapws95.latent_heat_vaporization_saturated_J_kg(float(T_K)))
 
 
 def humidity_ratio_from_rh(T_C: float, relative_humidity: float, pressure_Pa: float) -> float:
@@ -4104,91 +4557,153 @@ def solve_heating_aeration_tube_python(
     pout_m = np.pi * od_m
     wall_k = float(aer_inputs.get("wallK_W_mK", 16.0))
     pressure_pa = float(env_inputs.get("pressure_Pa", 101325.0))
-    release_fraction = float(aer_inputs.get("releaseFraction", 0.95))
-
-    remaining_mdot_kg_s = mdot_in_kg_s
-    released_total_kg_s = mdot_in_kg_s * release_fraction
-    dm_release_kg_s = released_total_kg_s / n_segments
-    tair_C = float(tair_in_C)
-    q_to_bed_W = 0.0
-    latent_evap_W = 0.0
-    water_loss_kg_s = 0.0
-    dp_pa = 0.0
-
-    air_profile_C = np.zeros(n_segments + 1, dtype=float)
-    air_profile_C[0] = tair_C
 
     evap_inputs = model_overrides.get("evaporation", {})
     n_tubes = max(1, int(round(float(aer_inputs.get("nParallelTubes", 1)))))
-    hole_diameter_m = max(1e-12, float(model_overrides.get("perforation", {}).get("holeDiameter_m", 0.005)))
-    holes_per_tube = max(1, int(round(float(model_overrides.get("perforation", {}).get("holesPerTube", 60)))))
+    perforation_inputs = model_overrides.get("perforation", {})
+    hole_diameter_m = max(1e-12, float(perforation_inputs.get("holeDiameter_m", 0.005)))
+    holes_per_tube = max(1, int(round(float(perforation_inputs.get("holesPerTube", 60)))))
+    discharge_coefficient = max(float(perforation_inputs.get("dischargeCoefficient", 0.60)), 0.0)
     props_in = air_props(tair_in_C, pressure_pa)
-    vol_release_m3_s = release_fraction * mdot_in_kg_s / max(props_in["rho_kg_m3"], 1e-12)
-    flow_per_hole_lpm = vol_release_m3_s * 60000.0 / holes_per_tube
-    hole_velocity_m_s = vol_release_m3_s / max(holes_per_tube * np.pi * hole_diameter_m**2 / 4.0, 1e-12)
+    hole_area_m2 = np.pi * hole_diameter_m**2 / 4.0
+    holes_per_segment = max(float(holes_per_tube) / max(n_segments, 1), 1e-12)
+    segment_hole_area_m2 = holes_per_segment * hole_area_m2
+    total_hole_area_m2 = max(float(holes_per_tube), 1.0) * hole_area_m2
     seg_area_m2 = derived_wetted_area_m2(summary_inputs, model_overrides) / max(n_tubes * n_segments, 1)
+    bin_inputs = effective_bin_inputs(summary_inputs, model_overrides)
+    bed_pressure_model = build_segmentwise_bed_pressure_model(
+        summary_inputs,
+        model_overrides,
+        bin_inputs,
+        aer_inputs,
+        length_m,
+        n_segments,
+        od_m,
+    )
+    boundary_props = air_props(tbed_C, pressure_pa)
+    bed_boundary_gauge_pa = derived_outlet_boundary_gauge_pa(
+        mdot_in_kg_s,
+        boundary_props["rho_kg_m3"],
+        bed_pressure_model,
+    )
     inlet_relative_humidity = float(evap_inputs.get("relativeHumidity", 0.80))
     surface_temp_C = float(evap_inputs.get("surfaceTemp_C", tbed_C))
     lewis_factor = float(evap_inputs.get("lewisFactor", 1.0))
     evaporation_multiplier = float(calibration.get("evaporationHMultiplier", 1.0))
 
-    for idx in range(n_segments):
-        props = air_props(tair_C, pressure_pa)
-        u_bulk_m_s = remaining_mdot_kg_s / max(props["rho_kg_m3"] * atube_m2, 1e-12)
-        re_tube = props["rho_kg_m3"] * u_bulk_m_s * id_m / max(props["mu_Pa_s"], 1e-12)
-        nu_tube = internal_tube_nu(re_tube, props["Pr"], id_m, length_m)
-        h_inside = float(calibration.get("hWallMultiplier", 1.0)) * nu_tube * props["k_W_mK"] / id_m
-        h_outside = float(calibration.get("bedHTMultiplier", 1.0)) * float(aer_inputs.get("bedH_W_m2K", 8.0))
-        u_tube = 1.0 / max(
-            1.0 / max(h_inside, 1e-12)
-            + (od_m - id_m) / max(2.0 * wall_k, 1e-12)
-            + 1.0 / max(h_outside, 1e-12),
-            1e-12,
-        )
+    def march_branch(inlet_gauge_pressure_pa: float) -> dict:
+        remaining_mdot_kg_s = mdot_in_kg_s
+        tair_C = float(tair_in_C)
+        q_to_bed_W = 0.0
+        latent_evap_W = 0.0
+        water_loss_kg_s = 0.0
+        dp_pa = 0.0
+        peak_flow_per_hole_lpm = 0.0
+        peak_hole_velocity_m_s = 0.0
 
-        q_wall_W = u_tube * pout_m * dx_m * (tair_C - tbed_C)
-        dm_kg_s = min(dm_release_kg_s, remaining_mdot_kg_s)
-        q_jet_W = dm_kg_s * props["cp_J_kgK"] * (tair_C - tbed_C)
-        q_avail_W = max(q_jet_W, 0.0)
-        m_evap_kg_s, q_evap_W = summer_evaporation_loss_segment(
-            dm_kg_s,
-            tair_C,
-            tbed_C,
-            q_avail_W,
-            hole_velocity_m_s,
-            seg_area_m2,
-            pressure_pa,
-            inlet_relative_humidity,
-            surface_temp_C,
-            lewis_factor,
-            evaporation_multiplier,
-            hole_diameter_m,
-            float(env_inputs.get("greenhouseAir_C", tbed_C)),
-        )
-        q_to_bed_W += q_wall_W + q_jet_W - q_evap_W
-        latent_evap_W += q_evap_W
-        water_loss_kg_s += m_evap_kg_s
+        air_profile_C = np.zeros(n_segments + 1, dtype=float)
+        air_profile_C[0] = tair_C
+        pressure_profile_gauge_pa = np.zeros(n_segments + 1, dtype=float)
+        pressure_profile_gauge_pa[0] = inlet_gauge_pressure_pa
+        bed_pressure_profile_gauge_pa = np.zeros(n_segments, dtype=float)
+        local_gauge_pressure_pa = inlet_gauge_pressure_pa
 
-        remaining_after_release_kg_s = max(remaining_mdot_kg_s - dm_kg_s, 1e-9)
-        tair_C = tair_C - q_wall_W / max(remaining_after_release_kg_s * props["cp_J_kgK"], 1e-12)
-        remaining_mdot_kg_s = remaining_after_release_kg_s
-        air_profile_C[idx + 1] = tair_C
+        for idx in range(n_segments):
+            local_pressure_pa = pressure_pa + max(local_gauge_pressure_pa, bed_boundary_gauge_pa)
+            props = air_props(tair_C, local_pressure_pa)
+            u_bulk_m_s = remaining_mdot_kg_s / max(props["rho_kg_m3"] * atube_m2, 1e-12)
+            re_tube = props["rho_kg_m3"] * u_bulk_m_s * id_m / max(props["mu_Pa_s"], 1e-12)
+            nu_tube = internal_tube_nu(re_tube, props["Pr"], id_m, length_m)
+            h_inside = float(calibration.get("hWallMultiplier", 1.0)) * nu_tube * props["k_W_mK"] / id_m
+            h_outside = float(calibration.get("bedHTMultiplier", 1.0)) * float(aer_inputs.get("bedH_W_m2K", 8.0))
+            u_tube = 1.0 / max(
+                1.0 / max(h_inside, 1e-12)
+                + (od_m - id_m) / max(2.0 * wall_k, 1e-12)
+                + 1.0 / max(h_outside, 1e-12),
+                1e-12,
+            )
 
-        f = churchill_friction_factor(re_tube)
-        dp_pa += (
-            f * dx_m / id_m + float(aer_inputs.get("endMinorK", 1.0)) / n_segments
-        ) * 0.5 * props["rho_kg_m3"] * u_bulk_m_s**2
+            dm_kg_s, local_bed_gauge_pressure_pa = solve_segment_release_with_bed_backpressure(
+                local_gauge_pressure_pa,
+                props["rho_kg_m3"],
+                props["mu_Pa_s"],
+                discharge_coefficient,
+                segment_hole_area_m2,
+                remaining_mdot_kg_s,
+                bed_pressure_model,
+                idx,
+                bed_boundary_gauge_pa,
+            )
+            bed_pressure_profile_gauge_pa[idx] = local_bed_gauge_pressure_pa
+            remaining_after_release_kg_s = max(remaining_mdot_kg_s - dm_kg_s, 1e-9)
+            mdot_mean_kg_s = max(remaining_mdot_kg_s - 0.5 * dm_kg_s, 1e-12)
+            ua_seg_W_K = u_tube * pout_m * dx_m
+            wall_factor = np.exp(-ua_seg_W_K / max(mdot_mean_kg_s * props["cp_J_kgK"], 1e-12))
+            tair_after_wall_C = tbed_C + (tair_C - tbed_C) * wall_factor
+            q_wall_W = mdot_mean_kg_s * props["cp_J_kgK"] * (tair_C - tair_after_wall_C)
+            t_release_C = 0.5 * (tair_C + tair_after_wall_C)
+            vol_release_m3_s = dm_kg_s / max(props["rho_kg_m3"], 1e-12)
+            local_flow_per_hole_lpm = vol_release_m3_s * 60000.0 / max(holes_per_segment, 1e-12)
+            local_hole_velocity_m_s = vol_release_m3_s / max(segment_hole_area_m2, 1e-12)
+            peak_flow_per_hole_lpm = max(peak_flow_per_hole_lpm, local_flow_per_hole_lpm)
+            peak_hole_velocity_m_s = max(peak_hole_velocity_m_s, local_hole_velocity_m_s)
+            q_jet_W = dm_kg_s * props["cp_J_kgK"] * (t_release_C - tbed_C)
+            q_avail_W = max(q_jet_W, 0.0)
+            m_evap_kg_s, q_evap_W = summer_evaporation_loss_segment(
+                dm_kg_s,
+                t_release_C,
+                tbed_C,
+                q_avail_W,
+                local_hole_velocity_m_s,
+                seg_area_m2,
+                local_pressure_pa,
+                inlet_relative_humidity,
+                surface_temp_C,
+                lewis_factor,
+                evaporation_multiplier,
+                hole_diameter_m,
+                float(env_inputs.get("greenhouseAir_C", tbed_C)),
+            )
+            q_to_bed_W += q_wall_W + q_jet_W - q_evap_W
+            latent_evap_W += q_evap_W
+            water_loss_kg_s += m_evap_kg_s
 
-    return {
-        "QtoBed_W": float(q_to_bed_W),
-        "airOutlet_C": float(tair_C),
-        "airProfile_C": air_profile_C,
-        "deltaP_Pa": float(dp_pa),
-        "flowPerHole_Lpm": float(flow_per_hole_lpm),
-        "holeVelocity_m_s": float(hole_velocity_m_s),
-        "waterLoss_kg_day": float(water_loss_kg_s * 86400.0),
-        "latentEvap_W": float(latent_evap_W),
-    }
+            tair_C = tair_after_wall_C
+            remaining_mdot_kg_s = remaining_after_release_kg_s
+            air_profile_C[idx + 1] = tair_C
+
+            f = churchill_friction_factor(re_tube)
+            seg_dp_pa = f * dx_m / id_m * 0.5 * props["rho_kg_m3"] * u_bulk_m_s**2
+            dp_pa += seg_dp_pa
+            local_gauge_pressure_pa = max(local_gauge_pressure_pa - seg_dp_pa, local_bed_gauge_pressure_pa)
+            pressure_profile_gauge_pa[idx + 1] = local_gauge_pressure_pa
+
+        return {
+            "QtoBed_W": float(q_to_bed_W),
+            "airOutlet_C": float(tair_C),
+            "airProfile_C": air_profile_C,
+            "flowPerHole_Lpm": float(peak_flow_per_hole_lpm),
+            "holeVelocity_m_s": float(peak_hole_velocity_m_s),
+            "waterLoss_kg_day": float(water_loss_kg_s * 86400.0),
+            "latentEvap_W": float(latent_evap_W),
+            "remaining_mdot_kg_s": float(remaining_mdot_kg_s),
+            "tubeFrictionDrop_Pa": float(dp_pa),
+            "bedBoundaryGauge_Pa": float(bed_boundary_gauge_pa),
+            "pressureProfileGauge_Pa": pressure_profile_gauge_pa,
+            "bedPressureProfileGauge_Pa": bed_pressure_profile_gauge_pa,
+            "maxBedGaugePressure_Pa": float(np.max(bed_pressure_profile_gauge_pa)) if bed_pressure_profile_gauge_pa.size else float(bed_boundary_gauge_pa),
+        }
+
+    state = solve_closed_end_inlet_gauge_pressure(
+        mdot_in_kg_s,
+        total_hole_area_m2,
+        props_in["rho_kg_m3"],
+        discharge_coefficient,
+        march_branch,
+    )
+    state["deltaP_Pa"] = float(state["inlet_gauge_pressure_Pa"])
+    state["aerationInletGaugePressure_Pa"] = float(state["inlet_gauge_pressure_Pa"])
+    return state
 
 
 def simulate_heating_reference_point(config: dict, point: dict, ambient_air_C: float, bed_temp_C: float) -> dict:
@@ -4460,6 +4975,28 @@ def sudden_expansion_loss_Pa(mdot_kg_s: float, T_C: float, pressure_Pa: float, D
     return float(loss_coeff * 0.5 * props["rho_kg_m3"] * velocity_upstream_m_s**2)
 
 
+def hooper_2k_fitting_loss_coefficient(reynolds_number: float, diameter_m: float, K1: float, Kinf: float) -> float:
+    reynolds_number = float(reynolds_number)
+    diameter_m = float(diameter_m)
+    if reynolds_number <= 1e-12 or diameter_m <= 0.0:
+        return 0.0
+    diameter_in = max(diameter_m * 39.37007874015748, 1e-12)
+    # [R14] Crowl and Louvar, Eq. (4-38): Hooper's 2-K fitting-loss method.
+    return float(K1 / reynolds_number + Kinf * (1.0 + 1.0 / diameter_in))
+
+
+def hooper_2k_entrance_loss_coefficient(reynolds_number: float, K1: float = 160.0, Kinf: float = 0.50) -> float:
+    reynolds_number = float(reynolds_number)
+    if reynolds_number <= 1e-12:
+        return 0.0
+    # [R14] Crowl and Louvar, Eq. (4-39): entrance/exit form of the 2-K method.
+    return float(K1 / reynolds_number + Kinf)
+
+
+def aeration_loss_multiplier(aer_inputs: dict, primary_key: str, legacy_key: str) -> float:
+    return max(0.0, float(aer_inputs.get(primary_key, aer_inputs.get(legacy_key, 1.0))))
+
+
 def branch_distribution_losses(
     total_flow_m3_s: float,
     branch_flow_m3_s: float,
@@ -4473,13 +5010,13 @@ def branch_distribution_losses(
     rho = props["rho_kg_m3"]
     mu = props["mu_Pa_s"]
     header_enabled = bool(aer_inputs.get("headerEnabled", True))
-    header_minor_k = float(aer_inputs.get("headerMinorK", 1.0))
+    header_loss_multiplier = aeration_loss_multiplier(aer_inputs, "headerLossMultiplier", "headerMinorK")
     header_id_m = max(1e-12, float(aer_inputs.get("headerID_mm", 50.0)) / 1000.0)
     splitter_outlet_count = max(1, int(round(float(aer_inputs.get("splitterOutletCount", 4)))))
     splitter_inlet_id_m = max(1e-12, float(aer_inputs.get("splitterInletID_mm", aer_inputs.get("branchConnectorID_mm", 19.0))) / 1000.0)
     branch_connector_id_m = max(1e-12, float(aer_inputs.get("branchConnectorID_mm", 19.0)) / 1000.0)
     branch_connector_length_m = max(0.0, float(aer_inputs.get("branchConnectorLength_m", 0.0)))
-    splitter_body_k = max(0.0, float(aer_inputs.get("splitterBodyK", 1.0)))
+    splitter_body_loss_multiplier = aeration_loss_multiplier(aer_inputs, "splitterBodyLossMultiplier", "splitterBodyK")
     contraction_angle_deg = float(aer_inputs.get("contractionConeAngle_deg", 60.0))
     active_splitter_branches = max(1, min(splitter_outlet_count, int(n_tubes)))
 
@@ -4503,7 +5040,9 @@ def branch_distribution_losses(
     if header_enabled:
         header_area_m2 = np.pi * header_id_m**2 / 4.0
         header_velocity_m_s = total_flow_m3_s / max(header_area_m2, 1e-12)
-        dp_header = header_minor_k * 0.5 * rho * header_velocity_m_s**2
+        header_re = rho * header_velocity_m_s * header_id_m / max(mu, 1e-12)
+        header_loss_coeff = header_loss_multiplier * hooper_2k_entrance_loss_coefficient(header_re, K1=160.0, Kinf=0.50)
+        dp_header = header_loss_coeff * 0.5 * rho * header_velocity_m_s**2
         dp_header_to_splitter = idelchik_conical_contraction_loss_Pa(
             splitter_inlet_mdot_kg_s,
             T_C,
@@ -4515,8 +5054,24 @@ def branch_distribution_losses(
     else:
         dp_header = 0.0
         dp_header_to_splitter = 0.0
+        header_loss_coeff = 0.0
 
-    dp_splitter_body = splitter_body_k * 0.5 * rho * connector_velocity_m_s**2
+    splitter_branch_tee_loss_coeff = hooper_2k_fitting_loss_coefficient(
+        connector_re,
+        branch_connector_id_m,
+        K1=500.0,
+        Kinf=0.70,
+    )
+    splitter_valve_loss_coeff = hooper_2k_fitting_loss_coefficient(
+        connector_re,
+        branch_connector_id_m,
+        K1=300.0,
+        Kinf=0.10,
+    )
+    splitter_body_loss_coeff = splitter_body_loss_multiplier * (
+        splitter_branch_tee_loss_coeff + splitter_valve_loss_coeff
+    )
+    dp_splitter_body = splitter_body_loss_coeff * 0.5 * rho * connector_velocity_m_s**2
     dp_connector_to_branch = 0.0
     if downstream_branch_id_m < branch_connector_id_m:
         dp_connector_to_branch = idelchik_conical_contraction_loss_Pa(
@@ -4542,8 +5097,15 @@ def branch_distribution_losses(
         "splitter_body_Pa": float(dp_splitter_body),
         "connector_friction_Pa": float(dp_connector_friction),
         "connector_to_branch_Pa": float(dp_connector_to_branch),
+        "header_loss_coefficient": float(header_loss_coeff),
+        "header_loss_multiplier": float(header_loss_multiplier),
+        "splitter_body_loss_coefficient": float(splitter_body_loss_coeff),
+        "splitter_body_loss_multiplier": float(splitter_body_loss_multiplier),
+        "splitter_branch_tee_loss_coefficient": float(splitter_branch_tee_loss_coeff),
+        "splitter_valve_loss_coefficient": float(splitter_valve_loss_coeff),
         "total_Pa": float(dp_header + dp_header_to_splitter + dp_splitter_body + dp_connector_friction + dp_connector_to_branch),
         "connector_velocity_m_s": float(connector_velocity_m_s),
+        "connector_reynolds": float(connector_re),
         "splitter_active_branches": float(active_splitter_branches),
         "header_enabled": float(1.0 if header_enabled else 0.0),
     }
@@ -5163,7 +5725,7 @@ def simulate_year_round_day_task(
         mode = "cooling"
         nominal_state = simulate_summer_cooling_point(
             config,
-            float(cooling_ref.get("totalFlow_Lpm", 0.0)),
+            float(cooling_ref.get("requestedTotalFlow_Lpm", cooling_ref.get("totalFlow_Lpm", 0.0))),
             bin_model_cool,
             required_cooling_W,
             ambient_air_override_C=ambient_C,
@@ -5850,13 +6412,13 @@ def append_moisture_process(lines: list[str], payload: dict, config: dict) -> No
             f"{1000 * float(perforation_inputs['holeDiameter_m']):.1f} mm diameter, "
             f"area per hole {hole_area_m2:.8f} m^2"
         )
-    if "releaseFraction" in aeration_inputs:
+    if "dischargeCoefficient" in perforation_inputs:
         lines.append(
-            "  Tube release fraction                : "
-            f"{100 * float(aeration_inputs['releaseFraction']):.1f}% of each tube flow is released through the perforations"
+            "  Perforation discharge coefficient    : "
+            f"{float(perforation_inputs['dischargeCoefficient']):.2f}"
         )
-    lines.append("  Per-hole flow relation               : released tube flow / holes per tube")
-    lines.append("  Hole-velocity relation               : released tube flow / (holes per tube x area per hole)")
+    lines.append("  Per-hole flow relation               : local released flow follows C_d A_h sqrt(2 rho Delta p)")
+    lines.append("  Hole-velocity relation               : local released flow / local perforation area")
     lines.append("  Evaporation relation                 : m_dot = min(m_diffusion, m_capacity, m_heat)")
     lines.append("  Diffusion limit                      : m_diffusion = h_m A (rho_v,sat(T_surface) - rho_v,bulk)")
     lines.append("                                         the diffusion, carrying-capacity, and heat-limited")
@@ -6363,9 +6925,9 @@ def write_design_point_block(
             f"connector->branch {float(rec.get('distributionConnectorToBranch_Pa', 0.0)):.1f} Pa"
         )
     if "flowPerHole_Lpm" in rec:
-        lines.append(f"  Released flow per hole             : {float(rec['flowPerHole_Lpm']):.2f} L/min")
+        lines.append(f"  Peak local flow per hole           : {float(rec['flowPerHole_Lpm']):.2f} L/min")
     if "holeVelocity_m_s" in rec:
-        lines.append(f"  Hole velocity                      : {float(rec['holeVelocity_m_s']):.2f} m/s")
+        lines.append(f"  Peak hole velocity                 : {float(rec['holeVelocity_m_s']):.2f} m/s")
     if "waterLoss_kg_day" in rec:
         lines.append(f"  Water loss / sprinkler make-up     : {float(rec['waterLoss_kg_day']):.2f} kg/24 h")
     if "latentEvap_W" in rec:
@@ -6390,6 +6952,8 @@ def write_design_point_block(
 def cooling_status_long(rec: dict) -> str:
     if not rec:
         return "no hard-constraint-safe summer cooling point exists in the current sweep"
+    if not bool(rec.get("pressureSolveConverged", True)):
+        return "pressure solve unresolved; excluded from Pareto eligibility and retained only for diagnostics"
     if bool(rec.get("isConstraintSafeByCriteria", False)):
         return "meets all summer hard constraints and provides net bed cooling"
     return "best-available only; it violates one or more summer hard constraints"
@@ -6403,7 +6967,11 @@ def write_cooling_design_point_block(lines: list[str], heading: str, rec: dict, 
         return
 
     limits = cooling_mode_config(config)["limits"]
-    lines.append(f"  Total flow                         : {float(rec['totalFlow_Lpm']):.1f} L/min")
+    lines.append(f"  Achieved total flow                : {float(rec['totalFlow_Lpm']):.1f} L/min")
+    if np.isfinite(float(rec.get("requestedTotalFlow_Lpm", np.nan))):
+        lines.append(f"  Requested total flow               : {float(rec['requestedTotalFlow_Lpm']):.1f} L/min")
+    if np.isfinite(float(rec.get("assistBlowerFlowShortfall_Lpm", np.nan))):
+        lines.append(f"  Assist-blower flow shortfall       : {float(rec['assistBlowerFlowShortfall_Lpm']):.1f} L/min")
     lines.append(f"  Spot-cooler target supply air      : {float(rec.get('spotCoolerTargetSupply_C', np.nan)):.1f} C")
     if np.isfinite(float(rec.get("spotCoolerDerivedTargetSupply_C", np.nan))):
         lines.append(f"  Spec-derived middle-case supply    : {float(rec['spotCoolerDerivedTargetSupply_C']):.1f} C")
@@ -6424,8 +6992,8 @@ def write_cooling_design_point_block(lines: list[str], heading: str, rec: dict, 
     lines.append(f"  Bottom-node steady temperature     : {float(rec['TbottomFullPower_C']):.1f} C")
     lines.append(f"  Top-node steady temperature        : {float(rec['TtopFullPower_C']):.1f} C")
     lines.append(f"  Bottom-top spread                  : {abs(float(rec['TbottomFullPower_C']) - float(rec['TtopFullPower_C'])):.1f} C")
-    lines.append(f"  Released flow per hole             : {float(rec['flowPerHole_Lpm']):.2f} L/min")
-    lines.append(f"  Hole velocity                      : {float(rec['holeVelocity_m_s']):.2f} m/s")
+    lines.append(f"  Peak local flow per hole           : {float(rec['flowPerHole_Lpm']):.2f} L/min")
+    lines.append(f"  Peak hole velocity                 : {float(rec['holeVelocity_m_s']):.2f} m/s")
     lines.append(f"  Substrate water loss               : {float(rec['waterLoss_kg_day']):.2f} kg/24 h")
     lines.append(f"  Latent evaporation load            : {float(rec['latentEvap_W']):.1f} W")
     lines.append(f"  Total pressure drop                : {float(rec['deltaP_Pa']):.1f} Pa")
@@ -6444,6 +7012,16 @@ def write_cooling_design_point_block(lines: list[str], heading: str, rec: dict, 
             f"  Assist-blower static-pressure margin: "
             f"{float(rec['assistBlowerAvailablePressure_Pa']) - float(rec['deltaP_Pa']):.1f} Pa"
         )
+    if not bool(rec.get("pressureSolveConverged", True)):
+        lines.append("  Pressure-solve status              : unresolved bracket; excluded from Pareto eligibility")
+        if np.isfinite(float(rec.get("pressureSolveResidual_kg_s", np.nan))) and np.isfinite(
+            float(rec.get("pressureSolveMassBalanceTolerance_kg_s", np.nan))
+        ):
+            lines.append(
+                "  Pressure-solve residual / tol      : "
+                f"{float(rec['pressureSolveResidual_kg_s']):.3e} / "
+                f"{float(rec['pressureSolveMassBalanceTolerance_kg_s']):.3e} kg/s"
+            )
     lines.append(f"  Status                             : {cooling_status_long(rec)}")
 
 
@@ -6651,6 +7229,8 @@ def write_cooling_summary(payload: dict, config: dict, output_dir: Path) -> None
     )
     lines.append("  Step 1: compute the inequality-constraint residuals listed below for every sampled flow point.")
     lines.append("  Step 2: run NSGA-II with those residuals as hard constraints and the objective set listed below.")
+    lines.append("          Any point with an unresolved closed-end pressure bracket is removed from Pareto eligibility and kept only")
+    lines.append("          for diagnostics.")
     lines.append("  Step 3: keep only fully summer-hard-safe points on the resulting Pareto front.")
     lines.append("  Step 4: report one design point from that feasible Pareto set using the configured cooling report-priority order.")
     lines.append("  No weighted penalty score is used.")
@@ -6871,10 +7451,10 @@ def write_summary(payload: dict, config: dict, output_dir: Path) -> None:
             "  Bed-side heat-transfer assumption       : "
             f"effective sensible h = {float(model_aeration['bedH_W_m2K']):.1f} W/m^2-K"
         )
-    if "releaseFraction" in model_aeration:
+    if "dischargeCoefficient" in perforation_inputs:
         lines.append(
-            "  Perforation release fraction            : "
-            f"{100 * float(model_aeration['releaseFraction']):.1f}% of tube flow"
+            "  Perforation discharge coefficient       : "
+            f"{float(perforation_inputs['dischargeCoefficient']):.2f}"
         )
     if {"name", "gauge", "diameter_mm"} <= wire_inputs.keys():
         lines.append(

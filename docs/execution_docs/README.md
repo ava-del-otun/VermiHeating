@@ -67,7 +67,7 @@ This directory contains a repository-grounded audit and documentation set for th
 
 ## Suggested next verification steps
 
-- Compile `physics/physics_and_math_reference.tex` and `physics/implementation_traceability.tex` after any future equation-label edits to confirm all references resolve cleanly.
+- Run `.\docs\execution_docs\build_execution_docs.ps1` after any future equation-label edits. The script compiles `physics/physics_and_math_reference.tex` and `physics/implementation_traceability.tex` twice so equation references and bookmarks settle cleanly.
 - If cooling feasibility is intended to require full cooling-load satisfaction, decide whether `coolingShortfall_W` should become a hard cooling constraint instead of remaining diagnostic-only.
 - Compile the generated `.tex` files in a local LaTeX environment.
 - Capture one real refresh/export run with MATLAB available and archive the emitted temp helper for comparison against the documented template.

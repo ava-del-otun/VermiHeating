@@ -1987,8 +1987,10 @@ Munson when the loss is referenced to the upstream velocity.
 
 The internal loss of the commercial $4$-way splitter body is not published
 by the vendor. Therefore the code represents that unresolved internal
-branching loss by the editable lumped coefficient
-\texttt{splitterBodyK}, applied on the connector-velocity basis:
+branching loss by a textbook \(2\)-\(K\) surrogate for one branch path
+through the manifold body, optionally scaled by the calibration multiplier
+\texttt{splitterBodyLossMultiplier} (with legacy alias
+\texttt{splitterBodyK}), applied on the connector-velocity basis:
 \begin{equation}
 \Delta P_{\mathrm{splitter}}
 = K_{\mathrm{splitter}} \frac{\rho u_c^2}{2}.
@@ -2356,7 +2358,9 @@ groups are:
       splitter/connector inputs
       \texttt{headerEnabled}, \texttt{splitterOutletCount},
       \texttt{splitterInletID\_mm}, \texttt{branchConnectorID\_mm},
-      \texttt{branchConnectorLength\_m}, \texttt{splitterBodyK}, and
+      \texttt{branchConnectorLength\_m},
+      \texttt{headerLossMultiplier},
+      \texttt{splitterBodyLossMultiplier}, and
       \texttt{contractionConeAngle\_deg};
 \item \texttt{model\_overrides.perforation}, which includes hole count and
       hole diameter; and
@@ -2376,8 +2380,8 @@ matches the stated use of the GroundWork
 Tractor Supply $4$-way brass shutoff manifold as the physical distribution
 device. Because the vendor page does not publish an internal hydraulic
 diameter or an internal branch-loss coefficient, the unresolved internal
-manifold loss is represented by the editable lumped parameter
-\texttt{splitterBodyK}.
+manifold loss is represented by the textbook tee-plus-valve \(2\)-\(K\)
+surrogate, scaled if desired by \texttt{splitterBodyLossMultiplier}.
 
 The \texttt{summary\_inputs} block is intentionally \emph{not} the editable
 source for these geometry/material quantities. It is used only for static

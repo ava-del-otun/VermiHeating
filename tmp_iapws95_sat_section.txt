@@ -1,0 +1,400 @@
+398                                                       W. WAGNER AND A. PRUß
+
+                                                                                     2.3. The Vapor–Liquid Phase Boundary
+
+                                                                                 In 1987, Saul and Wagner 共1987兲 published correlation
+                                                                              equations for properties of H2 O along the vapor–liquid
+                                                                              phase boundary. The equations for the vapor pressure, the
+                                                                              saturated liquid and vapor density, and the caloric difference
+                                                                              property ⌬␣ were based on the temperature scale IPTS-68.
+                                                                              At a later date, the experimental data on which these equa-
+                                                                              tions are based were converted into ITS-90 temperatures.
+                                                                              With these converted data the equations were re-established,
+                                                                              see Wagner and Pruss 共1993兲; this article of 1993 also con-
+                                                                              tains the IAPWS supplementary release of 1992 on this sub-
+                                                                              ject as the Appendix. For reasons of completeness and be-
+                                                                              cause these equations were used to develop the IAPWS-95
+                                                                              formulation, these auxiliary equations are given in the next
+                                                                              two subsections. Remarks on the usefulness and the consis-
+                                                                              tency of the equations in relation to IAPWS-95 can be found
+                                                                              at the end of Sec. 2.3.1.
+
+
+                                                                              2.3.1. Experimental Data and Equations for the Vapor Pressure
+                                                                                    and the Densities of the Saturated Liquid and Vapor
+FIG. 2.1. The phase–boundary curves of water in a p – T diagram. The
+sublimation curve p subl and the several melting curves p m plotted in bold      Table 2.1 summarizes certain information on the selected
+correspond to the lower limit of the range of validity of IAPWS-95 with       experimental data of the vapor pressure and the densities of
+regard to temperature. The dashed line corresponds to the range of validity   the saturated liquid and vapor used to develop the interna-
+of IAPWS-95 with regard to pressure.
+                                                                              tional equations for the saturation properties, Eqs. 共2.5兲–
+                                                                              共2.7兲. The only vapor–pressure data of Table 2.1 that were
+                                                                              not used for the development of the vapor–pressure equation
+共iv兲    Correlation equations for the pressure along the                      关Wagner and Saul 共1986兲, Saul and Wagner 共1987兲兴 are the
+        melting–pressure curve and along the sublimation–                     data of Morita et al. 共1989兲, which were published later; they
+        pressure curve.                                                       are, however, included in the comparison of the selected data
+                                                                              in Fig. 2.2.
+                      2.1. The Triple Point                                      The densities of the saturated liquid and the saturated va-
+   The temperature of the gas–liquid–solid triple point of                    por of Osborne et al. 共1937兲, 共1939兲 constitute a special case.
+water corresponds by definition to one of the 17 defined                      These densities were not directly measured but were calcu-
+fixed points of the temperature scale ITS-90 关Preston-                        lated by Wagner and Saul 共1986兲 from the relations
+Thomas 共1990兲兴. Accordingly it is
+                                                                                                                dp ␴ ⫺1
+                             T t⫽273.16 K.                         共2.1a兲                             ␳ ⬘ ⫽T        ␤ ,                  共2.3兲
+                                                                                                                dT
+
+Based on the internationally accepted measurements of                                                           dp ␴ ⫺1
+Guildner et al. 共1976兲, the triple-point pressure is                                                   ␳ ⬙ ⫽T       ␥ ,                  共2.4兲
+                                                                                                                dT
+                      p t⫽ 共 611.657⫾0.010兲 Pa.                    共2.1b兲
+                                                                              by using Osborne et al.’s 共1939兲 experimental values of the
+                     2.2. The Critical Point                                  two caloric properties ␤ and ␥ and the derivative dp ␴ /dT
+                                                                              determined from the vapor–pressure equation given by Wag-
+   Based on the comprehensive evaluation and assessment of                    ner and Saul 共1986兲 and Saul and Wagner 共1987兲, see Eq.
+the experimental data of the critical region of H2 O, Levelt                  共2.5a兲. The international equations for the vapor pressure and
+Sengers et al. 共1985兲 determined the most likely values of                    the densities of the saturated liquid and vapor 关Saul and
+the critical parameters. Later on, these values were converted                Wagner 共1987兲兴, converted to ITS-90 temperatures by Wag-
+to ITS-90 temperatures and are given in the corresponding                     ner and Pruss 共1993兲 are as follows:
+IAPWS release 关IAPWS 共1992兲兴 as:                                                 Vapor–pressure equation and its derivative:
+
+
+                                                                                                冉 冊
+               T c⫽ 共 647.096⫾ ⑀ 兲 K        with ⑀ ⫽0.01,          共2.2a兲
+                                                                                                p␴  Tc
+                                                                                           ln      ⫽ 共 a 1 ␽ ⫹a 2 ␽ 1.5⫹a 3 ␽ 3
+                p c⫽ 共 22.064⫾0.27⑀ ⫾0.005兲 MPa,                   共2.2b兲                       pc  T
+                        ␳ c⫽ 共 322⫾3 兲 kg m⫺3 .                    共2.2c兲                             ⫹a 4 ␽ 3.5⫹a 5 ␽ 4 ⫹a 6 ␽ 7.5兲 ,   共2.5兲
+
+J. Phys. Chem. Ref. Data, Vol. 31, No. 2, 2002
+                                 THERMODYNAMIC PROPERTIES OF ORDINARY WATER                                                                                   399
+
+                    TABLE 2.1. Information on the selected measuring runs for the vapor pressure p ␴ , the saturated liquid density
+                    ␳⬘, and the saturated vapor density ␳⬙
+
+                                                                                              Uncertainty             Number of data
+                                                                   Temperature
+                               Authors                Property       range/K           ⌬T/mKa         ⌬y b           Total     Selected
+
+                         Osborne et al. 共1933兲           p␴          373– 647             ¯         ⫾0.025%           390         382
+                         Rivkin et al. 共1964a兲           p␴          646 – 647            ¯         ⫾0.01%             18          13
+                         Stimson 共1969兲                  p␴          298 –373            ⫾0.4       ⫾0.002%             7            7
+                         Guildner et al. 共1976兲          p␴           273.16              ¯         ⫾0.016%             1            1
+                         Hanafusa et al. 共1984兲          p␴          643– 646             ¯         ⫾0.01%              8            8
+                         Kell et al. 共1985兲              p␴          423– 623             ¯         ⫾0.04%             22          22
+                         Morita et al. 共1989兲c           p␴          620– 647            ⫾4         ⫾0.02%             26         ¯c
+                         Smith & Keyes 共1934兲               ␳⬘       303–593              ¯         ⫾0.05%             13            9
+                         Osborne et al. 共1937兲              ␳⬘       603– 645             ¯         ⫾0.5%              65          29
+                         Kell 共1975兲                        ␳⬘       273– 423             ¯         ⌬␳⬘d               32          32
+                         Kell et al. 共1985兲                 ␳⬘       423– 623             ¯         ⫾0.05%             22          22
+                         Osborne et al. 共1937兲              ␳⬙       373– 645             ¯         ⌬␳⬙e              214         189
+                         Osborne et al. 共1939兲              ␳⬙       273–373              ¯         ⫾0.05%           152          146
+                    a
+                     When no uncertainty value is given, then this uncertainty is taken into account in the uncertainty in y.
+                    b
+                      y corresponds to p ␴ , ␳⬘, and ␳⬙, respectively.
+                    c
+                     These data were only available after the vapor–pressure equation had been developed.
+                    d
+                      ⌬ ␳ ⬘ ⫽⫾ 关 2⫻10⫺6 ⫹1⫻10⫺7 (T/K⫺273) 兴 kg m⫺3 .
+                    e
+                     ⌬ ␳ ⬙ ⫽⫾0.01关 5⫹0.125(T/K⫺423) 兴 %.
+
+
+
+
+        dp ␴
+        dT
+             ⫽⫺
+                p␴
+                T
+                   ln
+                      p␴
+                      pc冋冉 冊
+                         ⫹a 1 ⫹1.5a 2 ␽ 0.5⫹3a 3 ␽ 2
+
+
+                 ⫹3.5a 4 ␽ 2.5⫹4a 5 ␽ 3 ⫹7.5a 6 ␽ 6.5 , 册        共2.5a兲
+
+with ␽ ⫽(1⫺T/T c), T c⫽647.096 K, p c⫽22.064 MPa, a 1
+⫽⫺7.859 517 83, a 2 ⫽1.844 082 59, a 3 ⫽⫺11.786 649 7,
+a 4 ⫽22.680 741 1,      a 5 ⫽⫺15.961 871 9, and    a6
+⫽1.801 225 02.
+    Saturated liquid density equation:
+              ␳⬘
+                 ⫽1⫹b 1 ␽ 1/3⫹b 2 ␽ 2/3⫹b 3 ␽ 5/3
+              ␳c
+                     ⫹b 4 ␽ 16/3⫹b 5 ␽ 43/3⫹b 6 ␽ 110/3,           共2.6兲
+with       b 1 ⫽1.992 740 64,      b 2 ⫽1.099 653 42, b3
+⫽⫺0.510 839 303,              b 4 ⫽⫺1.754 934 79,     b5
+⫽⫺45.517 035 2, and b 6 ⫽⫺6.746 944 50⫻105 ; for the
+definition of ␽ see Eq. 共2.5兲.
+  Saturated vapor density equation:
+
+            ln   冉 冊
+                 ␳⬙
+                 ␳c
+                    ⫽c 1 ␽ 2/6⫹c 2 ␽ 4/6⫹c 3 ␽ 8/6
+
+                        ⫹c 4 ␽ 18/6⫹c 5 ␽ 37/6⫹c 6 ␽ 71/6,         共2.7兲
+with     c 1 ⫽⫺2.031 502 40,        c 2 ⫽⫺2.683 029 40,      c3
+⫽⫺5.386 264 92, c 4 ⫽⫺17.299 160 5, c 5 ⫽⫺44.758 658 1,
+and c 6 ⫽⫺63.920 106 3; for the definition of ␽ see Eq. 共2.5兲.                   FIG. 2.2. Percentage deviations of the experimental data of the vapor pres-
+                                                                                 sure p ␴ , the saturated liquid density ␳⬘, and the saturated vapor density
+   Figure 2.2 illustrates that Eqs. 共2.5兲–共2.7兲 represent the                    ␳⬙ from the values calculated from the corresponding Eqs. 共2.5兲, 共2.6兲,
+selected experimental data of p ␴ , ␳⬘, and ␳⬙ very well within                                                                                                  ⬘
+                                                                                 or 共2.7兲: 100⌬p ␴ /p ␴ ⫽100(p ␴ ,exp⫺p␴,calc)/p ␴ ,exp , 100⌬ ␳ ⬘ / ␳ ⬘ ⫽100( ␳ exp
+their experimental uncertainty listed in Table 2.1. Values for                             ⬘ , 100⌬ ␳ ⬙ / ␳ ⬙ ⫽100( ␳ exp
+                                                                                    ⬘ )/ ␳ exp
+                                                                                 ⫺␳calc                                   ⬙ )/ ␳ exp
+                                                                                                                      ⬙ ⫺␳calc   ⬙ .
+
+                                                                                                           J. Phys. Chem. Ref. Data, Vol. 31, No. 2, 2002
+400                                                     W. WAGNER AND A. PRUß
+
+TABLE 2.2. Information on the selected data for the caloric difference
+quantity ⌬␣
+
+                                                        Number of data
+                           Temperature    Uncertainty
+       Authors               range/K        ⌬共⌬␣兲       Total   Selected
+
+ Osborne et al. 共1937兲      373– 647       ⫾0.3%        142       142
+ Osborne et al. 共1939兲      273–373        ⫾0.05%       256       256
+
+
+
+
+computer-program verification of Eqs. 共2.5兲–共2.7兲 can be                   FIG. 2.3. Percentage deviations 100⌬(⌬ ␣ )/⌬ ␣ ⫽100(⌬ ␣ exp⫺⌬␣calc)/
+found in the article of Wagner and Pruss 共1993兲.                           ⌬ ␣ exp between experimental data of the caloric difference quantity ⌬␣ and
+                                                                           values calculated from Eq. 共2.9兲.
+   It should be pointed out that Eqs. 共2.5兲–共2.7兲 are only
+auxiliary equations for calculating properties along the
+vapor–liquid phase boundary. Although the differences be-
+tween the results from these equations and the corresponding                             ␺        19                   9
+results from the IAPWS-95 formulation, Eq. 共6.4兲, are ex-                                   ⫽d ␺ ⫹ d 1 ␪ ⫺20⫹d 2 ln ␪ ⫹ d 3 ␪ 3.5
+                                                                                         ␺0       20                   7
+tremely small, these equations are not thermodynamically
+consistent with IAPWS-95. Nevertheless, the application of                                      5        109
+these auxiliary equations might be useful for simple calcula-                                  ⫹ d 4␪ 4⫹     d ␪ 53.5,                        共2.9a兲
+                                                                                                4        107 5
+tions of these saturation properties or for the determination
+of starting values when iteratively calculating the saturation             where ␣ 0 ⫽1 kJ kg⫺1 , ␺ 0 ⫽ ␣ 0 /T c , ␪ ⫽T/T c , T c⫽647.096
+properties from IAPWS-95 according to the phase-                           K, and the coefficients are d ␣ ⫽⫺1135.905 627 715, d ␺
+equilibrium condition.                                                     ⫽2319.5246, d 1 ⫽⫺5.651 349 98⫻10⫺8 , d 2 ⫽2690.666 31,
+                                                                           d 3 ⫽127.287 297,       d 4 ⫽⫺135.003 439,          and      d5
+                                                                           ⫽0.981 825 814. The values of the coefficients d ␣ and d ␺
+                                                                           were determined according to the international agreement so
+2.3.2. Experimental Data for the Caloric Difference Property ⌬␣
+       and Equations for the Enthalpy and Entropy of the
+                                                                           that the zero points of the specific internal energy and the
+             Saturated Liquid and Saturated Vapor                          specific entropy are met for the saturated liquid at the triple
+                                                                           point 关namely u ⬘t ⫽0, s t⬘ ⫽0, see also Eq. 共6.7兲兴. Figure 2.3
+   Up to now it has not been possible to measure directly                  shows the comparison between the experimental ⌬␣ values
+values of the enthalpy and internal energy along the vapor–                and the values calculated from Eq. 共2.9兲. 共In all such devia-
+liquid phase boundary of H2 O. Thus, for a system consisting               tion plots, points shown at the top or bottom edge have de-
+of a gas and liquid phase, 关in addition to the quantities ␤ and            viations larger than the scale of the plot.兲
+␥, see Eqs. 共2.3兲 and 共2.4兲兴, Osborne measured the caloric                     The equations for calculating the specific values of the
+difference quantity ⌬␣, which basically corresponds to the                 enthalpy h, the internal energy u, and the entropy s for the
+difference of the internal energy between two temperatures                 saturated liquid and the saturated vapor are summarized as
+in the two-phase region. For this quantity the following re-               follows:
+lation exists:
+                                                                              Specific enthalpy
+
+                         ⌬ ␣ ⫽h ⬘ ⫺⌬ vh
+                                             v⬘
+                                          v ⬙⫺ v ⬘
+                                                   ,               共2.8兲
+                                                                                 h⬘   ␣
+                                                                                     ⫽ ⫹103
+                                                                              kJ kg⫺1 ␣ 0
+                                                                                                    T/K      dp ␴
+                                                                                            ␳ ⬘ / 共 kg m⫺3 兲 dT       冉 冊冒冉 冊        MPa
+                                                                                                                                      K
+                                                                                                                                         ,
+                                                                                                                                              共2.10兲
+where ⌬␣ depends only on temperature. Table 2.2 summa-
+rizes the information on these selected measuring runs of the
+caloric difference quantity ⌬␣.
+                                                                                 h⬙   ␣
+                                                                                     ⫽ ⫹103
+                                                                              kJ kg⫺1 ␣ 0
+                                                                                                    T/K      dp ␴
+                                                                                            ␳ ⬙ / 共 kg m⫺3 兲 dT       冉 冊冒冉 冊        MPa
+                                                                                                                                      K
+                                                                                                                                         .
+                                                                                                                                              共2.11兲
+   A correlation equation for ␣ ⫽ ␣ (T) allows the calculation
+of the enthalpy, internal energy, and entropy along the phase
+boundary, for details see Saul and Wagner 共1987兲. On the                   Specific internal energy
+basis of this article, Wagner and Pruss 共1993兲 made the co-
+efficients of the equation for ␣ and its integrated form ␺
+consistent with the ITS-90 temperature scale. The equations
+                                                                                 u⬘   ␣
+                                                                                     ⫽ ⫹103
+                                                                                            T dp ␴
+                                                                                            K dT         冉 冊冒冉 冊
+                                                                                                             MPa
+                                                                                                              K
+                                                                                                                   ⫺
+                                                                                                                     p␴
+                                                                                                                     MPa
+                                                                                                                         ,                    共2.12兲
+and the converted coefficients read:                                          kJ kg⫺1 ␣ 0         ␳ ⬘ / 共 kg m⫺3 兲
+
+
+  ␣
+     ⫽d ␣ ⫹d 1 ␪ ⫺19⫹d 2 ␪ ⫹d 3 ␪ 4.5⫹d 4 ␪ 5 ⫹d 5 ␪ 54.5,         共2.9兲
+                                                                                 u⬙   ␣
+                                                                                     ⫽ ⫹103
+                                                                                            T dp ␴
+                                                                                            K dT         冉 冊冒冉 冊
+                                                                                                             MPa
+                                                                                                              K
+                                                                                                                   ⫺
+                                                                                                                     p␴
+                                                                                                                     MPa
+                                                                                                                         .                    共2.13兲
+  ␣0                                                                          kJ kg⫺1 ␣ 0         ␳ ⬙ / 共 kg m⫺3 兲
+
+J. Phys. Chem. Ref. Data, Vol. 31, No. 2, 2002
+                                       THERMODYNAMIC PROPERTIES OF ORDINARY WATER                                                              401
+
+Specific entropy                                                                                 p m,ice III
+
+                                                 冉 冊冒冉 冊
+                                                                                                             ⫽1⫺0.295 252共 1⫺ ␪ 60兲 ,        共2.17兲
+                                                 dp ␴         MPa                                   pn
+             s⬘                    ␺             dT            K          with ␪ ⫽T/T n , T n⫽251.165 K, and p n⫽209.9 MPa.
+                       ⫽                   ⫹10
+                                             3
+                                                                    ,
+     kJ kg⫺1 K⫺1           kJ kg⫺1 K⫺1                        ⫺3
+                                                  ␳ ⬘ / 共 kg m 兲             Melting–pressure equation for ice V (temperature range
+                                                                 共2.14兲   from 256.164 to 273.31 K):
+
+
+             s⬙                    ␺             冉 冊冒冉 冊
+                                                 dp ␴
+                                                 dT
+                                                              MPa
+                                                               K
+                                                                                                  p m,ice V
+                                                                                                     pn
+                                                                                                            ⫽1⫺1.187 21共 1⫺ ␪ 8 兲 ,          共2.18兲
+                    ⫺1 ⫽               ⫺1 ⫹10
+                                             3
+          ⫺1                   ⫺1                             ⫺3    .
+     kJ kg        K        kJ kg       K          ␳ ⬙ / 共 kg m 兲
+                                                                 共2.15兲   with ␪ ⫽T/T n , T n⫽256.164 K, and p n⫽350.1 MPa.
+                                                                             Melting–pressure equation for ice VI (temperature range
+In order to evaluate Eqs. 共2.10兲–共2.15兲 the quantities ␣ / ␣ 0 ,          from 273.31 to 355 K):
+␺, ␳⬘, ␳⬙, p ␴ , and dp ␴ /dT are calculated from Eqs. 共2.9兲,
+共2.9a兲, 共2.6兲, 共2.7兲, 共2.5兲, and 共2.5a兲. Values for computer-                                    p m,ice VI
+program verification of these equations are given by Wagner                                                 ⫽1⫺1.074 76共 1⫺ ␪ 4.6兲 ,         共2.19兲
+and Pruss 共1993兲.                                                                                   pn
+   For remarks regarding the usefulness of Eqs. 共2.10兲–                   with ␪ ⫽T/T n , T n⫽273.31 K, and p n⫽632.4 MPa.
+共2.15兲 and their consistency related to IAPWS-95, see the                    Melting–pressure equation for ice VII (temperature range
+end of Sec. 2.3.1.                                                        from 355 to 715 K):
+
+
+   2.4. The Solid–Liquid and Solid–Vapor Phase
+                    Boundaries
+                                                                              ln   冉   p m,ice VII
+                                                                                           pn     冊⫽1.736 83共 1⫺ ␪ ⫺1 兲 ⫺0.054 4606共 1⫺ ␪ 5 兲
+
+                                                                                                       ⫹0.806 106⫻10⫺7 共 1⫺ ␪ 22兲 ,          共2.20兲
+   Depending on the pressure and temperature range, solid
+water forms different structures. Five of the known ice forms             with ␪ ⫽T/T n , T n⫽355 K, and p n⫽2216 MPa.
+are bordered by the liquid phase of H2 O. Although the inter-               Further details regarding Eqs. 共2.16兲–共2.20兲, including
+sections of two melting–pressure curves are also called triple            values for computer-program verification, are given by Wag-
+points 共two solid phases are in equilibrium with the liquid               ner et al. 共1994兲.
+phase兲, in this article the term ‘‘triple point’’ is only used for
+the solid–liquid–vapor triple point, see Sec. 2.1. Figure 2.1                             2.4.2. The Sublimation–Pressure Equation
+illustrates the plot of the phase–boundary curves in a p – T
+diagram.                                                                    According to Wagner et al. 共1994兲, the sublimation pres-
+   Correlation equations for the melting–pressure curves                  sure is given by:
+共solid–liquid phase boundary兲 and the sublimation–pressure
+curve 共solid–vapor phase boundary兲 are described by Wag-
+ner et al. 共1994兲 and documented in the corresponding
+IAPWS release 关IAPWS 共1993兲兴; this release is appended to
+                                                                                            ln   冉 冊
+                                                                                                 p subl
+                                                                                                  pn
+                                                                                                        ⫽⫺13.928 169共 1⫺ ␪ ⫺1.5兲
+
+the above mentioned article. Although these equations were                                                  ⫹34.707 823 8共 1⫺ ␪ ⫺1.25兲 ,     共2.21兲
+not directly used for the development of the IAPWS-95 for-                with ␪ ⫽T/T n , T n⫽273.16 K, and p n⫽0.000 611 657 MPa.
+mulation, the equations are presented here because they mark              For further details and values for computer-program verifi-
+the boundaries between the fluid phase 共for which                         cation see Wagner et al. 共1994兲.
+IAPWS-95 is valid兲 and the solid phase.
+
+              2.4.1. The Melting–Pressure Equations                                               3. The Gas Equation
+   The melting–pressure equations adopted by IAPWS 关see                      Reference equations of state for methane 关Setzmann and
+Wagner et al. 共1994兲兴 are as follows:                                     Wagner 共1991兲, Wagner and de Reuck 共1996兲兴 and carbon
+   Melting–pressure equation for ice I (temperature range                 dioxide 关Span and Wagner 共1996兲兴 that are valid for the en-
+from 273.16 to 251.165 K):                                                tire fluid region have been successfully established by using
+                                                                          not only the so-called nonlinear experimental data but also
+                  p m,ice I                                               corresponding 共precorrelated兲 linearized data at least for
+                            ⫽1⫺0.626⫻106 • 共 1⫺ ␪ ⫺3 兲
+                     pn                                                   parts of the entire fluid region, for details see Sec. 5.3.2. In
+                                                                          particular, the gas region has offered possibilities for such a
+                            ⫹0.197 135⫻106 共 1⫺ ␪ 21.2兲 ,       共2.16兲
+                                                                          procedure. Thus, a special gas equation for water was devel-
+with ␪ ⫽T/T n , T n⫽273.16 K, and p n⫽0.000 611 657 MPa.                  oped with the general aim of providing so-called synthetic
+   Melting–pressure equation for ice III (temperature range               data for the development of IAPWS-95. For the development
+from 251.165 to 256.164 K):                                               of IAPWS-95 and for calculating values in the metastable
+
+                                                                                                      J. Phys. Chem. Ref. Data, Vol. 31, No. 2, 2002
+402                                                       W. WAGNER AND A. PRUß
+
+TABLE 3.1. Coefficients and exponents of the residual part ␾ r of the dimen-    heat capacity c p , Joule–Thomson coefficient ␮, and isother-
+sionless Helmholtz free energy, Eq. 共3.3兲
+                                                                                mal throttling coefficient ␦ T . Due to the density range con-
+      i           di             ti                       ni                    sidered here, only data with ␳⭐55 kg m⫺3 were used. Infor-
+                                                                                mation on all data selected for the development of the
+      1           1             0.25           0.474 865 925 9
+                                                                                IAPWS-95 formulation is summarized in Sec. 4; for the data
+      2           1             1.25          ⫺0.112 437 055 3⫻101
+      3           1             3.5           ⫺0.811 862 740 1                  considered in connection with the gas equation see Secs. 4.2,
+      4           1            12             ⫺0.621 301 850 1⫻10⫺3             4.3, 4.5, 4.7, and 4.8. Figures 4.1, 4.5, 4.8, and 4.9, which
+      5           2             1.5            0.192 443 099 3                  show the data distribution in corresponding p – T diagrams,
+      6           2            13.5           ⫺0.832 286 766 2⫻10⫺1             contain the isochoric line ␳⫽55 kg m⫺3 to illustrate which
+      7           4             8.75           0.139 105 223 0⫻101
+                                                                                part of the gas region and which data sets were involved. In
+                                                                                total, 604 p ␳ T data, 112 w data, 90 c p data, 234 ␮ data, and
+                                                                                180 ␦ T data were used to develop the gas equation, Eq. 共3.2兲.
+steam region, the establishment of this gas equation is of                      These data had to be represented by the gas equation to
+primary importance and is therefore described in this section.                  within their experimental uncertainty.
+
+            3.1. Density Range and Input Data
+
+   For ‘‘normal’’ substances, a simple virial equation,                                       3.2. Details of the Gas Equation
+     p                                                                             Like the IAPWS-95 formulation, Eq. 共6.4兲, the gas equa-
+        ⫽1⫹B 共 T 兲 • ␳ ⫹C 共 T 兲 • ␳ 2 ⫹D 共 T 兲 • ␳ 3 ⫹E 共 T 兲 • ␳ 4
+   ␳ RT                                                                         tion is a fundamental equation for the specific Helmholtz free
+                                                                                energy f. This equation is expressed in dimensionless form,
+            ⫹... ,                                                    共3.1兲     ␾ ⫽ f /(RT), and is separated into two parts, an ideal-gas part
+truncated after the term with the third virial coefficient C(T)                 ␾° and a residual part ␾ r, so that:
+is able to cover the fluid region up to densities of 0.5 ␳ c                                   f 共 ␳ ,T 兲
+within the experimental uncertainty of the data. For the ‘‘dif-                                           ⫽ ␾ 共 ␦ , ␶ 兲 ⫽ ␾ ° 共 ␦ , ␶ 兲 ⫹ ␾ r共 ␦ , ␶ 兲 ,   共3.2兲
+ficult’’ substance water, such a truncated virial equation can                                    RT
+only cover the gas region very accurately for densities up to                   where ␦ ⫽ ␳ / ␳ c and ␶ ⫽T c /T with ␳ c⫽322 kg m⫺3 , T c
+about 0.1 ␳ c . It was, however, our aim that the gas equation                  ⫽647.096 K, and R⫽0.461 518 05 kJ kg⫺1 K⫺1 . The ideal-
+should cover a region up to densities of ␳ ⫽55 kg m⫺3                           gas part ␾° of Eq. 共3.2兲 is identical to the ideal-gas part of
+⬇0.17 ␳ c . In this region, the gas equation should represent                   IAPWS-95, Eq. 共6.5兲.
+all thermodynamic properties with the best possible accu-                         The form of the residual part ␾ r of the dimensionless
+racy.                                                                           Helmholtz free energy is:
+   In order to achieve this aim, the equation was developed                                                            7
+by using selected experimental data of the thermal properties                                                  ␾ ⫽ 兺 n i␦ di␶ ti,
+                                                                                                                 r
+                                                                                                                                                           共3.3兲
+(p ␳ T) and the properties speed of sound w, specific isobaric                                                       i⫽1
+
+
+
+
+              FIG. 3.1. Percentage density deviations between experimental p ␳ T data and values calculated from the gas equation, Eq. 共3.2兲.
+
+
+J. Phys. Chem. Ref. Data, Vol. 31, No. 2, 2002
+

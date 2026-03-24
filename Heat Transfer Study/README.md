@@ -45,7 +45,7 @@ Key config fields:
 - `model_overrides.bin_wall`: editable vessel-wall material stack for the MATLAB export (`sheetThickness_mm`, `sheetK_W_mK`, `insulationThickness_mm`, `insulationK_W_mK`, `internalH_W_m2K`)
 - `model_overrides.heater_tube`: editable base heater-tube geometry (`length_m`, `ID_mm`, `OD_mm`, `insulationThickness_mm`, `wallK_W_mK`, `insulationK_W_mK`, `externalH_W_m2K`, `segments`, `extraMinorK`)
 - `model_overrides.heaterTube`: editable coil-geometry overrides such as `coilMeanD_m` and `coilSpan_m`
-- `model_overrides.aeration`: editable aeration-network geometry and process inputs (`nParallelTubes`, `length_m`, `ID_mm`, `OD_mm`, optional `headerEnabled` / `headerID_mm` / `headerMinorK`, splitter inputs `splitterInletID_mm`, `branchConnectorID_mm`, `branchConnectorLength_m`, `splitterBodyK`, plus `wallK_W_mK`, `segments`, `bedH_W_m2K`, `releaseFraction`, `endMinorK`). `splitterOutletCount` is now derived automatically from `nParallelTubes`.
+- `model_overrides.aeration`: editable aeration-network geometry and process inputs (`nParallelTubes`, `length_m`, `ID_mm`, `OD_mm`, optional `headerEnabled` / `headerID_mm` / `headerLossMultiplier`, splitter inputs `splitterInletID_mm`, `branchConnectorID_mm`, `branchConnectorLength_m`, `splitterBodyLossMultiplier`, plus `wallK_W_mK`, `segments`, `bedH_W_m2K`). `splitterOutletCount` is now derived automatically from `nParallelTubes`. The legacy names `headerMinorK` and `splitterBodyK` are still accepted as backward-compatible aliases for the new calibration multipliers.
 - `cooling_mode`: summer ambient temperature, Whynter supply target/capacity/COP, optional rated-spec derivation fields (`ratedTotalCapacity_BTU_h`, `ratedAirflow_CFM`, `ratedDehumidification_pints_day`, `deriveTargetFromRatedSpecs`), the `assist_blower` block, the assist-blower-limited airflow sweep, inlet RH, surface temperature, summer hard constraints, and cooling-mode lexicographic order
 - `cooling_mode.assist_blower`: downstream pressure-source block for the plenum architecture (`model`, `ratedFlow_CFM`, `ratedPressure_inH2O`, `shutoffPressure_inH2O`, `motorPower_W`, `reference`); the current default basis is the 3-phase Goorui `GHBH 1D7 34 1R5`, and the code currently uses a linear fan-curve approximation between shutoff pressure and the implied free-air point when only the shutoff and rated-duty points are available
 - `cost_analysis`: electricity-price inputs for operating-cost calculations; the current default uses the Connecticut residential average price from the U.S. EIA and can be overridden directly in `USD/kWh`
@@ -100,8 +100,8 @@ Distribution-manifold pressure model:
   - `4` splitter outlets,
   - `19 mm` splitter inlet and branch connector,
   - `60 deg` conical contraction angle,
-  - configurable connector length and splitter-body `K`.
-- The GroundWork 4-way brass manifold basis is the Tractor Supply `4510201` product, which is a `3/4 in` 4-way shutoff manifold. The model converts that nominal `3/4 in` size to an editable `19 mm` hydraulic placeholder because the product page does not publish an internal hydraulic diameter or internal loss coefficient. The unresolved internal manifold loss is represented by `splitterBodyK`.
+  - configurable connector length and textbook-loss calibration multipliers.
+- The GroundWork 4-way brass manifold basis is the Tractor Supply `4510201` product, which is a `3/4 in` 4-way shutoff manifold. The model converts that nominal `3/4 in` size to an editable `19 mm` hydraulic placeholder because the product page does not publish an internal hydraulic diameter or internal loss coefficient. The unresolved internal manifold loss is now represented by a textbook-derived `2-K` surrogate for one branch path through the manifold body, scaled by `splitterBodyLossMultiplier`.
 
 Automatic export refresh:
 

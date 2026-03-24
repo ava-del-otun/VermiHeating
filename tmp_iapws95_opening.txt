@@ -1,0 +1,261 @@
+This article appears on the www.TEOS-10.org web site with permission from the American Institute of Physics.
+
+
+               The IAPWS Formulation 1995 for the Thermodynamic Properties
+                 of Ordinary Water Substance for General and Scientific Use
+                                                                      W. Wagnera… and A. Prußb…
+                                    Lehrstuhl für Thermodynamik, Ruhr-Universität Bochum, D-44780 Bochum, Germany
+
+                                共Received 20 September 2001; revised manuscript received 20 December 2001; published 7 June 2002兲
+
+                                In 1995, the International Association for the Properties of Water and Steam 共IAPWS兲
+                            adopted a new formulation called ‘‘The IAPWS Formulation 1995 for the Thermody-
+                            namic Properties of Ordinary Water Substance for General and Scientific Use’’, which we
+                            abbreviate to IAPWS-95 formulation or IAPWS-95 for short. This IAPWS-95 formula-
+                            tion replaces the previous formulation adopted in 1984. This work provides information
+                            on the selected experimental data of the thermodynamic properties of water used to
+                            develop the new formulation, but information is also given on newer data. The article
+                            presents all details of the IAPWS-95 formulation, which is in the form of a fundamental
+                            equation explicit in the Helmholtz free energy. The function for the residual part of the
+                            Helmholtz free energy was fitted to selected data for the following properties: 共a兲 thermal
+                            properties of the single-phase region (p ␳ T) and of the vapor–liquid phase boundary
+                            ( p ␴ ␳ ⬘ ␳ ⬙ T), including the phase-equilibrium condition 共Maxwell criterion兲, and 共b兲 the
+                            caloric properties specific isochoric heat capacity, specific isobaric heat capacity, speed of
+                            sound, differences in the specific enthalpy and in the specific internal energy, Joule–
+                            Thomson coefficient, and isothermal throttling coefficient. By applying modern strategies
+                            for optimizing the functional form of the equation of state and for the simultaneous
+                            nonlinear fitting to the data of all mentioned properties, the resulting IAPWS-95 formu-
+                            lation covers a validity range for temperatures from the melting line 共lowest temperature
+                            251.2 K at 209.9 MPa兲 to 1273 K and pressures up to 1000 MPa. In this entire range of
+                            validity, IAPWS-95 represents even the most accurate data to within their experimental
+                            uncertainty. In the most important part of the liquid region, the estimated uncertainty of
+                            IAPWS-95 ranges from ⫾0.001% to ⫾0.02% in density, ⫾0.03% to ⫾0.2% in speed of
+                            sound, and ⫾0.1% in isobaric heat capacity. In the liquid region at ambient pressure,
+                            IAPWS-95 is extremely accurate in density 共uncertainty ⭐⫾0.0001%兲 and in speed of
+                            sound 共⫾0.005%兲. In a large part of the gas region the estimated uncertainty in density
+                            ranges from ⫾0.03% to ⫾0.05%, in speed of sound it amounts to ⫾0.15% and in isobaric
+                            heat capacity it is ⫾0.2%. In the critical region, IAPWS-95 represents not only the
+                            thermal properties very well but also the caloric properties in a reasonable way. Special
+                            interest has been focused on the extrapolation behavior of the new formulation. At least
+                            for the basic properties such as pressure and enthalpy, IAPWS-95 can be extrapolated up
+                            to extremely high pressures and temperatures. In addition to the IAPWS-95 formulation,
+                            independent equations for vapor pressure, the densities, and the most important caloric
+                            properties along the vapor–liquid phase boundary, and for the pressure on the melting
+                            and sublimation curve, are given. Moreover, a so-called gas equation for densities up to
+                            55 kg m⫺3 is also included. Tables of the thermodynamic properties calculated from the
+                            IAPWS-95 formulation are listed in the Appendix. © 2002 American Institute of Phys-
+                            ics.
+                            Key words: critical region, data evaluation, equation of state, extrapolation, fundamental equation,
+                            H2O , IAPWS-95 formulation, melting curve, property tables, sublimation curve, thermal and caloric
+                            properties, vapor–liquid phase boundary, water substance.
+
+
+
+
+                                    Contents                                                      1.2. Previous Equations of State. . . . . . . . . . . . . . .          395
+  1. Introduction. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .   395            1.3. Need for the Development of a New
+     1.1. Background. . . . . . . . . . . . . . . . . . . . . . . . . . . .        395                 Scientific Formulation and Adoption of the
+                                                                                                       IAPWS-95 Formulation. . . . . . . . . . . . . . . . . .           397
+                                                                                                  1.4. Existence of the New Industrial Formulation
+  a兲
+    Author to whom correspondence should be addressed; Electronic mail:                                IAPWS-IF97. . . . . . . . . . . . . . . . . . . . . . . . . . .   397
+    Wagner@thermo.ruhr-uni-bochum.de                                                              1.5. Note on the Values of Temperature Used
+  b兲
+    Present address: Degussa AG, Paul-Baumann Str. 1, D-45764 Marl, Ger-
+    many.                                                                                              Throughout this Article. . . . . . . . . . . . . . . . . . .      397
+    © 2002 American Institute of Physics.                                                      2. Phase Equilibria of Water. . . . . . . . . . . . . . . . . . . .       397
+http://link.aip.org/link/JPCRBU/v31/i2/p387/s1
+  0047-2689Õ2002Õ31„2…Õ387Õ149Õ$35.00                                                    387                          J. Phys. Chem. Ref. Data, Vol. 31, No. 2, 2002
+388                                                                 W. WAGNER AND A. PRUß
+
+   2.1. The Triple Point. . . . . . . . . . . . . . . . . . . . . . . .           398      5.4. Functional Forms for ␾ r and the Bank of
+   2.2. The Critical Point. . . . . . . . . . . . . . . . . . . . . . .           398           Terms. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .   423
+   2.3. The Vapor–Liquid Phase Boundary. . . . . . . . .                          398           5.4.1. Polynomial Terms. . . . . . . . . . . . . . . . . .               423
+        2.3.1. Experimental Data and Equations for                                              5.4.2. Polynomial Terms in Combination
+               the Vapor Pressure and the Densities                                                    with Exponential Functions. . . . . . . . . .                     423
+               of the Saturated Liquid and Vapor. . . .                           398           5.4.3. Modified Gaussian Bell-Shaped
+        2.3.2. Experimental Data for the Caloric                                                       Terms. . . . . . . . . . . . . . . . . . . . . . . . . . .        424
+               Difference Property ⌬␣ and Equations                                             5.4.4. Nonanalytical Terms. . . . . . . . . . . . . . . .                424
+               for the Enthalpy and Entropy of                                                  5.4.5. Bank of Terms. . . . . . . . . . . . . . . . . . . .              425
+               the Saturated Liquid and Saturated                                          5.5. Determination of the Final Form of the
+               Vapor. . . . . . . . . . . . . . . . . . . . . . . . . . . .       400           IAPWS-95 Formulation. . . . . . . . . . . . . . . . . .                  426
+   2.4. The Solid–Liquid and Solid–Vapor Phase                                                  5.5.1. Summarizing Information on the
+        Boundaries. . . . . . . . . . . . . . . . . . . . . . . . . . . . .       401                  Sorts of Data Used. . . . . . . . . . . . . . . . .               426
+        2.4.1. The Melting–Pressure Equations. . . . . .                          401           5.5.2. Iterative Process of the Development
+        2.4.2. The Sublimation–Pressure Equation. . .                             401                  of the IAPWS-95 Formulation. . . . . . . .                        426
+3. The Gas Equation. . . . . . . . . . . . . . . . . . . . . . . . . . .          401   6. The IAPWS-95 Formulation. . . . . . . . . . . . . . . . . .                   427
+   3.1. Density Range and Input Data. . . . . . . . . . . . .                     402      6.1. Reference Constants. . . . . . . . . . . . . . . . . . . . .             428
+   3.2. Details of the Gas Equation. . . . . . . . . . . . . . .                  402      6.2. Numerical Description of the IAPWS-95
+   3.3. Comparison of the Gas Equation with                                                     Formulation. . . . . . . . . . . . . . . . . . . . . . . . . . . .       429
+        Experimental Data. . . . . . . . . . . . . . . . . . . . . . .            403      6.3. Basic Information on the Application of the
+4. The Selected Experimental Data and Other Data                                                IAPWS-95 Formulation. . . . . . . . . . . . . . . . . .                  432
+   Used to Develop IAPWS-95 and Further                                                         6.3.1. Range of Validity. . . . . . . . . . . . . . . . . .              432
+   Experimental Data for Comparison. . . . . . . . . . . . .                      403           6.3.2. Estimates of Uncertainty. . . . . . . . . . . .                   432
+   4.1. Vapor–Liquid Phase Boundary. . . . . . . . . . . . .                      405           6.3.3. Computer-Program Verification. . . . . . .                        435
+        4.1.1. Thermal Properties in the Saturation                                        6.4. Features of the Nonanalytical Terms Used
+               State. . . . . . . . . . . . . . . . . . . . . . . . . . . .       405           for IAPWS-95. . . . . . . . . . . . . . . . . . . . . . . . . .          435
+        4.1.2. Caloric Properties in the Saturation                                             6.4.1. Positive Features of the Nonanalytical
+               State. . . . . . . . . . . . . . . . . . . . . . . . . . . .       405                  Terms. . . . . . . . . . . . . . . . . . . . . . . . . . .        435
+   4.2. Single-Phase Region. . . . . . . . . . . . . . . . . . . . .              406           6.4.2. Weaknesses of the Nonanalytical
+        4.2.1. p ␳ T Data. . . . . . . . . . . . . . . . . . . . . . . .          407                  Terms. . . . . . . . . . . . . . . . . . . . . . . . . . .        437
+        4.2.2. Second Virial Coefficients. . . . . . . . . . .                    410           6.4.3. Nonanalytical Terms Proposed by
+   4.3. Speeds of Sound. . . . . . . . . . . . . . . . . . . . . . . .            410                  Kiselev and Friend. . . . . . . . . . . . . . . . .               441
+   4.4. Isochoric Heat Capacities. . . . . . . . . . . . . . . . .                412           6.4.4. Summary of the Advantages and
+   4.5. Isobaric Heat Capacities. . . . . . . . . . . . . . . . . .               413                  Weaknesses of the Nonanalytical
+        4.5.1. Data of the Specific Isobaric Heat                                                      Terms in IAPWS-95. . . . . . . . . . . . . . . .                  441
+               Capacity in the Ideal-Gas State. . . . . . .                       413   7. Comparison of the IAPWS-95 Formulation with
+        4.5.2. Experimental Data of the Specific                                           Experimental Data and Values from Other
+               Isobaric Heat Capacity. . . . . . . . . . . . . .                  414      Equations of State. . . . . . . . . . . . . . . . . . . . . . . . . .         442
+   4.6. Enthalpy Differences. . . . . . . . . . . . . . . . . . . . .             416      7.1. The Vapor–Liquid Phase Boundary. . . . . . . . .                         443
+   4.7. Joule–Thomson Coefficient. . . . . . . . . . . . . . .                    416           7.1.1. Thermal Properties at Saturation. . . . . .                       443
+   4.8. Isothermal Throttling Coefficient. . . . . . . . . . .                    416           7.1.2. Speeds of Sound at Saturation. . . . . . . .                      444
+   4.9. Hugoniot-Curve Data and Derived p ␳ T                                                   7.1.3. Isochoric Heat Capacities at
+        Data. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .   417                  Saturation. . . . . . . . . . . . . . . . . . . . . . . .         445
+   4.10. Calculated Data for the Gas Region. . . . . . .                          418           7.1.4. Isobaric Heat Capacities at
+   4.11. Data for Special Applications. . . . . . . . . . . .                     418                  Saturation. . . . . . . . . . . . . . . . . . . . . . . .         445
+5. Details of the Development of the IAPWS-95                                                   7.1.5. The Caloric Difference Property ⌬␣
+   Formulation. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .     419                  and the Enthalpies at Saturation. . . . . .                       446
+   5.1. Basic Structure of an Equation of State                                            7.2. The Representation of Properties in the
+        Explicit in the Helmholtz Free Energy. . . . . .                          419           Single-Phase Region. . . . . . . . . . . . . . . . . . . . .             446
+   5.2. The Equation for the Helmholtz Free                                                     7.2.1. p ␳ T Data. . . . . . . . . . . . . . . . . . . . . . . .         446
+        Energy of the Ideal Gas. . . . . . . . . . . . . . . . . .                419                  7.2.1.1. Temperature Range T
+   5.3. Basic Statements for Fitting and Optimizing                                                                 ⬍273.16 K. . . . . . . . . . . . . . . .             446
+        the Structure of an Equation for the                                                           7.2.1.2. Temperature Range 273.16 K
+        Residual Part of the Helmholtz Free Energy..                              420                               ⭐T⬍643.15 K. . . . . . . . . . . . .                 447
+        5.3.1. Fitting an Equation for ␾ r to Data. . . .                         420                  7.2.1.3. Critical Region 643.15 K⭐T
+        5.3.2. Basic Statements for Optimizing the                                                                  ⬍663.15 K. . . . . . . . . . . . . . . .             449
+               Mathematical Form of ␾ r. . . . . . . . . . .                      422                  7.2.1.4. Temperature Range 663.15 K
+                                                                                                                    ⭐T⬍1273.15 K. . . . . . . . . . . .                  450
+J. Phys. Chem. Ref. Data, Vol. 31, No. 2, 2002
+                                             THERMODYNAMIC PROPERTIES OF ORDINARY WATER                                                                                            389
+
+                7.2.1.5. Comparison with the IAPS                                            4.4. Information on the selected p ␳ T data. . . . . . . . .                          406
+                              Skeleton Table Values at                                       4.5. Information on the selected data for the speed
+                              High Pressures and                                                   of sound w. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .         411
+                              High Temperatures. . . . . . . . . .                     450   4.6. Information on the selected data for the
+         7.2.2. Second and Third Virial Coefficients. .                                451         specific isochoric heat capacity. . . . . . . . . . . . . . .                   413
+         7.2.3. Speed of Sound. . . . . . . . . . . . . . . . . . .                    452   4.7. Information on data sets for the isobaric heat
+         7.2.4. Isochoric Heat Capacity. . . . . . . . . . . . .                       455         capacity of water in the ideal-gas state. . . . . . . .                         413
+         7.2.5. Isobaric Heat Capacity. . . . . . . . . . . . . .                      459   4.8. Information on the selected data for the
+         7.2.6. Enthalpy Differences. . . . . . . . . . . . . . .                      464         specific isobaric heat capacity c p . . . . . . . . . . . . .                   414
+         7.2.7. Joule–Thomson and Isothermal
+                                                                                             4.9. Information on the selected data of the caloric
+                Throttling Coefficient. . . . . . . . . . . . . . .                    465
+                                                                                                   properties enthalpy difference ⌬h, Joule–
+         7.2.8. Isentropic Temperature–Pressure
+                                                                                                   Thomson coefficient ␮, and isothermal throttling
+                Coefficient. . . . . . . . . . . . . . . . . . . . . . . .             468
+    7.3. Selected Attributes of the IAPWS-95                                                       coefficient ␦ T . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       416
+         Formulation. . . . . . . . . . . . . . . . . . . . . . . . . . . .            468   5.1. Contribution of the several linear, nonlinear,
+         7.3.1. Derivatives of the Thermal Properties                                              and linearized data to the weighted sum of
+                in the Liquid Phase. . . . . . . . . . . . . . . .                     468         squares for the fitting and optimization process..                              421
+         7.3.2. Representation of Thermodynamic                                              5.2. Parameters of the modified Gaussian bell-shaped
+                Properties in Metastable Regions. . . . .                              472         terms according to Eq. 共5.37兲 which are
+                7.3.2.1. Subcooled Liquid. . . . . . . . . . .                         472         contained in the bank of terms, Eq. 共5.41兲. . . . . .                           425
+                7.3.2.2. Superheated Liquid. . . . . . . . . .                         473   5.3. Parameters of the nonanalytical terms according
+                7.3.2.3. Subcooled Vapor. . . . . . . . . . . .                        474         to Eq. 共5.40兲 which are contained in the bank
+         7.3.3. Extrapolation Behavior. . . . . . . . . . . . . .                      475         of terms, Eq. 共5.41兲. . . . . . . . . . . . . . . . . . . . . . . .             426
+                7.3.3.1. Hugoniot Curve and p ␳ T                                            5.4. Summarizing information on the selected data
+                              Behavior at Extreme                                                  used in the linear optimization procedure and
+                              Pressures and Temperatures. . .                          475         in the nonlinear fitting process when
+                7.3.3.2. Ideal Curves. . . . . . . . . . . . . . .                     476         developing the IAPWS-95 formulation. . . . . . . .                              427
+8. Uncertainty of the IAPWS-95 Formulation. . . . . .                                  478   6.1. Coefficients of Eq. 共6.5兲. . . . . . . . . . . . . . . . . . . .                 429
+9. Recommendations for Improving the Basis of                                                6.2. Coefficients and exponents of Eq. 共6.6兲. . . . . . . .                           430
+    the Experimental Data. . . . . . . . . . . . . . . . . . . . . . .                 479   6.3. Relations of thermodynamic properties to the
+10. Conclusions. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .         480         ideal-gas part ␾°, Eq. 共6.5兲, and the residual
+11. Acknowledgments. . . . . . . . . . . . . . . . . . . . . . . . . .                 480         part ␾ r, Eq. 共6.6兲, of the dimensionless
+12. References. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        481
+                                                                                                   Helmholtz free energy and their derivatives. . . .                              431
+13. Appendix: Tables of Thermodynamic Properties
+                                                                                             6.4. The ideal-gas part ␾°, Eq. 共6.5兲, of the
+    of Water. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        485
+                                                                                                   dimensionless Helmholtz free energy and
+                                                                                                   its derivatives. . . . . . . . . . . . . . . . . . . . . . . . . . . . .        432
+                               List of Tables                                                6.5. The residual part ␾ r, Eq. 共6.6兲, of the
+1.1.    Information on selected equations of state for                                             dimensionless Helmholtz free energy and its
+        water. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .   396         derivatives. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        433
+2.1.    Information on the selected measuring runs for                                       6.6. Values for the ideal-gas part ␾°, Eq. 共6.5兲, and
+        the vapor pressure p ␴ , the saturated liquid                                              for the residual part ␾ r, Eq. 共6.6兲, of the
+        density ␳⬘, and the saturated vapor density ␳⬙...                              399         dimensionless Helmholtz free energy together
+2.2.    Information on the selected data for the caloric
+                                                                                                   with the corresponding derivatives for two
+        difference quantity ⌬␣. . . . . . . . . . . . . . . . . . . . .                400
+                                                                                                   combinations of temperature and density. . . . . . .                            436
+3.1.    Coefficients and exponents of the residual part
+                                                                                             7.1. The zeroth and first order ideal curves for the
+        ␾ r of the dimensionless Helmholtz free energy,
+                                                                                                   compression factor Z and their definitions in
+        Eq. 共3.3兲. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .     402
+4.1.    Information on the selected values of the                                                  terms of the compression factor Z( ␳ ,T) and of
+        thermal saturation properties used to develop                                              the residual part of the reduced Helmholtz
+        the IAPWS-95 formulation. . . . . . . . . . . . . . . . . .                    405         free energy ␾ r( ␳ ,T) and the condition for the
+4.2.    Information on the selected values for the                                                 second virial coefficient B at the temperature
+        specific internal energy on the vapor–liquid                                               T end . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .   477
+        phase boundary. . . . . . . . . . . . . . . . . . . . . . . . . . .            405   13.1. Thermodynamic properties of water on the
+4.3.    Information on the selected data for the caloric                                           vapor–liquid phase boundary as a function on
+        properties speed of sound w and specific                                                   temperature. . . . . . . . . . . . . . . . . . . . . . . . . . . . . .          486
+        isobaric heat capacity c p of the saturated liquid                                   13.2. Thermodynamic properties of water in the
+        and vapor. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       406         single-phase region. . . . . . . . . . . . . . . . . . . . . . . .              495
+
+                                                                                                                        J. Phys. Chem. Ref. Data, Vol. 31, No. 2, 2002
+390                                                                     W. WAGNER AND A. PRUß
+
+                              List of Figures                                                4.9. Distribution of the selected data of the three
+2.1.   The phase–boundary curves of water in a p – T                                               properties enthalpy difference, Joule–Thomson
+       diagram.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       398         coefficient, and isothermal throttling
+2.2.   Percentage deviations of the experimental data                                              coefficient used to develop the residual part of
+       of the vapor pressure p ␴ , the saturated liquid                                            IAPWS-95, Eq. 共6.6兲, in a p – T diagram.. . . . . .                             417
+       density ␳⬘, and the saturated vapor density                                           5.1. Scheme of one step of the entire iteration cycle
+       ␳⬙ from the values calculated from the                                                      to develop the residual part ␾ r of IAPWS-95,
+       corresponding Eqs. 共2.5兲, 共2.6兲, or 共2.7兲.. . . . . . .                         399         Eq. 共6.6兲.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       428
+2.3.   Percentage deviations 100⌬(⌬ ␣ )/⌬ ␣                                                  6.1. Percentage uncertainties in density estimated
+       ⫽100(⌬ ␣ exp⫺⌬␣calc)/⌬ ␣ exp between                                                        for IAPWS-95, Eq. 共6.4兲.. . . . . . . . . . . . . . . . . . .                   434
+       experimental data of the caloric difference                                           6.2. Percentage uncertainties in speed of sound
+       quantity ⌬␣ and values calculated from                                                      estimated for IAPWS-95, Eq. 共6.4兲.. . . . . . . . . . .                         434
+       Eq. 共2.9兲.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       400   6.3. Percentage uncertainties in specific isobaric
+3.1.   Percentage density deviations between                                                       heat capacity estimated for IAPWS-95, Eq.
+       experimental p ␳ T data and values calculated                                               共6.4兲.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .   435
+       from the gas equation, Eq. 共3.2兲.. . . . . . . . . . . . .                      402   6.4. Percentage uncertainties in vapor pressure
+3.2.   Percentage deviations between experimental                                                  100 ⌬p ␴ /p ␴ , in saturated liquid density 100
+       data of the speed of sound w and values                                                     ⌬␳⬘/␳⬘, and in saturated vapor density
+       calculated from the gas equation, Eq. 共3.2兲.. . . .                             403         100 ⌬␳⬙/␳⬙ estimated for IAPWS-95, Eq. 共6.4兲...                                 435
+3.3.   Percentage deviations between experimental                                            6.5. Isochoric heat capacity in the critical region as
+       data of the isobaric heat capacity c p and                                                  a function of temperature 共on the critical
+       values calculated from the gas equation, Eq.                                                isochore of the single-phase region兲 calculated
+       共3.2兲.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .   404         from IAPWS-95, Eq. 共6.4兲, an IAPWS-95-like
+3.4.   Percentage deviations between experimental                                                  equation but without nonanalytical terms,
+       data of the Joule–Thomson coefficient ␮ and                                                 and the equation of Saul and Wagner 共1989兲.. . .                                436
+       values calculated from the gas equation,                                              6.6. Isochoric heat capacity in the critical region as
+       Eq. 共3.2兲.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       404         a function of density on two isotherms
+4.1.   Distribution of the selected p ␳ T data used to                                             calculated from IAPWS-95, Eq. 共6.4兲, IAPS-84,
+       develop the residual part of IAPWS-95, Eq.                                                  and the crossover equation of Kostrowicka
+       共6.6兲, in a p – T diagram.. . . . . . . . . . . . . . . . . . . .               407         Wyczalkowska et al. 共2000兲.. . . . . . . . . . . . . . . . .                    436
+4.2.   Percentage density deviations 100⌬ ␳ / ␳                                              6.7. Speed of sound in the critical region as a
+       ⫽100( ␳ exp⫺␳calc)/ ␳ exp of experimental                                                   function of density on two isotherms
+       p ␳ T data of Grindley and Lind 共1971兲 and                                                  calculated from IAPWS-95, Eq. 共6.4兲, IAPS-84,
+       Kell and Whalley 共1975兲 from values calculated                                              and the crossover equation of Kostrowicka
+       from a preliminary equation of state.. . . . . . . . . .                        408         Wyczalkowska et al. 共2000兲.. . . . . . . . . . . . . . . . .                    437
+4.3.   Percentage density deviations between                                                 6.8. Isochoric heat capacity along the critical
+       experimental p ␳ T data of Kell et al. 共1989兲 and                                           isochore of the single-phase region in a
+       values calculated from a preliminary equation                                               double logarithmic diagram calculated from
+       of state.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .    408         IAPWS-95, Eq. 共6.4兲, IAPS-84, and the
+4.4.   Percentage density deviations between                                                       crossover equation of Kostrowicka
+       experimental p ␳ T data and values calculated                                               Wyczalkowska et al. 共2000兲.. . . . . . . . . . . . . . . . .                    437
+       from a preliminary equation of state.. . . . . . . . . .                        408   6.9. Partial derivative of pressure with respect to
+4.5.   Distribution of the selected data of the speed                                              density at constant temperature as a function of
+       of sound used to develop the residual part of                                               density calculated from IAPWS-95, Eq.
+       IAPWS-95, Eq. 共6.6兲, in a p – T diagram.. . . . . .                             411         共6.4兲, along the isotherm T⫽T c⫹10 mK.. . . . . .                               438
+4.6.   Distribution of experimental data of the                                              6.10. Partial derivative of density with respect to
+       isochoric heat capacity in a T – ␳ diagram.. . . . .                            412         pressure at constant temperature as a function
+4.7.   Percentage deviations between the data of the                                               of density calculated from IAPWS-95, Eq.
+       isobaric heat capacity in the ideal-gas state c ⴰp                                          共6.4兲, along the isotherm T⫽T c⫹10 mK.. . . . . .                               438
+       from statistical mechanical models and                                                6.11. Isobaric heat capacity as a function of density
+       from property tables, respectively, and values                                              calculated from IAPWS-95, Eq. 共6.4兲, along
+       calculated from the ␾° equation of                                                          the isotherm T⫽T c⫹10 mK.. . . . . . . . . . . . . . . .                        439
+       IAPWS-95, Eq. 共6.5兲.. . . . . . . . . . . . . . . . . . . . . .                 414   6.12. Isobaric heat capacity as a function of density
+4.8.   Distribution of the selected data of the isobaric                                           calculated from IAPWS-95, Eq. 共6.4兲, along
+       heat capacity used to develop the residual part                                             the two isotherms T⫽T c⫹1 K and T⫽T c
+       of IAPWS-95, Eq. 共6.6兲, in a p – T diagram.. . . .                              415         ⫹2 K.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .      439
+
+J. Phys. Chem. Ref. Data, Vol. 31, No. 2, 2002
+

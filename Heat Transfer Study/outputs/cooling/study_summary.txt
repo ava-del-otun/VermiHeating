@@ -19,8 +19,8 @@ Design specifications:
   Cooling-air architecture               : spot cooler discharges into an insulated metal plenum; a downstream assist blower draws from the plenum and pushes air through the bed network
   Assist blower                          : Goorui GHBH 1D7 34 1R5 side channel blower, 150.1 CFM @ 0.0 in. H2O, shutoff 56.2 in. H2O, 1100.0 W
   Spot-cooler rating basis               : 10000 BTU/h total, 244 CFM rated airflow, 82.0 pints/day dehumidification
-  Practical middle-case supply estimate  : 23.5 C from 1847 W sensible / 244 CFM at 37.5 C ambient
-  Rated sensible-latent split            : 1847 W sensible, 1083 W latent
+  Practical middle-case supply estimate  : 23.5 C from 1849 W sensible / 244 CFM at 37.5 C ambient
+  Rated sensible-latent split            : 1849 W sensible, 1082 W latent
   Ambient dew-point check                : 19.4 C dew point at 35% RH; no condensate expected at the derived supply temperature
   Spot-cooler source note               : Whynter ARC-1030WN product specs: 10,000 BTU DOE/SACC, 244 CFM medium airflow, 82 pints/day dehumidification
   Assist-blower source note             : Goorui GHBH 1D7 34 1R5 side channel blower basis: 255 m^3/h maximum airflow (= about 150.1 CFM), 140 mbar maximum pressure (= about 56.2 in H2O), 1.1 kW motor, 3-phase, converter-operation capable, about $640. The current model treats 255 m^3/h as the free-air endpoint and 140 mbar as the shutoff-pressure endpoint until a full fan curve is available.
@@ -32,8 +32,8 @@ Overall UA to ambient air                  : 1.429 W/K
 External natural-convection h estimate     : 3.89 W/m^2-K
 Lumped time constant                       : 330.4 h
 Lumped Biot number estimate                : 1.19
-Hard-safe cooling points found             : 4 of 60
-Feasible cooling Pareto points found       : 2 of 60
+Hard-safe cooling points found             : 10 of 60
+Feasible cooling Pareto points found       : 7 of 60
 
 Summer cooling selection process:
   Cooling recommendations now use constrained NSGA-II on the evaluated summer airflow sweep.
@@ -78,9 +78,9 @@ Perforation and moisture process:
                                          Churchill-Bernstein hole convection, Lewis relation,
                                          and IAPWS saturation/latent-heat relations
   Perforation geometry                 : 100 holes/tube, 5.0 mm diameter, area per hole 0.00001963 m^2
-  Tube release fraction                : 95.0% of each tube flow is released through the perforations
-  Per-hole flow relation               : released tube flow / holes per tube
-  Hole-velocity relation               : released tube flow / (holes per tube x area per hole)
+  Perforation discharge coefficient    : 0.60
+  Per-hole flow relation               : local released flow follows C_d A_h sqrt(2 rho Delta p)
+  Hole-velocity relation               : local released flow / local perforation area
   Evaporation relation                 : m_dot = min(m_diffusion, m_capacity, m_heat)
   Diffusion limit                      : m_diffusion = h_m A (rho_v,sat(T_surface) - rho_v,bulk)
                                          the diffusion, carrying-capacity, and heat-limited
@@ -129,12 +129,12 @@ Radial air-cooling profile:
   Maximum plume radius                 : none; plume radius grows linearly across the plotted range
   Selected outlet temperature          : 23.7 C
   Sink temperature used                : 23.7 C
-  Bed reference temperature            : 24.2 C
+  Bed reference temperature            : 24.1 C
   Wetted-area density                  : 749.3 m^2/m^3
   Base sensible coefficient            : 8.00 W/m^2-K
   Mean latent coefficient              : 0.00 W/m^2-K
   Mean combined sink coefficient       : 8.00 W/m^2-K
-  Released mass flow per tube length   : 0.008222 kg/s-m
+  Released mass flow per tube length   : 0.009281 kg/s-m
   Initial / final plume RH             : 6.0% -> 6.0%
   Initial / final vapor density        : 0.0013 -> 0.0013 kg/m^3
   Integrated radial sensible / latent  : 0.00 W and 0.00 W
@@ -168,66 +168,80 @@ Tube layout and worm-habitat exclusion:
                                          includes both plume exclusion cylinders and 1D wall-return bands
 
 NSGA-II reported feasible Pareto cooling point:
-  Total flow                         : 3706.4 L/min
+  Achieved total flow                : 3974.8 L/min
+  Requested total flow               : 4059.0 L/min
+  Assist-blower flow shortfall       : 84.2 L/min
   Spot-cooler target supply air      : 23.5 C
   Spec-derived middle-case supply    : 23.5 C
   Spot-cooler actual supply air      : 23.5 C
   Spot-cooler supply RH              : 78.1 %
-  Spot-cooler sensible load          : 991.1 W
-  Spot-cooler electric power         : 330.4 W
+  Spot-cooler sensible load          : 1063.4 W
+  Spot-cooler electric power         : 354.5 W
   Assist-blower electric power       : 1100.0 W
-  Assist-blower available static     : 1791.4 Pa
+  Assist-blower available static     : 907.7 Pa
   Spot-cooler condensate output      : 0.00 kg/24 h
   Aeration outlet temperature        : 23.7 C
-  Net cooling to bed                 : 18.5 W
-  Signed Q_to_bed                    : -18.5 W
-  Bottom-node steady temperature     : 24.2 C
+  Net cooling to bed                 : 18.6 W
+  Signed Q_to_bed                    : -18.6 W
+  Bottom-node steady temperature     : 24.1 C
   Top-node steady temperature        : 24.9 C
   Bottom-top spread                  : 0.7 C
-  Released flow per hole             : 4.20 L/min
-  Hole velocity                      : 3.57 m/s
+  Peak local flow per hole           : 4.90 L/min
+  Peak hole velocity                 : 4.16 m/s
   Substrate water loss               : 0.31 kg/24 h
-  Latent evaporation load            : 8.8 W
-  Total pressure drop                : 769.8 Pa
-  Distribution manifold dP          : 764.4 Pa
-  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 441.3, connector friction 0.0, connector->branch 323.1 Pa
-  Assist-blower static-pressure margin: 1021.6 Pa
+  Latent evaporation load            : 8.9 W
+  Total pressure drop                : 907.7 Pa
+  Distribution manifold dP          : 879.1 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 507.5, connector friction 0.0, connector->branch 371.5 Pa
+  Assist-blower static-pressure margin: 0.0 Pa
   Status                             : meets all summer hard constraints and provides net bed cooling
 
 Best-available summer reference point:
-  Total flow                         : 3706.4 L/min
+  Achieved total flow                : 3974.8 L/min
+  Requested total flow               : 4059.0 L/min
+  Assist-blower flow shortfall       : 84.2 L/min
   Spot-cooler target supply air      : 23.5 C
   Spec-derived middle-case supply    : 23.5 C
   Spot-cooler actual supply air      : 23.5 C
   Spot-cooler supply RH              : 78.1 %
-  Spot-cooler sensible load          : 991.1 W
-  Spot-cooler electric power         : 330.4 W
+  Spot-cooler sensible load          : 1063.4 W
+  Spot-cooler electric power         : 354.5 W
   Assist-blower electric power       : 1100.0 W
-  Assist-blower available static     : 1791.4 Pa
+  Assist-blower available static     : 907.7 Pa
   Spot-cooler condensate output      : 0.00 kg/24 h
   Aeration outlet temperature        : 23.7 C
-  Net cooling to bed                 : 18.5 W
-  Signed Q_to_bed                    : -18.5 W
-  Bottom-node steady temperature     : 24.2 C
+  Net cooling to bed                 : 18.6 W
+  Signed Q_to_bed                    : -18.6 W
+  Bottom-node steady temperature     : 24.1 C
   Top-node steady temperature        : 24.9 C
   Bottom-top spread                  : 0.7 C
-  Released flow per hole             : 4.20 L/min
-  Hole velocity                      : 3.57 m/s
+  Peak local flow per hole           : 4.90 L/min
+  Peak hole velocity                 : 4.16 m/s
   Substrate water loss               : 0.31 kg/24 h
-  Latent evaporation load            : 8.8 W
-  Total pressure drop                : 769.8 Pa
-  Distribution manifold dP          : 764.4 Pa
-  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 441.3, connector friction 0.0, connector->branch 323.1 Pa
-  Assist-blower static-pressure margin: 1021.6 Pa
+  Latent evaporation load            : 8.9 W
+  Total pressure drop                : 907.7 Pa
+  Distribution manifold dP          : 879.1 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 507.5, connector friction 0.0, connector->branch 371.5 Pa
+  Assist-blower static-pressure margin: 0.0 Pa
   Status                             : meets all summer hard constraints and provides net bed cooling
 
 Top NSGA-II Pareto summer cooling candidates:
   Qtot(L/min)  Tbottom(C)  Ttop(C)  dT(C)  Tair,out(C)  cooling(W)  water(kg/d)  Qspot(W)  Pspot(W)  Pblow(W)  Vhole  dP(Pa)  state
-      3706.4       24.2     24.9    0.7         23.7       18.5        0.31     991.1     330.4    1100.0   3.57   769.8  cooling-safe
-      3635.9       24.2     25.0    0.7         23.7       18.4        0.31     972.2     324.1    1100.0   3.50   740.8  cooling-safe
+      3974.8       24.1     24.9    0.7         23.7       18.6        0.31    1063.4     354.5    1100.0   4.16   907.7  cooling-safe
+      3974.8       24.1     24.9    0.7         23.7       18.6        0.31    1063.4     354.5    1100.0   4.16   907.7  cooling-safe
+      3974.7       24.1     24.9    0.7         23.7       18.6        0.31    1063.4     354.5    1100.0   4.16   907.7  cooling-safe
+      3974.7       24.1     24.9    0.7         23.7       18.6        0.31    1063.4     354.5    1100.0   4.16   907.7  cooling-safe
+      3776.9       24.2     24.9    0.7         23.8       18.5        0.31    1010.5     336.8    1100.0   3.96   819.6  cooling-safe
+      3635.9       24.2     24.9    0.7         23.8       18.5        0.31     972.8     324.3    1100.0   3.81   759.6  cooling-safe
+      3565.4       24.2     25.0    0.7         23.8       18.4        0.31     953.9     318.0    1100.0   3.74   730.4  cooling-safe
 
 NSGA-II optimization-ranked summer points:
   Qtot(L/min)  Tmax(C)  Tmean(C)  dT(C)  cooling(W)  water(kg/d)  Pcool(W)  dP(Pa)  state
-      3706.4     24.9      24.5    0.7       18.5        0.31    1430.4   769.8  cooling-safe
-      3635.9     25.0      24.6    0.7       18.4        0.31    1424.1   740.8  cooling-safe
+      3974.8     24.9      24.5    0.7       18.6        0.31    1454.5   907.7  cooling-safe
+      3974.8     24.9      24.5    0.7       18.6        0.31    1454.5   907.7  cooling-safe
+      3974.7     24.9      24.5    0.7       18.6        0.31    1454.5   907.7  cooling-safe
+      3974.7     24.9      24.5    0.7       18.6        0.31    1454.5   907.7  cooling-safe
+      3776.9     24.9      24.5    0.7       18.5        0.31    1436.8   819.6  cooling-safe
+      3635.9     24.9      24.5    0.7       18.5        0.31    1424.3   759.6  cooling-safe
+      3565.4     25.0      24.6    0.7       18.4        0.31    1418.0   730.4  cooling-safe
 ============================================================

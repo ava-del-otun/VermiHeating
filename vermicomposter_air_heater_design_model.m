@@ -73,6 +73,10 @@ params.aeration.ID_m = 0.040;
 params.aeration.OD_m = 0.044;
 params.aeration.length_m = params.bin.length_m;
 params.aeration.nParallelTubes = 12;
+params.aeration.bedSideGaugePressure_Pa = 0.0;
+params.aeration.bedPorosity = 0.80;
+params.aeration.bedParticleDiameter_m = [];
+params.aeration.representativeTubeCenterHeight_m = NaN;
 
 params.wire.gauge = '31 AWG';
 params.wire.diameter_m = 2.27e-4;
@@ -112,6 +116,7 @@ params.calibration.evaporationHMultiplier = 1.0;
 
 params.perforation.holesPerTube = 60;
 params.perforation.holeDiameter_m = 0.005;
+params.perforation.dischargeCoefficient = 0.60;
 
 params.evaporation = struct();
 params.evaporation.relativeHumidity = 0.80;
@@ -660,19 +665,21 @@ params.aeration.OD_m = 0.044;
 params.aeration.wallK_W_mK = 16;
 params.aeration.segments = 40;
 params.aeration.bedH_W_m2K = 8;
-params.aeration.releaseFraction = 0.95;
-params.aeration.endMinorK = 1.0;
 params.aeration.nParallelTubes = 12;
 params.aeration.headerEnabled = true;
 params.aeration.headerID_m = 0.050;
-params.aeration.headerMinorK = 1.0;
+params.aeration.headerLossMultiplier = 1.0;
 params.aeration.splitterOutletCount = 4;
 params.aeration.splitterInletID_m = 0.019;
 params.aeration.branchConnectorID_m = 0.019;
 params.aeration.branchConnectorLength_m = 0.0;
-params.aeration.splitterBodyK = 1.0;
+params.aeration.splitterBodyLossMultiplier = 1.0;
 params.aeration.contractionModel = 'idelchik_conical_bellmouth_without_end_wall';
 params.aeration.contractionConeAngle_deg = 60.0;
+params.aeration.bedSideGaugePressure_Pa = 0.0;
+params.aeration.bedPorosity = 0.80;
+params.aeration.bedParticleDiameter_m = [];
+params.aeration.representativeTubeCenterHeight_m = NaN;
 
 params.wire = struct();
 params.wire.name = 'Nichrome 80/20';
@@ -719,6 +726,7 @@ params.control.highCutout_C = 28;
 params.perforation = struct();
 params.perforation.holesPerTube = 60;
 params.perforation.holeDiameter_m = 0.005;
+params.perforation.dischargeCoefficient = 0.60;
 
 params.evaporation = struct();
 params.evaporation.relativeHumidity = 0.80;
@@ -920,18 +928,28 @@ function area_m2 = derivedWettedAreaParticleSurface_m2(params, accessibleFractio
 % diameter d_i, the blended mass fraction is w_i, the Sauter mean diameter
 % is d32 = 1/sum(w_i/d_i), and the corresponding external area is
 % A_wet = f_access * 6 * V_fill / d32.
+d32_m = table3ParticleSauterDiameter_m(params);
+fillVolume_m3 = params.bin.length_m * params.bin.width_m * ...
+    params.bin.height_m * params.bin.fillFraction;
+area_m2 = max(0.0, accessibleFraction) * 6 * fillVolume_m3 / max(d32_m, 1e-12);
+end
+
+function d32_m = table3ParticleSauterDiameter_m(params)
+d32_m = NaN;
 table3 = defaultTable3ParticleSurface();
-if isfield(params.evaporation, 'table3ParticleSurface') && ...
+if isfield(params, 'evaporation') && isstruct(params.evaporation) && ...
+        isfield(params.evaporation, 'table3ParticleSurface') && ...
         isstruct(params.evaporation.table3ParticleSurface)
     table3 = mergeStructs(table3, params.evaporation.table3ParticleSurface);
 end
 
 [weights, diameters_m] = table3ParticleBlend(table3);
+if isempty(weights) || any(~isfinite(diameters_m))
+    return;
+end
+
 invD32_m_inv = sum(weights ./ max(diameters_m, 1e-12));
 d32_m = 1 / max(invD32_m_inv, 1e-12);
-fillVolume_m3 = params.bin.length_m * params.bin.width_m * ...
-    params.bin.height_m * params.bin.fillFraction;
-area_m2 = max(0.0, accessibleFraction) * 6 * fillVolume_m3 / max(d32_m, 1e-12);
 end
 
 function [weights, diameters_m] = table3ParticleBlend(table3)
@@ -1893,32 +1911,95 @@ U_W_m2K = 1 / (Rin + Rwall + Rins + Rout);
 end
 
 function aeration = solveAerationTube(params, TairIn_C, Tbed_C, mdotIn_kg_s)
+propsRef = airProps(TairIn_C + 273.15, params.environment.pressure_Pa);
+totalHoleArea_m2 = holesPerTube(params) * perforationHoleArea(params);
+Cd = perforationDischargeCoefficient(params);
+massBalanceTol_kg_s = max(1e-9, 1e-4 * mdotIn_kg_s);
+
+if mdotIn_kg_s <= 0 || totalHoleArea_m2 <= 0 || Cd <= 0
+    aeration = marchAerationTubeClosedEnd(params, TairIn_C, Tbed_C, mdotIn_kg_s, 0.0);
+    aeration.deltaP_Pa = 0.0;
+    aeration.inletGaugePressure_Pa = 0.0;
+    return
+end
+
+hi_Pa = max((mdotIn_kg_s / max(Cd * totalHoleArea_m2, 1e-12))^2 / ...
+    max(2 * max(propsRef.rho_kg_m3, 1e-12), 1e-12), 1.0);
+stateHi = marchAerationTubeClosedEnd(params, TairIn_C, Tbed_C, mdotIn_kg_s, hi_Pa);
+
+for iter = 1:40
+    if stateHi.remainingMdot_kg_s <= massBalanceTol_kg_s
+        break
+    end
+    hi_Pa = 2 * hi_Pa;
+    stateHi = marchAerationTubeClosedEnd(params, TairIn_C, Tbed_C, mdotIn_kg_s, hi_Pa);
+end
+
+if stateHi.remainingMdot_kg_s > massBalanceTol_kg_s
+    aeration = stateHi;
+    aeration.deltaP_Pa = hi_Pa;
+    aeration.inletGaugePressure_Pa = hi_Pa;
+    return
+end
+
+lo_Pa = 0.0;
+bestPressure_Pa = hi_Pa;
+bestState = stateHi;
+for iter = 1:80
+    mid_Pa = 0.5 * (lo_Pa + hi_Pa);
+    stateMid = marchAerationTubeClosedEnd(params, TairIn_C, Tbed_C, mdotIn_kg_s, mid_Pa);
+    if stateMid.remainingMdot_kg_s <= massBalanceTol_kg_s
+        hi_Pa = mid_Pa;
+        bestPressure_Pa = mid_Pa;
+        bestState = stateMid;
+    else
+        lo_Pa = mid_Pa;
+    end
+    if hi_Pa - lo_Pa <= max(1e-6, 1e-6 * max(bestPressure_Pa, 1.0))
+        break
+    end
+end
+
+aeration = bestState;
+aeration.deltaP_Pa = bestPressure_Pa;
+aeration.inletGaugePressure_Pa = bestPressure_Pa;
+end
+
+function aeration = marchAerationTubeClosedEnd(params, TairIn_C, Tbed_C, mdotIn_kg_s, inletGaugePressure_Pa)
 N = params.aeration.segments;
 L_m = params.aeration.length_m;
-dx_m = L_m / N;
+dx_m = L_m / max(N, 1);
 ID_m = params.aeration.ID_m;
 OD_m = params.aeration.OD_m;
 Atube_m2 = pi * ID_m^2 / 4;
 Pout_m = pi * OD_m;
+holesPerSeg = max(holesPerTube(params) / max(N, 1), 1e-12);
+segHoleArea_m2 = holesPerSeg * perforationHoleArea(params);
+bedPressureModel = buildSegmentwiseBedPressureModel(params, L_m, N, OD_m);
+boundaryProps = airProps(Tbed_C + 273.15, params.environment.pressure_Pa);
+bedBoundaryGauge_Pa = derivedOutletBoundaryGaugePressure_Pa( ...
+    mdotIn_kg_s, boundaryProps.rho_kg_m3, bedPressureModel);
 
 remainingMdot_kg_s = mdotIn_kg_s;
-releasedTotal_kg_s = mdotIn_kg_s * params.aeration.releaseFraction;
-dmRelease_kg_s = releasedTotal_kg_s / N;
 Tair_C = TairIn_C;
 QtoBed_W = 0;
 latentEvap_W = 0;
 waterLoss_kg_s = 0;
-dp_Pa = 0;
+dpTube_Pa = 0;
+peakFlowPerHole_Lpm = 0;
+peakHoleVelocity_m_s = 0;
+localGaugePressure_Pa = inletGaugePressure_Pa;
 
 airProfile_C = zeros(N + 1, 1);
 airProfile_C(1) = Tair_C;
-
-flowPerHole_Lpm = perforationFlowPerHole_Lpm(params, mdotIn_kg_s, TairIn_C);
-holeVelocity_m_s = perforationHoleVelocity(params, mdotIn_kg_s, TairIn_C);
+pressureProfileGauge_Pa = zeros(N + 1, 1);
+pressureProfileGauge_Pa(1) = inletGaugePressure_Pa;
+bedPressureProfileGauge_Pa = zeros(N, 1);
 
 for i = 1:N
-    Tair_K = Tair_C + 273.15;
-    props = airProps(Tair_K, params.environment.pressure_Pa);
+    localPressure_Pa = params.environment.pressure_Pa + ...
+        max(localGaugePressure_Pa, bedBoundaryGauge_Pa);
+    props = airProps(Tair_C + 273.15, localPressure_Pa);
     uBulk_m_s = remainingMdot_kg_s / max(props.rho_kg_m3 * Atube_m2, 1e-12);
     ReTube = props.rho_kg_m3 * uBulk_m_s * ID_m / max(props.mu_Pa_s, 1e-12);
     NuTube = internalTubeNu(ReTube, props.Pr, ID_m, L_m);
@@ -1926,45 +2007,64 @@ for i = 1:N
         NuTube * props.k_W_mK / ID_m;
     hOutside_W_m2K = params.calibration.bedHTMultiplier * params.aeration.bedH_W_m2K;
 
-    % [R5] Overall U across the aeration tube wall.
     U_W_m2K = 1 / ( ...
         1 / max(hInside_W_m2K, 1e-9) + ...
         (OD_m - ID_m) / (2 * max(params.aeration.wallK_W_mK, 1e-9)) + ...
         1 / max(hOutside_W_m2K, 1e-9));
 
-    % [R5] Wall-to-bed heat transfer along the aeration tube.
-    qWall_W = U_W_m2K * Pout_m * dx_m * (Tair_C - Tbed_C);
+    [dm_kg_s, localBedGauge_Pa] = solveSegmentReleaseWithBedBackpressure( ...
+        params, localGaugePressure_Pa, props.rho_kg_m3, props.mu_Pa_s, ...
+        segHoleArea_m2, remainingMdot_kg_s, bedPressureModel, i, bedBoundaryGauge_Pa);
+    bedPressureProfileGauge_Pa(i) = localBedGauge_Pa;
+    remainingAfterRelease_kg_s = max(remainingMdot_kg_s - dm_kg_s, 1e-9);
+    mdotMean_kg_s = max(remainingMdot_kg_s - 0.5 * dm_kg_s, 1e-12);
+    UAseg_W_K = U_W_m2K * Pout_m * dx_m;
+    wallFactor = exp(-UAseg_W_K / max(mdotMean_kg_s * props.cp_J_kgK, 1e-12));
+    TairAfterWall_C = Tbed_C + (Tair_C - Tbed_C) * wallFactor;
+    qWall_W = mdotMean_kg_s * props.cp_J_kgK * (Tair_C - TairAfterWall_C);
+    Trelease_C = 0.5 * (Tair_C + TairAfterWall_C);
+    qJet_W = dm_kg_s * props.cp_J_kgK * (Trelease_C - Tbed_C);
 
-    % [R5] q_jet = m_dot_release * cp * (T_air - T_bed)
-    dm_kg_s = min(dmRelease_kg_s, remainingMdot_kg_s);
-    qJet_W = dm_kg_s * props.cp_J_kgK * (Tair_C - Tbed_C);
+    releaseProps = airProps(Trelease_C + 273.15, localPressure_Pa);
+    volRelease_m3_s = dm_kg_s / max(releaseProps.rho_kg_m3, 1e-12);
+    localFlowPerHole_Lpm = volRelease_m3_s * 60 * 1000 / max(holesPerSeg, 1e-12);
+    localHoleVelocity_m_s = volRelease_m3_s / max(segHoleArea_m2, 1e-12);
+    peakFlowPerHole_Lpm = max(peakFlowPerHole_Lpm, localFlowPerHole_Lpm);
+    peakHoleVelocity_m_s = max(peakHoleVelocity_m_s, localHoleVelocity_m_s);
+
     qAvail_W = max(qJet_W, 0);
     [mEvap_kg_s, qEvap_W] = evaporationLossSegment( ...
-        params, dm_kg_s, Tair_C, Tbed_C, qAvail_W, holeVelocity_m_s);
+        params, dm_kg_s, Trelease_C, Tbed_C, qAvail_W, localHoleVelocity_m_s);
     QtoBed_W = QtoBed_W + qWall_W + qJet_W - qEvap_W;
     latentEvap_W = latentEvap_W + qEvap_W;
     waterLoss_kg_s = waterLoss_kg_s + mEvap_kg_s;
 
-    remainingAfterRelease_kg_s = max(remainingMdot_kg_s - dm_kg_s, 1e-9);
-    Tair_C = Tair_C - qWall_W / max(remainingAfterRelease_kg_s * props.cp_J_kgK, 1e-9);
+    Tair_C = TairAfterWall_C;
     remainingMdot_kg_s = remainingAfterRelease_kg_s;
     airProfile_C(i + 1) = Tair_C;
 
     f = churchillFrictionFactor(ReTube);
-    dp_Pa = dp_Pa + ...
-        (f * dx_m / ID_m + params.aeration.endMinorK / N) * ...
-        0.5 * props.rho_kg_m3 * uBulk_m_s^2;
+    segDp_Pa = f * dx_m / ID_m * 0.5 * props.rho_kg_m3 * uBulk_m_s^2;
+    dpTube_Pa = dpTube_Pa + segDp_Pa;
+    localGaugePressure_Pa = max(localGaugePressure_Pa - segDp_Pa, localBedGauge_Pa);
+    pressureProfileGauge_Pa(i + 1) = localGaugePressure_Pa;
 end
 
 aeration = struct();
 aeration.QtoBed_W = QtoBed_W;
 aeration.airOutlet_C = Tair_C;
 aeration.airProfile_C = airProfile_C;
-aeration.deltaP_Pa = dp_Pa;
-aeration.flowPerHole_Lpm = flowPerHole_Lpm;
-aeration.holeVelocity_m_s = holeVelocity_m_s;
+aeration.deltaP_Pa = inletGaugePressure_Pa;
+aeration.flowPerHole_Lpm = peakFlowPerHole_Lpm;
+aeration.holeVelocity_m_s = peakHoleVelocity_m_s;
 aeration.waterLoss_kg_day = waterLoss_kg_s * 86400;
 aeration.latentEvap_W = latentEvap_W;
+aeration.remainingMdot_kg_s = remainingMdot_kg_s;
+aeration.tubeFrictionDrop_Pa = dpTube_Pa;
+aeration.bedBoundaryGaugePressure_Pa = bedBoundaryGauge_Pa;
+aeration.pressureProfileGauge_Pa = pressureProfileGauge_Pa;
+aeration.bedPressureProfileGauge_Pa = bedPressureProfileGauge_Pa;
+aeration.maxBedGaugePressure_Pa = max(bedPressureProfileGauge_Pa);
 end
 
 function holes = totalPerforationHoles(params)
@@ -1979,22 +2079,231 @@ function area_m2 = perforationHoleArea(params)
 area_m2 = pi * max(params.perforation.holeDiameter_m, 1e-9)^2 / 4;
 end
 
-function flowPerHole_Lpm = perforationFlowPerHole_Lpm(params, mdotTube_kg_s, Tair_C)
-props = airProps(Tair_C + 273.15, params.environment.pressure_Pa);
-volRelease_m3_s = params.aeration.releaseFraction * mdotTube_kg_s / ...
-    max(props.rho_kg_m3, 1e-9);
-% [R5] Mean released flow per perforation from continuity:
-% Q_hole = Q_release,tube / N_holes,tube
-flowPerHole_Lpm = volRelease_m3_s * 60 * 1000 / max(holesPerTube(params), 1);
+function Cd = perforationDischargeCoefficient(params)
+Cd = 0.60;
+if isfield(params, 'perforation') && isstruct(params.perforation) && ...
+        isfield(params.perforation, 'dischargeCoefficient') && ...
+        ~isempty(params.perforation.dischargeCoefficient)
+    Cd = max(params.perforation.dischargeCoefficient, 0.0);
+end
 end
 
-function velocity_m_s = perforationHoleVelocity(params, mdotTube_kg_s, Tair_C)
-props = airProps(Tair_C + 273.15, params.environment.pressure_Pa);
-volRelease_m3_s = params.aeration.releaseFraction * mdotTube_kg_s / ...
-    max(props.rho_kg_m3, 1e-9);
-% [R5] Mean perforation exit velocity from continuity:
-% u_hole = Q_release,tube / (N_holes,tube * A_hole)
-velocity_m_s = volRelease_m3_s / max(holesPerTube(params) * perforationHoleArea(params), 1e-12);
+function bedSideGauge_Pa = aerationBedSideGaugePressure(params)
+bedSideGauge_Pa = 0.0;
+if isfield(params, 'aeration') && isstruct(params.aeration) && ...
+        isfield(params.aeration, 'bedSideGaugePressure_Pa') && ...
+        ~isempty(params.aeration.bedSideGaugePressure_Pa)
+    bedSideGauge_Pa = params.aeration.bedSideGaugePressure_Pa;
+end
+end
+
+function centerHeight_m = defaultRepresentativeTubeCenterHeight_m(fillHeight_m, tubeOD_m)
+tubeRadius_m = max(0.5 * max(tubeOD_m, 0.0), 0.0);
+centerHeight_m = min(max(0.10 * max(fillHeight_m, 0.0), tubeRadius_m), ...
+    max(fillHeight_m - tubeRadius_m, tubeRadius_m));
+end
+
+function bedModel = buildSegmentwiseBedPressureModel(params, length_m, N, tubeOD_m)
+bedModel = struct();
+bedModel.enabled = false;
+bedModel.mode = 'configured_boundary_only';
+bedModel.boundaryGaugePressure_Pa = aerationBedSideGaugePressure(params);
+bedModel.boundaryGaugeOffset_Pa = aerationBedSideGaugePressure(params);
+bedModel.derivedBoundaryEnabled = false;
+bedModel.outletAreaPerBranch_m2 = NaN;
+bedModel.outletDischargeCoefficient = NaN;
+bedModel.porosity = 0.80;
+bedModel.particleDiameter_m = 0.015;
+bedModel.particleDiameterSource = 'fallback_constant';
+bedModel.representativeTubeCenterHeight_m = NaN;
+bedModel.verticalEscapeDistance_m = NaN;
+bedModel.tributaryArea_m2 = NaN;
+bedModel.segmentPathLengths_m = zeros(max(N, 1), 1);
+bedModel.segmentCenters_m = zeros(max(N, 1), 1);
+
+if ~(isfield(params, 'bin') && isstruct(params.bin) && isfield(params, 'aeration') && isstruct(params.aeration))
+    return;
+end
+
+if isfield(params.aeration, 'bedPorosity') && ~isempty(params.aeration.bedPorosity)
+    bedModel.porosity = params.aeration.bedPorosity;
+end
+particleDiameter_m = NaN;
+particleDiameterIsOverride = false;
+if isfield(params.aeration, 'bedParticleDiameter_m') && ~isempty(params.aeration.bedParticleDiameter_m)
+    particleDiameter_m = params.aeration.bedParticleDiameter_m;
+    particleDiameterIsOverride = isfinite(particleDiameter_m) && particleDiameter_m > 0.0;
+end
+if particleDiameterIsOverride
+    bedModel.particleDiameterSource = 'aeration_override';
+else
+    particleDiameter_m = table3ParticleSauterDiameter_m(params);
+    if isfinite(particleDiameter_m) && particleDiameter_m > 0.0
+        bedModel.particleDiameterSource = 'table3_d32_default';
+    end
+end
+if ~(isfinite(particleDiameter_m) && particleDiameter_m > 0.0)
+    particleDiameter_m = 0.015;
+    bedModel.particleDiameterSource = 'fallback_constant';
+end
+bedModel.particleDiameter_m = particleDiameter_m;
+
+fillHeight_m = max(params.bin.height_m * params.bin.fillFraction, 1e-12);
+if isfield(params.aeration, 'representativeTubeCenterHeight_m') && ...
+        ~isempty(params.aeration.representativeTubeCenterHeight_m) && ...
+        isfinite(params.aeration.representativeTubeCenterHeight_m)
+    repCenterHeight_m = params.aeration.representativeTubeCenterHeight_m;
+else
+    repCenterHeight_m = defaultRepresentativeTubeCenterHeight_m(fillHeight_m, tubeOD_m);
+end
+tubeRadius_m = max(0.5 * max(tubeOD_m, 0.0), 0.0);
+repCenterHeight_m = min(max(repCenterHeight_m, tubeRadius_m), ...
+    max(fillHeight_m - tubeRadius_m, tubeRadius_m));
+verticalEscape_m = max(fillHeight_m - repCenterHeight_m, 1e-6);
+dx_m = max(length_m, 1e-12) / max(N, 1);
+nTubes = max(1, round(params.aeration.nParallelTubes));
+tributaryArea_m2 = max(dx_m * max(params.bin.width_m, 1e-12) / max(nTubes, 1), 1e-12);
+segmentCenters_m = dx_m * (((1:max(N, 1))' - 0.5));
+
+bedModel.representativeTubeCenterHeight_m = repCenterHeight_m;
+bedModel.verticalEscapeDistance_m = verticalEscape_m;
+bedModel.tributaryArea_m2 = tributaryArea_m2;
+bedModel.segmentCenters_m = segmentCenters_m;
+
+openTop = isfield(params.bin, 'openTop') && logical(params.bin.openTop);
+ventCount = 0;
+ventDiameter_m = 0.0;
+if isfield(params.bin, 'ventHoleCount') && ~isempty(params.bin.ventHoleCount)
+    ventCount = max(0, round(params.bin.ventHoleCount));
+end
+if isfield(params.bin, 'ventHoleDiameter_m') && ~isempty(params.bin.ventHoleDiameter_m)
+    ventDiameter_m = max(params.bin.ventHoleDiameter_m, 0.0);
+end
+
+if openTop
+    bedModel.mode = 'open_top';
+    bedModel.segmentPathLengths_m = verticalEscape_m * ones(max(N, 1), 1);
+    bedModel.enabled = bedModel.porosity > 0 && bedModel.porosity < 1 && ...
+        bedModel.particleDiameter_m > 0;
+elseif ventCount > 0 && ventDiameter_m > 0
+    bedModel.mode = 'covered_top_plus_vent';
+    ventCenters_m = max(length_m, 1e-12) * (((1:ventCount)' - 0.5) / ventCount);
+    axialOffsets_m = min(abs(segmentCenters_m - ventCenters_m'), [], 2);
+    bedModel.segmentPathLengths_m = hypot(verticalEscape_m, axialOffsets_m);
+    bedModel.enabled = bedModel.porosity > 0 && bedModel.porosity < 1 && ...
+        bedModel.particleDiameter_m > 0;
+    bedModel.derivedBoundaryEnabled = true;
+    bedModel.outletAreaPerBranch_m2 = max( ...
+        ventCount * pi * ventDiameter_m^2 / 4 / max(nTubes, 1), ...
+        1e-12);
+    bedModel.outletDischargeCoefficient = 0.63;
+end
+end
+
+function boundaryGauge_Pa = derivedOutletBoundaryGaugePressure_Pa( ...
+        branchMdot_kg_s, rhoBoundary_kg_m3, bedModel)
+boundaryGauge_Pa = 0.0;
+if isfield(bedModel, 'boundaryGaugeOffset_Pa') && ~isempty(bedModel.boundaryGaugeOffset_Pa)
+    boundaryGauge_Pa = bedModel.boundaryGaugeOffset_Pa;
+elseif isfield(bedModel, 'boundaryGaugePressure_Pa') && ~isempty(bedModel.boundaryGaugePressure_Pa)
+    boundaryGauge_Pa = bedModel.boundaryGaugePressure_Pa;
+end
+
+if branchMdot_kg_s <= 0 || ~(isfield(bedModel, 'derivedBoundaryEnabled') && bedModel.derivedBoundaryEnabled)
+    return;
+end
+
+area_m2 = NaN;
+Cd = NaN;
+if isfield(bedModel, 'outletAreaPerBranch_m2')
+    area_m2 = bedModel.outletAreaPerBranch_m2;
+end
+if isfield(bedModel, 'outletDischargeCoefficient')
+    Cd = bedModel.outletDischargeCoefficient;
+end
+if ~(isfinite(area_m2) && area_m2 > 0 && isfinite(Cd) && Cd > 0)
+    return;
+end
+
+boundaryGauge_Pa = boundaryGauge_Pa + ...
+    0.5 * (max(branchMdot_kg_s, 0.0) / max(Cd * area_m2, 1e-12))^2 / ...
+    max(rhoBoundary_kg_m3, 1e-12);
+end
+
+function dp_Pa = ergunSegmentBedPressureDrop_Pa(mdotRelease_kg_s, rho_kg_m3, mu_Pa_s, bedModel, segmentIndex)
+dp_Pa = 0.0;
+if ~isfield(bedModel, 'enabled') || ~bedModel.enabled || mdotRelease_kg_s <= 0
+    return;
+end
+
+porosity = bedModel.porosity;
+eps3 = max(porosity^3, 1e-12);
+oneMinusEps = max(1.0 - porosity, 0.0);
+particleDiameter_m = max(bedModel.particleDiameter_m, 1e-12);
+flowArea_m2 = max(bedModel.tributaryArea_m2, 1e-12);
+idx = min(max(round(segmentIndex), 1), numel(bedModel.segmentPathLengths_m));
+pathLength_m = max(bedModel.segmentPathLengths_m(idx), 0.0);
+uSuperficial_m_s = max(mdotRelease_kg_s, 0.0) / ...
+    max(max(rho_kg_m3, 1e-12) * flowArea_m2, 1e-12);
+dpdx_Pa_m = ...
+    150.0 * (oneMinusEps^2) / eps3 * max(mu_Pa_s, 0.0) * uSuperficial_m_s / (particleDiameter_m^2) + ...
+    1.75 * oneMinusEps / eps3 * max(rho_kg_m3, 0.0) * uSuperficial_m_s^2 / particleDiameter_m;
+dp_Pa = dpdx_Pa_m * pathLength_m;
+end
+
+function [mdotRelease_kg_s, bedGauge_Pa] = solveSegmentReleaseWithBedBackpressure( ...
+        params, gaugePressure_Pa, rho_kg_m3, mu_Pa_s, totalHoleArea_m2, ...
+        remainingMdot_kg_s, bedModel, segmentIndex, boundaryGauge_Pa)
+mdotRelease_kg_s = 0.0;
+bedGauge_Pa = boundaryGauge_Pa;
+Cd = perforationDischargeCoefficient(params);
+
+if remainingMdot_kg_s <= 0 || Cd <= 0 || totalHoleArea_m2 <= 0 || gaugePressure_Pa <= boundaryGauge_Pa
+    return;
+end
+
+if ~(isfield(bedModel, 'enabled') && bedModel.enabled)
+    mdotRelease_kg_s = min(perforationDischargeMassFlow_kg_s( ...
+        params, gaugePressure_Pa, rho_kg_m3, totalHoleArea_m2), ...
+        remainingMdot_kg_s);
+    return;
+end
+
+    function [residual_kg_s, localBedGauge_Pa] = dischargeResidual(mdotTrial_kg_s)
+        localBedGauge_Pa = boundaryGauge_Pa + ergunSegmentBedPressureDrop_Pa( ...
+            mdotTrial_kg_s, rho_kg_m3, mu_Pa_s, bedModel, segmentIndex);
+        predicted_kg_s = Cd * max(totalHoleArea_m2, 0.0) * ...
+            sqrt(2 * max(rho_kg_m3, 0.0) * max(gaugePressure_Pa - localBedGauge_Pa, 0.0));
+        residual_kg_s = predicted_kg_s - mdotTrial_kg_s;
+    end
+
+[residualHi_kg_s, bedGaugeHi_Pa] = dischargeResidual(remainingMdot_kg_s);
+if residualHi_kg_s >= 0
+    mdotRelease_kg_s = remainingMdot_kg_s;
+    bedGauge_Pa = bedGaugeHi_Pa;
+    return;
+end
+
+lo_kg_s = 0.0;
+hi_kg_s = remainingMdot_kg_s;
+for iter = 1:24
+    mid_kg_s = 0.5 * (lo_kg_s + hi_kg_s);
+    [residualMid_kg_s, bedGaugeMid_Pa] = dischargeResidual(mid_kg_s); %#ok<NASGU>
+    if residualMid_kg_s >= 0
+        lo_kg_s = mid_kg_s;
+    else
+        hi_kg_s = mid_kg_s;
+    end
+end
+mdotRelease_kg_s = 0.5 * (lo_kg_s + hi_kg_s);
+bedGauge_Pa = boundaryGauge_Pa + ergunSegmentBedPressureDrop_Pa( ...
+    mdotRelease_kg_s, rho_kg_m3, mu_Pa_s, bedModel, segmentIndex);
+end
+
+function mdot_kg_s = perforationDischargeMassFlow_kg_s(params, gaugePressure_Pa, rho_kg_m3, totalHoleArea_m2)
+deltaP_Pa = max(gaugePressure_Pa - aerationBedSideGaugePressure(params), 0.0);
+mdot_kg_s = perforationDischargeCoefficient(params) * max(totalHoleArea_m2, 0.0) * ...
+    sqrt(2 * max(rho_kg_m3, 0.0) * deltaP_Pa);
 end
 
 function [mEvap_kg_s, qEvap_W] = evaporationLossSegment( ...
@@ -2175,6 +2484,41 @@ end
 C = interp1(epsTable, colInterp, epsClamped, 'linear');
 end
 
+function K = hooper2KFittingLossCoefficient(Re, diameter_m, K1, Kinf)
+if Re <= 1e-12 || diameter_m <= 0
+    K = 0;
+    return;
+end
+diameter_in = max(diameter_m * 39.37007874015748, 1e-12);
+% [R14] Crowl and Louvar, Eq. (4-38): Hooper 2-K fitting-loss method.
+K = K1 / Re + Kinf * (1 + 1 / diameter_in);
+end
+
+function K = hooper2KEntranceLossCoefficient(Re, K1, Kinf)
+if nargin < 2
+    K1 = 160;
+end
+if nargin < 3
+    Kinf = 0.50;
+end
+if Re <= 1e-12
+    K = 0;
+    return;
+end
+% [R14] Crowl and Louvar, Eq. (4-39): entrance/exit form of the 2-K method.
+K = K1 / Re + Kinf;
+end
+
+function multiplier = aerationLossMultiplier(params, fieldName, legacyFieldName)
+if isfield(params.aeration, fieldName)
+    multiplier = max(0, params.aeration.(fieldName));
+elseif isfield(params.aeration, legacyFieldName)
+    multiplier = max(0, params.aeration.(legacyFieldName));
+else
+    multiplier = 1.0;
+end
+end
+
 function losses = distributionNetworkLosses(params, totalFlow_Lpm, branchFlow_Lpm, T_K, downstreamID_m)
 props = airProps(T_K, params.environment.pressure_Pa);
 volFlowTotal_m3_s = totalFlow_Lpm / (1000 * 60);
@@ -2190,11 +2534,22 @@ uConnector_m_s = mdotBranch_kg_s / max(props.rho_kg_m3 * connectorArea_m2, 1e-12
 ReConnector = props.rho_kg_m3 * uConnector_m_s * connectorID_m / ...
     max(props.mu_Pa_s, 1e-12);
 fConnector = churchillFrictionFactor(ReConnector);
+headerLossMultiplier = aerationLossMultiplier(params, 'headerLossMultiplier', 'headerMinorK');
+splitterBodyLossMultiplier = aerationLossMultiplier(params, 'splitterBodyLossMultiplier', 'splitterBodyK');
+splitterBranchTeeK = hooper2KFittingLossCoefficient(ReConnector, connectorID_m, 500, 0.70);
+splitterValveK = hooper2KFittingLossCoefficient(ReConnector, connectorID_m, 300, 0.10);
 
 losses = struct();
 losses.header_Pa = 0;
 losses.headerToSplitter_Pa = 0;
-losses.splitterBody_Pa = params.aeration.splitterBodyK * ...
+losses.headerLossCoefficient = 0;
+losses.headerLossMultiplier = headerLossMultiplier;
+losses.splitterBranchTeeLossCoefficient = splitterBranchTeeK;
+losses.splitterValveLossCoefficient = splitterValveK;
+losses.splitterBodyLossCoefficient = splitterBodyLossMultiplier * ...
+    (splitterBranchTeeK + splitterValveK);
+losses.splitterBodyLossMultiplier = splitterBodyLossMultiplier;
+losses.splitterBody_Pa = losses.splitterBodyLossCoefficient * ...
     0.5 * props.rho_kg_m3 * uConnector_m_s^2;
 losses.connectorFriction_Pa = fConnector * ...
     params.aeration.branchConnectorLength_m / max(connectorID_m, 1e-12) * ...
@@ -2204,9 +2559,15 @@ losses.connectorToBranch_Pa = 0;
 if isfield(params.aeration, 'headerEnabled') && params.aeration.headerEnabled
     Aheader_m2 = pi * params.aeration.headerID_m^2 / 4;
     uHeader_m_s = volFlowTotal_m3_s / max(Aheader_m2, 1e-12);
+    ReHeader = props.rho_kg_m3 * uHeader_m_s * params.aeration.headerID_m / ...
+        max(props.mu_Pa_s, 1e-12);
 
-    % [R5] Lumped loss of the upstream header/manifold.
-    losses.header_Pa = params.aeration.headerMinorK * ...
+    % [R14] The unresolved optional upstream-header entry is represented
+    % by the normal-entrance 2-K correlation, optionally scaled by a
+    % calibration multiplier.
+    losses.headerLossCoefficient = headerLossMultiplier * ...
+        hooper2KEntranceLossCoefficient(ReHeader, 160, 0.50);
+    losses.header_Pa = losses.headerLossCoefficient * ...
         0.5 * props.rho_kg_m3 * uHeader_m_s^2;
     losses.headerToSplitter_Pa = suddenContractionLoss( ...
         mdotSplitter_kg_s, T_K, params.aeration.headerID_m, ...
