@@ -1,0 +1,9 @@
+============================================================
+HEAT TRANSFER STUDY OUTPUT INDEX
+============================================================
+This root summary points to the mode-specific output folders.
+
+Heating mode:
+  Folder                             : S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\outputs_recreated_simplified_vertical_heatingviz\heating
+  Summary                            : S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\outputs_recreated_simplified_vertical_heatingviz\heating\study_summary.txt
+

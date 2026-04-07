@@ -1,0 +1,515 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[expansion=false]{microtype}
+\usepackage{amsmath,amssymb,booktabs,longtable,array,siunitx,enumitem,hyperref,xurl}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+\setlist{nosep}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.4em}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\setlength{\tabcolsep}{4pt}
+\setlength{\emergencystretch}{2em}
+\allowdisplaybreaks
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\srcref}[1]{\nolinkurl{#1}}
+\newcommand{\filepath}[1]{\nolinkurl{#1}}
+\newcommand{\code}[1]{\nolinkurl{#1}}
+
+\title{Physics and Mathematics Reference\\Recreated Heat Transfer Study Model}
+\date{Generated 2026-04-03}
+
+\begin{document}
+\maketitle
+
+\section{Purpose and scope}
+This document describes the physics and mathematics implemented in the recreated study script
+\srcref{heat_transfer_study_recreated.py}, including:
+\begin{itemize}[leftmargin=*]
+\item legacy winter heating from the exported heater/aeration sweep;
+\item simplified winter wall-blanket heating;
+\item legacy summer spot-cooler plus assist-blower cooling;
+\item simplified summer single vertical frozen-bottle column cooling;
+\item shared pressure-drop, moisture-loss, two-node bed, radial plume, and year-round layers.
+\end{itemize}
+
+Primary implementation anchors:
+\begin{itemize}[leftmargin=*]
+\item runtime dispatch and mode selection: \srcref{heat_transfer_study_recreated.py:L9427-L9557};
+\item heating mode config: \srcref{heat_transfer_study_recreated.py:L6500-L6520};
+\item cooling mode config: \srcref{heat_transfer_study_recreated.py:L6521-L6633};
+\item optimization config and temperature-goal toggles: \srcref{heat_transfer_study_recreated.py:L2506-L2586}.
+\end{itemize}
+
+\section{Execution modes and configuration controls}
+Two run layers can be enabled independently via \code{run\_modes.heating} and \code{run\_modes.cooling}.
+The recreated profiles are:
+\begin{itemize}[leftmargin=*]
+\item legacy+ profile:
+\srcref{study_config_legacy_plus.json:L8-L399};
+\item simplified vertical/wall-blanket profile:
+\srcref{study_config_simplified_vertical.json:L8-L446}.
+\end{itemize}
+
+Mode-selecting fields:
+\begin{itemize}[leftmargin=*]
+\item \code{heating\_mode.method}:
+\code{legacy\_export\_from\_matlab} or \code{wall\_blanket\_conduction}
+(\srcref{study_config_simplified_vertical.json:L8-L23});
+\item \code{cooling\_mode.method}:
+\code{spot\_cooler\_with\_assist\_blower} or
+\code{vertical\_frozen\_bottle\_column}
+(\srcref{study_config_simplified_vertical.json:L236-L239}).
+\end{itemize}
+
+Optimization and seasonal-goal toggles:
+\begin{itemize}[leftmargin=*]
+\item \code{optimization.method} and \code{cooling\_mode.optimization.method}:
+\code{nsga2} or \code{differential\_evolution};
+\item \code{temperature\_goal\_mode}:
+\code{legacy\_extreme\_node} or \code{seasonal\_threshold};
+\item threshold targets:
+\code{winter\_minimum\_target\_C}, \code{summer\_maximum\_target\_C}.
+\end{itemize}
+Config anchors:
+\srcref{study_config_legacy_plus.json:L264-L330},
+\srcref{study_config_simplified_vertical.json:L311-L377}.
+
+\section{Thermophysical and psychrometric closures}
+Air properties (ideal-gas and Sutherland-law transport):
+\begin{align}
+\rho &= \frac{p}{R_a T}, \\
+\mu &= \mu_0\left(\frac{T}{T_0}\right)^{3/2}\frac{T_0+S}{T+S}, \\
+k &= \frac{\mu c_p}{Pr}.
+\end{align}
+Implemented in \srcref{heat_transfer_study_recreated.py:L4972-L4980}.
+
+Humidity-ratio relations:
+\begin{align}
+w &= 0.62198\,\frac{p_v}{p-p_v}, \\
+p_v &= \phi\,p_{\mathrm{sat}}(T).
+\end{align}
+Implemented in
+\srcref{heat_transfer_study_recreated.py:L5016-L5029},
+with dew-point inversion in
+\srcref{heat_transfer_study_recreated.py:L5047-L5060}.
+Water saturation pressure and latent heat use the imported IAPWS backend
+(\srcref{heat_transfer_study_recreated.py:L4983-L5014}).
+
+\section{Convection and friction correlations}
+Wire-side external forced convection uses Churchill--Bernstein:
+\begin{equation}
+Nu = 0.3 + \frac{0.62 Re^{1/2} Pr^{1/3}}{\left(1+(0.4/Pr)^{2/3}\right)^{1/4}}
+\left(1+\left(\frac{Re}{282000}\right)^{5/8}\right)^{4/5}.
+\end{equation}
+Implemented in \srcref{heat_transfer_study_recreated.py:L5150-L5157}.
+
+Tube friction factor uses Churchill's smooth-pipe form:
+\begin{equation}
+f = 8\left[\left(\frac{8}{Re}\right)^{12} + \frac{1}{(A+B)^{3/2}}\right]^{1/12},
+\end{equation}
+with laminar fallback \(f=64/Re\), implemented in
+\srcref{heat_transfer_study_recreated.py:L5159-L5166}.
+
+Internal tube Nusselt closure:
+\begin{itemize}[leftmargin=*]
+\item laminar developing flow: \(Nu = 3.66 + \frac{0.0668\,Gz}{1+0.04\,Gz^{2/3}}\),
+\(Gz=Re\,Pr\,D/L\);
+\item turbulent flow: Gnielinski-type relation using \(f\).
+\end{itemize}
+Implemented in \srcref{heat_transfer_study_recreated.py:L5168-L5177}.
+
+Natural convection for wall-loss closure:
+\begin{itemize}[leftmargin=*]
+\item vertical surfaces: Churchill--Chu style \(Nu(Ra,Pr)\);
+\item horizontal surfaces: stable/unstable orientation piecewise \(Nu(Ra)\).
+\end{itemize}
+Implemented in \srcref{heat_transfer_study_recreated.py:L5062-L5099}.
+
+\section{Overall U and wall-loss resistances}
+The cylindrical overall \(U\) on the outer-area basis combines inner convection,
+wall conduction, optional insulation conduction, and outer convection:
+\begin{equation}
+\frac{1}{U_o} =
+\frac{D_o}{D_i h_i}
+ + \frac{D_o \ln(D_w/D_i)}{2k_w}
+ + \frac{D_o \ln(D_o/D_w)}{2k_{ins}}
+ + \frac{1}{h_o}.
+\end{equation}
+Implemented in \srcref{heat_transfer_study_recreated.py:L5179-L5215}.
+
+\section{Legacy winter heating path (exported heater/aeration design points)}
+For legacy heating, each sampled design point carries electrical topology,
+heater-tube segment results, aeration-tube release, pressure loss, and bed-node
+temperatures via \code{simulate\_heating\_reference\_point}
+(\srcref{heat_transfer_study_recreated.py:L5521-L6283}).
+
+Electrical grouping uses strings of series tubes under one supply voltage.
+For one string:
+\begin{align}
+I_{\mathrm{string}} &= \frac{V}{n_s R_{\mathrm{tube}}}, \\
+P_{\mathrm{tube}} &= I_{\mathrm{string}}^2 R_{\mathrm{tube}}.
+\end{align}
+The full point aggregates all strings/tubes.
+
+Heater-tube segment energy update:
+\begin{align}
+\dot q_{\mathrm{gen},i} &= P_{\mathrm{tube}}\frac{\Delta x}{L}, \\
+\dot q_{\mathrm{loss},i} &= U_{\mathrm{loss}} P_{\mathrm{exp}}\Delta x
+\max(T_{air,i}-T_\infty,0), \\
+T_{air,i+1} &= T_{air,i} +
+\frac{\dot q_{\mathrm{gen},i}-\dot q_{\mathrm{loss},i}}
+{\dot m c_p}.
+\end{align}
+Implemented in \srcref{heat_transfer_study_recreated.py:L5248-L5347}.
+
+\section{Simplified winter wall-blanket conduction path}
+When \code{heating\_mode.method = wall\_blanket\_conduction}, electrical aeration
+heating is replaced by wall blankets under insulation
+(\srcref{heat_transfer_study_recreated.py:L5523-L5630}).
+No aeration-driven heating or nichrome heater-tube heating is used in this
+winter branch.
+
+Configured blanket hardware basis (per blanket):
+\begin{itemize}[leftmargin=*]
+\item dimensions \(0.250\times1.740\times0.0015\;\si{m}\) (10 in \(\times\) 70 in \(\times\) 1.5 mm);
+\item rated electrical power \(1200\;\si{W}\) at \(110\;\si{V}\);
+\item modeled max blanket surface temperature \(120\,^\circ\mathrm{C}\).
+\end{itemize}
+
+Blanket surface temperature is duty-ramped:
+\begin{equation}
+T_{blanket} = T_\infty + \delta\,(T_{blanket,\max}-T_\infty), \qquad 0\le\delta\le 1.
+\end{equation}
+
+Inward and outward heat fluxes:
+\begin{align}
+q''_{\mathrm{in}} &= \frac{\max(T_{blanket}-T_{bed},0)}{R_{\mathrm{in}}}, \\
+q''_{\mathrm{out}} &= \frac{\max(T_{blanket}-T_\infty,0)}{R_{\mathrm{out}}}.
+\end{align}
+
+Total powers:
+\begin{align}
+Q_{\mathrm{to\,bed}} &= N_b A_b q''_{\mathrm{in}}\,\eta_{coupling}, \\
+Q_{\mathrm{to\,amb}} &= N_b A_b q''_{\mathrm{out}}, \\
+P_{\mathrm{elec}} &= Q_{\mathrm{to\,bed}} + Q_{\mathrm{to\,amb}}, \\
+I_{\mathrm{total}} &= \frac{P_{\mathrm{elec}}}{V_{supply}}.
+\end{align}
+
+Thermal response still uses the same two-node bed network and the same wall-loss
+model as all other branches.
+
+\section{Summer inlet-conditioning models}
+\subsection{Spot-cooler plus assist-blower mode}
+For \code{spot\_cooler\_with\_assist\_blower}, requested sensible cooling is
+\begin{equation}
+Q_{\mathrm{req}} = \dot m c_p (T_{amb}-T_{target})_+.
+\end{equation}
+Actual load is capped by configured/rated sensible capacity, then
+\begin{equation}
+T_{supply} = T_{amb} - \frac{Q_{\mathrm{actual}}}{\dot m c_p}.
+\end{equation}
+Condensate is estimated from psychrometric carrying-capacity difference with an
+optional rated dehumidification cap. Implemented in
+\srcref{heat_transfer_study_recreated.py:L3512-L3598}.
+
+\subsection{Simplified vertical frozen-bottle column mode}
+For \code{vertical\_frozen\_bottle\_column}, a single central vertical tube is
+used; fan flow is downward through packed frozen bottles
+(\srcref{heat_transfer_study_recreated.py:L3601-L3699},
+\srcref{heat_transfer_study_recreated.py:L3703-L4108}).
+
+Column superficial velocity:
+\begin{equation}
+u_s = \frac{\dot V}{A_{col}}, \qquad
+A_{col} = \frac{\pi D_{col}^2}{4}.
+\end{equation}
+
+Convective coefficient and effective UA:
+\begin{align}
+h_{col} &= h_0 + C_v u_s^{0.8}, \\
+UA_{col} &= h_{col} A_{exp}
+\quad \text{(or fixed override if configured)}.
+\end{align}
+
+Unconstrained outlet from an exponential UA model:
+\begin{equation}
+T_{out,ideal} = T_{sink} + (T_{amb}-T_{sink})
+\exp\!\left(-\frac{UA_{col}}{\dot m c_p}\right).
+\end{equation}
+
+Frozen-bottle capacity cap:
+\begin{align}
+E_{ice} &= m_w\!\left[c_{p,ice}(0-T_{ice,0}) + h_{fus}
++ c_{p,liq}(T_{post}-0)\right], \\
+\dot Q_{cap} &= \frac{E_{ice}}{\tau_{replace}}, \\
+\dot Q_{actual} &= \min(\dot Q_{ideal},\dot Q_{cap}).
+\end{align}
+
+The resulting \(T_{supply}\), humidity, and condensate then feed the same
+aeration/bed solvers used by the other summer branch.
+
+\section{Aeration pressure model and closed-end perforated-tube release}
+Both heating and cooling branches use the same core release and pressure closures.
+
+Per-segment perforation release:
+\begin{equation}
+\dot m_{\mathrm{rel},i}
+= C_d A_{h,i}\sqrt{2\rho_i\,(p_{tube,i}-p_{bed,i})_+}.
+\end{equation}
+Implemented in
+\srcref{heat_transfer_study_recreated.py:L3154-L3214},
+\srcref{heat_transfer_study_recreated.py:L3366-L3436}.
+
+Segmentwise bed backpressure uses an Ergun pressure gradient:
+\begin{equation}
+\frac{d p}{d x}
+=
+150\frac{(1-\epsilon)^2}{\epsilon^3}
+\frac{\mu u_s}{d_p^2}
++
+1.75\frac{1-\epsilon}{\epsilon^3}
+\frac{\rho u_s^2}{d_p},
+\end{equation}
+with local path length to open top or vent.
+Implemented in
+\srcref{heat_transfer_study_recreated.py:L3216-L3311},
+\srcref{heat_transfer_study_recreated.py:L3334-L3364}.
+
+Closed-end pressure is solved by scalar shooting:
+\begin{align}
+\dot m_{\mathrm{rem},i+1} &= \dot m_{\mathrm{rem},i} - \dot m_{\mathrm{rel},i}, \\
+p_{i+1} &= \max(p_i-\Delta p_{fric,i},\,p_{bed,i}).
+\end{align}
+The inlet gauge pressure is bisected until terminal residual flow is below
+tolerance. Implemented in
+\srcref{heat_transfer_study_recreated.py:L3442-L3510}.
+
+\section{Distribution-network losses}
+Legacy manifold-network losses include:
+\begin{itemize}[leftmargin=*]
+\item header entry and header-to-splitter contraction;
+\item splitter body/tee/valve surrogate losses (Hooper 2-K style);
+\item branch connector friction;
+\item connector-to-branch contraction/expansion losses.
+\end{itemize}
+Implemented in
+\srcref{heat_transfer_study_recreated.py:L5787-L6323}.
+
+In simplified vertical-column summer mode, these can be bypassed via
+\code{vertical\_column.bypassDistributionNetwork = true}
+(\srcref{heat_transfer_study_recreated.py:L3801-L3817}).
+
+\section{Aeration segment energy, jet transfer, and evaporation}
+Each aeration segment contributes:
+\begin{align}
+Q_{\mathrm{to\,bed},i}
+&=
+Q_{\mathrm{wall},i}
++
+Q_{\mathrm{jet},i}
+-
+Q_{\mathrm{evap},i}, \\
+Q_{\mathrm{jet},i}
+&= \dot m_{\mathrm{rel},i} c_p (T_{\mathrm{rel},i}-T_{bed}).
+\end{align}
+
+Evaporation rate is triple-limited:
+\begin{equation}
+\dot m_{evap,i}
+=
+\min\!\left(
+\dot m_{diff,i},
+\dot m_{capacity,i},
+\dot m_{heat,i}
+\right),
+\qquad
+Q_{\mathrm{evap},i}=\dot m_{evap,i} h_{fg}.
+\end{equation}
+Implemented in
+\srcref{heat_transfer_study_recreated.py:L3160-L3200},
+\srcref{heat_transfer_study_recreated.py:L5406-L5486},
+\srcref{heat_transfer_study_recreated.py:L3892-L3999}.
+
+\section{Bin wall losses and two-node bed closure}
+The bin loss model assembles side, bottom, and top UA based on top state
+(open, covered+vent, covered) and bottom boundary mode:
+\srcref{heat_transfer_study_recreated.py:L6324-L6464}.
+
+Lumped requirement:
+\begin{equation}
+Q_{req} = UA_{tot}(T_{set}-T_{amb}).
+\end{equation}
+Implemented in \srcref{heat_transfer_study_recreated.py:L6466-L6486}.
+
+Two-node steady state:
+\begin{equation}
+\begin{bmatrix}
+UA_b + UA_{12} & -UA_{12} \\
+-UA_{12} & UA_t + UA_{12}
+\end{bmatrix}
+\begin{bmatrix}T_b\\T_t\end{bmatrix}
+=
+\begin{bmatrix}
+Q_b + UA_b T_{amb}\\
+Q_t + UA_t T_{amb}
+\end{bmatrix},
+\end{equation}
+with \(Q_b=f_b Q_{bed}\), \(Q_t=(1-f_b)Q_{bed}\).
+Implemented in \srcref{heat_transfer_study_recreated.py:L6488-L6498}.
+
+\section{Radial plume and habitat exclusion post-processing}
+The post-processing plume uses release-air cooling away from the tube with
+configurable linear plume-radius spread:
+\begin{equation}
+r_p(x)=\min\!\left(r_{max},\,r_0+\alpha x\right).
+\end{equation}
+
+Sensible and latent sink terms are applied along radius; the ``safe distance''
+is the first radius where \(T(x)\le T_{threshold}\).
+Implemented in
+\srcref{heat_transfer_study_recreated.py:L1365-L1708}.
+
+Tube-layout and exclusion-area mapping is then computed on a 2-D cross-section
+grid using either explicit centers, custom single row, or rule-based patterns:
+\srcref{heat_transfer_study_recreated.py:L1709-L2050}.
+
+\section{Constraint residuals and objective metrics}
+\subsection{Heating metrics}
+Heating residuals include current, wire temperature, outlet-air temperature,
+pressure drop, moisture loss, hole velocity, bottom/top min and max limits,
+spread limit, and heat shortfall:
+\begin{equation}
+r_k(x)=\max(0,g_k(x)).
+\end{equation}
+Implemented in \srcref{heat_transfer_study_recreated.py:L2610-L2724}.
+
+Legacy heating objective family:
+\begin{itemize}[leftmargin=*]
+\item \code{power\_W};
+\item \code{minus\_min\_bed\_temp\_C};
+\item \code{temp\_spread\_C}.
+\end{itemize}
+
+Threshold heating objective family:
+\begin{itemize}[leftmargin=*]
+\item \code{winter\_threshold\_shortfall\_C};
+\item \code{power\_W};
+\item \code{temp\_spread\_C}.
+\end{itemize}
+
+\subsection{Cooling metrics}
+Cooling residuals include assist-blower margin, pressure drop, moisture loss,
+hole velocity, temperature bounds/spread, and nonpositive cooling delivery.
+Implemented in \srcref{heat_transfer_study_recreated.py:L4112-L4225}.
+
+Legacy cooling objective family:
+\begin{itemize}[leftmargin=*]
+\item \code{max\_bed\_temp\_C};
+\item \code{mean\_bed\_temp\_C};
+\item \code{combined\_cooling\_power\_W}.
+\end{itemize}
+
+Threshold cooling objective family:
+\begin{itemize}[leftmargin=*]
+\item \code{summer\_threshold\_excess\_C};
+\item \code{combined\_cooling\_power\_W};
+\item \code{totalFlow\_Lpm}.
+\end{itemize}
+
+\section{Optimization methods}
+\subsection{NSGA-II mode}
+When \code{method = nsga2}, constrained NSGA-II is applied directly on the
+candidate design-point set:
+\srcref{heat_transfer_study_recreated.py:L2889-L2919},
+\srcref{heat_transfer_study_recreated.py:L4317-L4347}.
+
+\subsection{Differential-evolution mode}
+When \code{method = differential\_evolution}, the solver runs multiple weighted
+scalarizations and then keeps the feasible non-dominated set.
+
+For one weight vector \(w_j\):
+\begin{equation}
+J_j(x)
+=
+\sum_i w_{j,i}\,
+\frac{f_i(x)-f_{i,\min}}{\Delta f_i}
+\;+\;
+\lambda \sum_k r_k(x),
+\end{equation}
+where \(r_k(x)\) are nonnegative constraint residuals.
+
+Heating DE implementation:
+\srcref{heat_transfer_study_recreated.py:L2921-L3001}.
+Cooling DE implementation:
+\srcref{heat_transfer_study_recreated.py:L4349-L4424}.
+
+\section{Seasonal threshold objective mode}
+With \code{temperature\_goal\_mode = seasonal\_threshold}:
+\begin{itemize}[leftmargin=*]
+\item winter heating objective/priority includes
+\code{winter\_threshold\_shortfall\_C} relative to
+\code{winter\_minimum\_target\_C};
+\item summer cooling objective/priority includes
+\code{summer\_threshold\_excess\_C} relative to
+\code{summer\_maximum\_target\_C}.
+\end{itemize}
+Implementation anchors:
+\srcref{heat_transfer_study_recreated.py:L2556-L2586},
+\srcref{heat_transfer_study_recreated.py:L2633-L2645},
+\srcref{heat_transfer_study_recreated.py:L4138-L4151}.
+
+\section{Year-round layer}
+The annual model builds a representative climate year via periodic Gaussian-kernel
+regression from monthly means/standard deviations, then applies freeze-day and
+heat-wave overrides:
+\srcref{heat_transfer_study_recreated.py:L6910-L7023}.
+
+Daily simulation:
+\begin{enumerate}[leftmargin=*]
+\item compute daily required heating/cooling from the same lumped UA model;
+\item re-simulate selected heating or cooling reference point at that day's ambient;
+\item apply duty, unmet-load accounting, electricity use, and water use.
+\end{enumerate}
+Implemented in
+\srcref{heat_transfer_study_recreated.py:L7025-L7133} and
+\srcref{heat_transfer_study_recreated.py:L7134-L7265}.
+
+\section{Symbol glossary}
+\begin{longtable}{L{0.22\textwidth}L{0.57\textwidth}L{0.17\textwidth}}
+\toprule
+Symbol & Meaning & Units \\
+\midrule
+\endfirsthead
+\toprule
+Symbol & Meaning & Units \\
+\midrule
+\endhead
+\(Q_{bed}\) & Net heat delivered to bed (positive heating, negative cooling) & W \\
+\(Q_{req}\) & Lumped required load at setpoint and ambient & W \\
+\(UA\) & Overall heat-loss conductance & W/K \\
+\(T_b, T_t\) & Bottom and top bed-node temperatures & \(^{\circ}\)C \\
+\(\dot m_{\mathrm{rel},i}\) & Segment release mass flow from perforations & kg/s \\
+\(\Delta p\) & Pressure drop / required static pressure & Pa \\
+\(\epsilon\) & Bed porosity in Ergun closure & -- \\
+\(d_p\) & Representative bed particle diameter & m \\
+\(h_{fg}\) & Latent heat of vaporization & J/kg \\
+\(\dot m_{evap}\) & Evaporation mass flow & kg/s \\
+\(u_s\) & Superficial velocity (context-dependent) & m/s \\
+\(\delta\) & Wall-blanket duty fraction & -- \\
+\bottomrule
+\end{longtable}
+
+\section{Implementation files}
+\begin{itemize}[leftmargin=*]
+\item model script:
+\filepath{S:\textbackslash AcademicResources\textbackslash UCONN\textbackslash 10. Spring 2026\textbackslash CHEG 4143W\textbackslash Project\textbackslash VermiHeating\textbackslash Heat Transfer Study\textbackslash Reduced\textbackslash heat\_transfer\_study\_recreated.py}
+\item legacy-plus config:
+\filepath{S:\textbackslash AcademicResources\textbackslash UCONN\textbackslash 10. Spring 2026\textbackslash CHEG 4143W\textbackslash Project\textbackslash VermiHeating\textbackslash Heat Transfer Study\textbackslash Reduced\textbackslash study\_config\_legacy\_plus.json}
+\item simplified config:
+\filepath{S:\textbackslash AcademicResources\textbackslash UCONN\textbackslash 10. Spring 2026\textbackslash CHEG 4143W\textbackslash Project\textbackslash VermiHeating\textbackslash Heat Transfer Study\textbackslash Reduced\textbackslash study\_config\_simplified\_vertical.json}
+\end{itemize}
+
+\end{document}

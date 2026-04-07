@@ -1,0 +1,837 @@
+
+
+===== PAGE 1 =====
+E. M. Sparrow 
+Fellow ASME 
+S. W. Celere 
+L. F. A. Azevedo 
+Department of Mechanical Engineering, 
+University of Minnesota, 
+Minneapolis, MN 55455 
+Evaporation at a Liquid Surface 
+Due to Jet Impingement 
+Experiments were performed to determine mass transfer coefficients for evapora­
+tion from a water surf ace on which an air jet impinged. During the course of the ex­
+periments, parametric variations were made of the jet velocity and diameter, the 
+separation distance between the jet origin and the water surface, the diameter of the 
+water surface, and the degree of insulation of the water containment pan. It was 
+found that for all of the investigated operating conditions, the dimensionless mass 
+transfer coefficient varied with the 0.8 power of the jet Reynolds number. Further­
+more, the transfer coefficient decreased linearly as the separation distance between 
+the jet origin and the water surface increased, with the most significant decreases oc­
+curring at relatively small values of the surface-to-jet diameter ratio. At larger 
+diameter ratios, the transfer coefficient was relatively insensitive to the separation. 
+In general, the larger the diameter of the water surface, the lower the transfer coeffi­
+cient. Comparisons with the literature showed that the dimensionless mass transfer 
+coefficients for impingement on a liquid surf ace are lower than those for impinge­
+ment on a solid surface. 
+Introduction 
+Jet impingement provides heat transfer coefficients that are 
+among the highest available in any forced convection flow. 
+This characteristic has motivated experimental study of a 
+variety of jet/impingement-surface configurations, involving 
+both heat transfer and mass transfer. The mass transfer work 
+was limited to jet impingement on solid surfaces, and the 
+resulting mass transfer coefficients were transformed to heat 
+transfer coefficients by employing the well-established 
+analogy between the two transport processes. A survey of the 
+available heat and mass transfer literature on jet impingement 
+has been provided by Martin [1]. 
+The present work is concerned with evaporation mass 
+transfer which occurs due to jet impingement on a liquid sur­
+face. The capability of the liquid surface to deform and to 
+move in response to both the impinging jet and the ensuing 
+wall jet gives rise to a pattern of fluid flow which differs from 
+that existing adjacent to a solid surface. The response of the 
+mass transfer coefficient to such an altered flow pattern will 
+be investigated here by experiment. 
+The physical situation to be studied is the normal impinge­
+ment of an air jet on a water surface. The jet is of circular 
+cross section and impinges at the center of the water surface, 
+which is also of circular planform. Measurement of the rate of 
+evaporation and evaluation of the density of the water vapor 
+at the liquid surface and in the jet from temperature and 
+pressure measurements enabled the mass transfer coefficient 
+and the Sherwood number to be determined. 
+The experiments encompassed systematic variations of four 
+relevant physical parameters. These included the jet velocity, 
+the diameters Dj and Dw of the jet and the water surface, and 
+the separation distance S between the origin of the jet and the 
+surface. In dimensionless terms, the parameters can be 
+represented by the jet-origin Reynolds number Re and the 
+dimension ratios Dw/Dj and S/Dj. The Dw/Dj ratio extended 
+from 7.7 to 23.5 in six steps, with one of the D„/Dj values be­
+ing attained using two different combinations of Dw and Dj. 
+This duplication was employed with a view to verifying the 
+universality of D„/Dj as a correlating parameter. The S/Dj 
+ratio ranged from 5 to 15 in three steps. For each Dw/Dj, S/Dj 
+combination, the jet Reynolds number covered the range from 
+about 3800 to 15,000. The presentation of results will be struc-
+Contributed by the Heat Transfer Division for publication in the JOURNAL OF 
+HEAT TRANSFER. Manuscript received by the Heat Transfer Division July 5, 
+1985. 
+tured so as to highlight the effect of each of the dimensionless 
+parameters on the Sherwood number. 
+The densities of the water vapor at the liquid surface and in 
+the jet were constant during a given data run but varied ap­
+preciably during the duration of the experimental work. Such 
+variations were useful in that they provided the opportunity to 
+demonstrate that the mass transfer coefficients were universal, 
+i.e., independent of the densities of the water vapor. To vary 
+the vapor density at the liquid surface, different degrees of in­
+sulation of the water containment pan were used. The 
+response of the Sherwood number to the thus-achieved 
+changes in vapor density will be highlighted. Density changes 
+also occurred in response to climatic changes, i.e., changes in 
+the relative humidity of the air. 
+Experimental Apparatus and Procedure 
+Apparatus. To achieve the well-defined thermal, vapor 
+concentration, and hydrodynamic conditions necessary for the 
+attainment of accurate and reproducible data, the experiments 
+were performed in an environment chamber and in the suction 
+mode. In this mode of operation, air from the temperature-
+controlled laboratory room was drawn into and through the 
+chamber by a downstream-positioned blower, the discharge of 
+which was vented outside the building. This arrangement 
+avoided the uncontrolled compression-related preheating of 
+the air and the hydrodynamic disturbances which would have 
+occurred had the system been operated in the blowing mode, 
+i.e., with an upstream-positioned blower. 
+The description of the experimental apparatus is facilitated 
+by reference to Fig. 1. The environment chamber was a large, 
+rectangular, metal-walled enclosure, completely airtight ex­
+cept for a vertically oriented jet delivery tube that pierced its 
+upper wall and an air exit port that was centered in its lower 
+wall. The chamber was 1.52 m in height, with a square 
+horizontal cross section of dimensions 0.61 x 0.61 m. Only the 
+upper portion of the chamber is depicted in Fig. 1. 
+The water to be evaporated was contained in a specially 
+fabricated, straight-sided circular pan supported from below 
+by a cylindrical column. Two such pans were employed during 
+the course of the experiments, with respective water-surface 
+diameters Dw of 16.34 and 22.30 cm (surface area ratio = 1.84) 
+and a sidewall height of 2.54 cm. The pans were fabricated 
+from 0.0635-cm-thick galvanized steel. Distilled water was 
+used in all of the experiments. 
+The actual support of the pan was accomplished by three 
+Journal of Heat Transfer MAY 1986, Vol. 108/411 
+Copyright © 1986 by ASME
+  
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/pdfaccess.ashx?url=/data/journals/jhtrao/27485/ on 03/08/2017 Terms of Use: http://www.asme.org/about-asme/terms-of-use
+
+===== PAGE 2 =====
+PLENUM 
+Fig. 1 Main features of the experimental apparatus 
+sharp-tipped Teflon screws threaded into a plexiglass flange at 
+the top of the support column. Adjustment of the screws 
+facilitated the leveling of the pan. The support column was a 
+thin-walled 10.16-cm-dia pvc tube. Note that all the com­
+ponents of the support system were made of low-conductivity 
+materials which, coupled with the point contact between the 
+screw tips and the bottom of the pan, served to minimize ex­
+traneous heat conduction. 
+In a supplementary set of experiments, the water contain­
+ment pan was enveloped at the sides and from below by an in­
+sulating cassette as pictured schematically in the inset at the 
+lower right in Fig. 1. The presence of the insulation gave rise 
+to lower temperatures of the evaporating water surface and to 
+lower vapor pressures at the surface. The cassette was 
+fabricated from closed-pore polystyrene insulation 
+(Styrofoam) and covered with plasticized contact paper. Its 
+outboard, upfacing surfaces were beveled downward at 45 deg 
+in order to avoid altering the pattern of fluid flow adjacent to 
+the water surface. Support of the cassette-enveloped pan was 
+by the sharp-tipped Teflon screws as before. 
+The jet which impinged on the water surface originated at 
+the exit cross section of a circular tube (i.e., the jet delivery 
+tube). As seen in the figure, the delivery tube was supported 
+and positioned by a sleevelike guide which rested in a lap in the 
+upper wall of the environment chamber. The tube could be 
+moved vertically within the guide, so that its exit could be 
+positioned at any desired distance S from the water surface. At 
+the lower end of the tube, the outer wall was beveled back 
+from the exit cross section at 45 deg to minimize possible ef­
+fects of the finite wall thickness. 
+Three jet delivery tubes were used throughout the course of 
+the experiments, with respective internal diameters Dj equal to 
+0.950, 1.572, and 2.129 cm. A different custom-fitted guide 
+was used with each tube. The lengths of the tubes were selected 
+to ensure the attainment of hydrodynamically developed flow 
+at the exit, and the respective length-diameter ratios of the 
+tubes were 80, 60, and 50. The motivation for the attainment 
+of developed flow is that such flows are characterized by well-
+defined and reproducible velocity distributions and turbulence 
+levels. 
+The portion of the jet delivery tube which protruded above 
+the upper wall of the environment chamber was enclosed in a 
+cylindrical plenum chamber. The wall of the plenum was 
+pierced near its lower end by an array of holes, and it was 
+through these holes that air was drawn into the system. This 
+plenum arrangement was adopted to ensure the accurate 
+measurement of the initial state of the airflow by a 
+psychrometric unit situated atop the upper wall of the environ­
+ment chamber. 
+In the lower portion of the environment chamber (not 
+shown in Fig. 1) was situated a balance for mass measurement 
+and a platform. Immediately preceding and immediately 
+following each data run, when measurements were made of 
+the mass of the pan and its contents, the lower end of the sup­
+port column rested on the weighing surface of the balance. 
+During the data run proper and at all other times, the column 
+rested on the platform. In the transfer of the support function 
+from the balance to the platform, both the column and the 
+balance remained stationary while the platform was slid under 
+the flanged lower end of the column. The balance and the plat­
+form were positioned so as to avoid blocking the air exit port 
+situated at the center of the lower wall of the environment 
+chamber. 
+The environment chamber was equipped with two leakproof 
+access windows. One of these was situated in the upper por­
+tion of the chamber and was used for filling and emptying the 
+water pan and for positioning the pan and the jet delivery 
+tube. The second window, situated in the lower part of the 
+chamber, was used to facilitate the mass measurement opera­
+tions and in transferring the support function from the plat­
+form to the balance and vice versa. 
+The upstream plenum, the jet delivery tube, and the en­
+vironment chamber were part of an open-loop flow circuit. 
+The air exiting the environment chamber was ducted through a 
+flowmeter (a calibrated orifice plate) and a control valve to the 
+blower, which was situated in a service corridor outside the 
+laboratory. 
+Instrumentation. The humidity of the air entering the en­
+vironment chamber was measured by a specially designed 
+psychrometric unit. It consisted of a 76-cm length of 7.6-cm-
+dia plexiglass tube equipped at its downstream end with a fan 
+which operated in the suction mode. The fan and the tube 
+Nomenclature 
+A = area of water 
+surface = -KD2JA 
+diameter of jet at origin 
+(i.d. of delivery tube) 
+diameter of water surface 
+mass diffusion coefficient 
+enthalpy per unit mass 
+average mass transfer coef­
+ficient, equation (1) 
+AM = change of mass 
+Dj 
+Dw 
+h 
+K 
+P 
+Re 
+Sc 
+Sh 
+Tab 
+rate of mass flow in jet 
+delivery tube 
+pressure 
+jet-origin Reynolds 
+number = 4/hj/fiirDj 
+separation distance between 
+jet origin and water surface 
+Schmidt number 
+Sherwood number = KDW/S) 
+dry-bulb temperature 
+TWb T 
+1 wtr 
+w 
+v 
+P 
+PwvJ 
+P' wv,s 
+wet-bulb temperature 
+water temperature 
+specific humidity 
+viscosity 
+kinematic viscosity 
+density 
+water vapor density in jet 
+water vapor density at liq­
+uid surface 
+duration of data run 
+412/Vol. 108, MAY 1986 Transactions of the ASME 
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/pdfaccess.ashx?url=/data/journals/jhtrao/27485/ on 03/08/2017 Terms of Use: http://www.asme.org/about-asme/terms-of-use
+
+===== PAGE 3 =====
+cross-sectional area were chosen to yield an airflow velocity 
+which provides near equality of the psychrometric wet-bulb 
+temperature and the thermodynamic wet-bulb temperature. 
+Wet- and dry-bulb thermometers, which could be read to 
+0.1 °F or better, were inserted radially into the tube through 
+cork apertures in the cylindrical wall. The thermometer bulbs 
+were positioned at the tube centerline, with the dry-bulb ther­
+mometer upstream of the wet-bulb thermometer (the separa­
+tion distance was 30 thermometer diameters). Radiation 
+shielding was provided by aluminum foil which completely 
+covered the outside wall of the plexiglass tube. 
+The air temperature in the environment chamber was sensed 
+by a thermocouple situated at a distance of ViS above the 
+water surface and displaced to the side of the jet by a distance 
+of 'ADW from the jet centerline. The thermocouple reading 
+was virtually indistinguishable from that of the dry-bulb ther­
+mometer of the psychrometric unit. 
+Four thermocouples were used to measure the temperature 
+of the evaporating water. One of these was situated at the 
+centerline, and a second was positioned adjacent to the outer 
+rim (about 0.3-0.4 cm from the rim). The other two ther­
+mocouples were installed so as to give a uniform radial spacing 
+for the four thermocouples. Owing to the presence of surface 
+motions which occurred for certain operating conditions, the 
+thermocouple junctions were located about 0.6 cm below the 
+nominal surface plane of the water. That placement ensured 
+that the junctions were not exposed to the airflow. All ther­
+mocouples were made from precalibrated, Teflon-coated, 
+30-gage chromel and constantan wire. 
+Mass measurements were made with an Ohaus triple-beam 
+balance having a capacity of 2610 g and which could be read to 
+0.05 g. The mass evaporated during a data run typically fell in 
+the range of 20-50 g. 
+The pressure in the environment chamber was read relative 
+to ambient by a Baratron solid-state, capacitance-type 
+pressure meter having a resolution of 10~3 Torr. The same 
+meter was used for the pressure measurements relevant to the 
+orifice flowmeter. A barometer situated adjacent to the en­
+vironment chamber provided the ambient pressure. 
+Procedure. It is well established that the temperature of an 
+evaporating water surface is lower than that of the ambient air 
+into which the evaporation takes place. Furthermore, if the 
+water is initially at ambient temperature, a waiting period 
+must be allowed for the water temperature to decrease to its 
+equilibrium value for steady-state evaporation. In the pres­
+ent experiments, it was determined from preliminary data runs 
+that equilibration periods of 1 and 1 Vi hours, respectively, for 
+the smaller and larger pans, were more than sufficient to yield 
+steady-state evaporation. Prior to the initiation of the 
+equilibration period, the pan was overfilled to compensate for 
+the expected loss of mass due to evaporation. During the 
+period, the jet velocity and separation distance were those of 
+the upcoming data run. 
+At the conclusion of the equilibration period, the pan re­
+mained slightly overfilled (an elevation of the surface of 
+0.05-0.1 cm at the center). This degree of overfilling ensured 
+that the water level did not drop perceptibly below the upper 
+edge of the pan sidewall during the ensuing data run. The ter­
+mination of the equilibration period was immediately fol­
+lowed by the measurement of the mass of the pan and its con­
+tents, after which the data run proper was initiated. 
+During the run, the four thermocouples situated in the pan 
+were read periodically - a total of twenty times. The wet- and 
+dry-bulb thermometers, the environment chamber thermocou­
+ple, and the pressures were read four times at equal intervals. 
+The duration of the run was chosen to yield evaporation-
+induced changes of mass in the 20 and 40 g ranges, respective­
+ly, for the smaller and larger pans. The mass was measured 
+immediately after the termination of the run. 
+Data Reduction 
+The mass transfer coefficient K for the evaporation process 
+was evaluated from the definition 
+K={UV[/TA)/(PWUIS-PWUJ) (1) 
+In this equation, AM is the measured change of mass which 
+occurred during a time interval r, whiles is the area of the cir­
+cular planform of the water surface (i.e., A = %D2JA). The 
+denominator is the difference between the densities of the 
+water vapor at the water surface and in the jet, p,TOS and pwvj, 
+respectively. Note that for the conditions of the experiments, 
+(2) 
+where pwv]00 is the vapor density in the ambient within the en­
+vironment chamber. From the standpoint of practice, p,v„i00 is 
+the most convenient representation of pwuj, since it is well 
+defined and can be readily determined. 
+For the evaluation of p„iS, it was assumed that phase 
+equilibrium prevailed at the liquid-vapor interface (i.e., at the 
+surface of the liquid), so that the vapor was saturated vapor 
+corresponding to the water temperature Twlr. The value of 
+Twlr was obtained by averaging the thermocouple readings 
+both radially and temporally. Owing to the virtual uniformity 
+of the radial temperature distribution, it was not necessary to 
+weight the individual thermocouple readings. Then, in terms 
+of standard notation (g = saturated vapor) 
+Pm,s=Pg(Twtr) (3) 
+The evaluation of pwvj begins with the determination of the 
+specific humidity W of the air entering the upstream plenum 
+from the laboratory. From any standard thermodynamics 
+text, 
+W= [Wwbhfg(Twb) + cpa{Twb-Tdb)]/[hg(Tdb)~hf(Twb)] (4) 
+Here, hf and hg denote the enthalpies of saturated liquid and 
+saturated vapor, and hjg is the latent heat, each evaluated at 
+the indicated temperature, where Tdb and T„b respectively 
+denote the dry-bulb and wet-bulb temperatures measured by 
+the psychrometric unit. In addition, cpa is the specific heat of 
+dry air (taken as 1.006 kJ/kg-°C) and Wwb is the specific 
+humidity corresponding to the wet-bulb saturation condition, 
+i.e., 
+Wwb = 0.622Aat(7^ )/[pbar -Psal(Twb)} (5) 
+in which pbar and psat are, respectively, the barometric 
+pressure in the laboratory and the saturation pressure of water 
+vapor. 
+In the impinging jet, the specific humidity is equal to the 
+value obtained from equation (4), but the pressure is no longer 
+equal topbar. If Ap is the pressure drop between the laboratory 
+and the environment chamber, the pressure in the jet can be 
+expressed as pj = (pbar - Ap). Then, in the jet, 
+W=0.622pWVJ/(pj-pWVJ) (6) 
+or 
+PmJ =Wp/(0.622+W) (7) 
+from which the numerical value of pwvj follows directly. 
+Finally, from the definition of the relative humidity </> 
+<t> =Pmj/psATj) = Pwvj/Pg (Tj) (8) 
+where the temperature 7} is the measured temperature in the 
+environment chamber, which was virtually identical to the 
+dry-bulb temperature at the psychrometric unit. Equation (8) 
+can be solved for the numerical value of pwvj, which is then in­
+troduced into equation (1), thereby completing its evaluation. 
+All of the thermodynamic properties needed in the forego­
+ing calculations were taken from the ASHRAE Handbook [2], 
+The mass transfer coefficients determined from equation (1) 
+were recast in dimensionless form in terms of the Sherwood 
+number 
+Journal of Heat Transfer MAY 1986, Vol. 108/413 
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/pdfaccess.ashx?url=/data/journals/jhtrao/27485/ on 03/08/2017 Terms of Use: http://www.asme.org/about-asme/terms-of-use
+
+===== PAGE 4 =====
+0.18 
+0.16 
+GO 
+d 
+cc 0.14-
+0.12-
+0.10 
+S/Di 
+-O ^—O O—jj—Cr 
+10 
+-O-
+15 
+-A A-—A—A £-
+J I I I i I i I I 
+4 6 8 10 20 
+RexlO"3 
+Fig. 2 Sherwood number results for Dw7Dy = 7.68 
+0.18 
+0.16-
+ce 
+0.14 
+0.12 
+0.10 
+S/D, 5 10 
+E ZZ 
+15 
+J i 1—i—i. i i 
+6 8 10 
+Re x 10"3 
+20 
+Fig. 5 Sherwood number results for Dw/Dj = 17.20 
+0.I8 
+0.I6 
+o <u 
+? 0.I4 
+O.I 2 
+0.I0 
+S/Di = 
+15 
+laAp. __'' sstjgjflp^ /^fo- —4jfr^ f. 
+Dw/Dj = 
+10.39 
+I L 
+10.47 
+J i I I i 
+8 10 
+J I 
+20 
+Re x I0"3 
+Fig. 3 Sherwood number results for Dw/Dj = 10.4 
+0.I8 
+0.I6 
+o 
+(V 
+en 
+0.I4 
+0.I2 S/Dj = 5 I0 15 
+0 IQI 1 1 1—l—L...i I 1 1 
+UJU 4 6 8 10 20 
+Re x I0~3 
+Fig. 6 Sherwood number results for D„IDj = 23.47 
+00 
+d 
+O.I8r 
+0.I6-
+0.I4 
+0.I2 
+0.I0 
+-
+-
+-
+S/D 
+U 
+u 
+A 
+i 
+_./ o 
+-a—D-
+A 
+I I I 
+—o~ 
+-DZ 
+A 
+15 
+1 1 
+10 
+i -a—D. 
+A 
+A 
+i 
+n 
+A 
+i i 
+6 8 10 
+Re x I0"3 
+20 
+Fig. 4 Sherwood number results for Dw/Dj = 14.18 
+o 
+cc 
+u.ia 
+0.I6 
+0.I4 
+0.I2 
+S/D 
+--»-
+-«-
+-
+i 
+" 
+-*-
+i 
+5 
+--®--®---®-a 
+10 
+~m • 
+I5 
+i i i i i i i 
+4 6 8 10 20 
+Re x I0"3 
+Fig. 7 Sherwood number results for the insulated water containment 
+pan, Dw/Dj = 10.47 
+Sh = KDW/S> (9) 
+By introducing the Schmidt number Sc = p/33, the mass diffu­
+sion coefficient 2D can be eliminated from equation (9), so that 
+Sh = (KDvl/v)Sc (10) 
+For the air/water vapor system, Sc = 0.6 (Table 10.1 of [3] and 
+Table 7 of [4]). 
+The kinematic viscosity v (= jx/p) appearing in equation (10) 
+was evaluated at jet conditions. The viscosity /x of mixtures of 
+air and water vapor is not known to high precision, but for the 
+jet temperatures and vapor concentrations of the present ex­
+periments, it did not differ by more than 0.2 percent from that 
+for dry air [4]. In view of this, dry-air viscosities were used. 
+The density of the air/water vapor mixture comprising the jet 
+is given by 
+Pj=PwvJ+PaJ (!1) 
+where pwvj is known from equation (8) and paJ is determined 
+by using the perfect gas law with 7} andpaJ (=pj-pwvj) as 
+inputs. 
+414/Vol. 108, MAY 1986 Transactions of the ASME 
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/pdfaccess.ashx?url=/data/journals/jhtrao/27485/ on 03/08/2017 Terms of Use: http://www.asme.org/about-asme/terms-of-use
+
+===== PAGE 5 =====
+The Sherwood number results were parameterized by the 
+Reynolds number Re at the jet origin (i.e., at the exit of the jet 
+delivery tube) 
+Re = 4mj/nirDj (12) 
+in which ihj is the rate of mass flow through the delivery tube. 
+The value of rhj was obtained from the measured flow rate at 
+the orifice meter by subtracting the rate of evaporation at the 
+water surface. 
+Results and Discussion 
+An analysis of the data indicated that for a given geometric 
+configuration characterized by fixed values of D„/Dj and 
+S/Dj, the Sherwood number varied with the 0.8 power of the 
+Reynolds number. This suggests a generalized presentation of 
+results in terms of Sh/Re0-8 rather than a presentation of Sh 
+itself. 
+The Sh/Re08 data for all of the investigated operating con­
+ditions are plotted in Figs. 2-7. Each figure pertains to a 
+specific value of the diameter ratio Dw/Dj of the water surface 
+and the jet, starting with Dw/Dj = 7.68 in Fig. 2 and increasing 
+from figure to figure to Dw/Dj = 23.47 in Fig. 6. Among the 
+six values of D„/Dj that were employed to parameterize the 
+experiments, two were nearly identical, namely, 10.39 and 
+10.47. The results for both these cases are presented in Fig. 3 
+to facilitate their direct comparison. In addition, results from 
+supplementary experiments in which the water containment 
+pan was insulated are presented in Fig. 7. 
+In each of Figs. 2-7, the Sh/Re0-8 ratio is plotted as a func­
+tion of the Reynolds number Re for three parametric values of 
+the dimensionless separation distance S/Dj between the jet 
+origin and the water surface, namely, S/Dj = 5, 10, and 15. 
+The horizontal lines that pass through the data for each S/Dj 
+are least-squares fits. To facilitate figure-to-figure com­
+parisons, the ordinate scales for all of the figures were made 
+identical. 
+An overall inspection of Figs. 2-7 indicates that the devia­
+tions of the data from the Sh ~ Re0-8 correlation do not exceed 
+about two percent, and there is no evidence of systematic 
+deviations with either Dw/Dj or S/Dj. The 0.8 power strongly 
+suggests that the airflow passing over the water surface is tur­
+bulent, and the early onset of turbulence is believed due to the 
+presence of roughnesslike disturbances and waves on the sur­
+face. This matter will be elaborated later when comparisons 
+are made with the literature on jet impingement on solid 
+surfaces. 
+In general, for fixed values of the water surface diameter 
+and the jet diameter (i.e., fixed Dw/Dj), the mass transfer 
+coefficient decreases as the separation between the jet origin 
+and the water surface increases. From a comparison of the 
+successive figures, it is seen that the sensitivity of the transfer 
+coefficient to the separation distance is markedly affected by 
+the Dw/Dj ratio. Over all, there is a trend for the coefficient to 
+become less and less dependent on the separation distance as 
+Dw/Dj increases. This is especially strongly manifested for the 
+three largest investigated Dw/Dj (14.18, 17.20, and 23.47). In 
+particular, at DJDj = 23.47, the effect of S/Dj is only 2-3 
+percent throughout its entire range. This insensitivity is 
+physically plausible since the details of the impingement which 
+are affected by the separation distance (i.e., impingement 
+velocity and size of impingement zone) are relatively unimpor­
+tant when the impingement zone is very much smaller than the 
+overall area of the surface. 
+Further comparisons of the successive figures reveal an in­
+itial increase of Sh/Re0-8 with D„/Dj (compare Figs. 2 and 3), 
+followed by a marked decrease at still larger values of Dw/Dj. 
+In rationalizing these results, it is convenient to think in terms 
+of a fixed jet diameter and, thereby, to associate increases in 
+Dw/Dj with increases in the diameter of the water surface. 
+Thus, the wall jet which is spawned by the impinging jet 
+traverses a longer radial distance along the water surface as 
+Dw/Dj increases, with related increases in the thicknesses of 
+the velocity and vapor-concentration boundary layers. These 
+thicker boundary layers give rise to lower mass transfer coeffi­
+cients for larger Dw/Dj. The Sherwood number, however, 
+contains the product of the mass transfer coefficient and the 
+diameter of the water surface, which vary oppositely with 
+Dw/Dj. At smaller Dw/Dj, the two opposing factors are com­
+petitive, leading to the initial increase of the Sherwood 
+number, while at larger Dw/Dj, the decrease of the mass 
+transfer coefficient dominates. 
+Attention will now be turned to Fig. 3 and to the com­
+parison of results for two cases having virtually identical 
+values of the Dw/Dj ratio but for which the individual values 
+of Dw and of Dj differed. These cases were investigated with a 
+view to exploring the universality of Dw/Dj as a correlation 
+parameter. The data corresponding to Dw/Dj= 16.34/ 
+1.572=10.39 are represented by the half-black symbols and 
+the dashed least-squares lines, while those for 
+Dw/Dj = 22.30/2.129= 10.47 are represented by the open sym­
+bols and the solid least-squares lines. 
+As seen in the figure, the data for the two cases are nearly 
+coincident. In fact, the maximum deviation of the corre­
+sponding least-squares correlating lines is 0.6 percent. This ex­
+cellent agreement provides strong testimony in support of the 
+universality of Dw/Dj as a correlation parameter. 
+As noted earlier, auxiliary experiments were undertaken to 
+demonstrate that the Sherwood number results are indepen­
+dent of the densities of the water vapor. To supplement the 
+naturally occurring changes in vapor density which accom­
+panied climatic changes (i.e., changes in the relative humidity 
+of the ambient air), more controlled changes of the vapor den­
+sity at the liquid surface were achieved by the use of the in­
+sulating cassette described earlier. The presence of the insula­
+tion brought about a decrease in the water temperature which, 
+in turn, decreased the vapor pressure and vapor density at the 
+surface. For instance, for one set of operating conditions, the 
+values of (Tw{r-T„b)/(Tdb-T„b) were 0.321 and 0.243, 
+respectively, without and with the insulation. The corre­
+sponding values for another case were 0.208 and 0.134. 
+The Sherwood number data obtained with the insulating 
+cassette in place are represented by the black data symbols in 
+Fig. 7 and by the pair of black data points in Fig. 6. In Fig. 7, 
+the dashed lines are the least-squares lines corresponding to 
+the uninsulated containment pan, i.e., the same dashed lines 
+that are plotted in Fig. 3. Both Figs. 7 and 6 display excellent 
+agreement between the Sherwood numbers for the uninsulated 
+and insulated pans. Since the two sets of results correspond to 
+different vapor densities at the liquid surface, it may be con­
+cluded that the Sherwood numbers are universal with respect 
+to this parameter. Furthermore, from the fact that the Sher­
+wood numbers were also independent of the vapor densities in 
+the jet, it follows that they are universal with respect to both 
+the vapor densities at the surface and in the jet. 
+Consideration will now be given to quantifying the varia­
+tions of Sh/Re0-8 with Dw/Dj and S/Dj. These variations have 
+been discussed qualitatively in connection with Figs. 2-6, but 
+in those figures both Dw/Dj and S/Dj served as discrete 
+parameters rather than as continuous independent variables, 
+so that their quantitative influences were not readily 
+discernible. 
+In Fig. 8, Sh/Re0-8 is plotted as a function of Dw/Dj for 
+parametric values of S/Dj. The data points shown in the 
+figure correspond to the least-squares horizontal lines in Figs. 
+2-6 and are, therefore, representative of the entire investigated 
+Reynolds number range. Smooth curves have been passed 
+through the data for continuity. 
+The figure shows that the overall variation of the Sherwood 
+number with Dw/Dj at a fixed Reynolds number is substantial 
+Journal of Heat Transfer MAY.1986, Vol. 108/415 
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/pdfaccess.ashx?url=/data/journals/jhtrao/27485/ on 03/08/2017 Terms of Use: http://www.asme.org/about-asme/terms-of-use
+
+===== PAGE 6 =====
+0.18 r 
+0.16 
+0.14 
+0.12 
+0.10 
+Fig. 8 Variation of the Sherwood number with Dw/Dj 
+0.18 
+0.16-
+0.14 
+0.12 
+0.10 
+-
+-
+10.4 
+7.68 
+14.18 
+Dw/Dj = 
+17.20 
+23.47 
+A 10 
+&>^^ /° l0 
+1 1 
+39 
+47 
+-a 
+i 
+10 
+S/Dj 
+Fig. 9 Variation of the Sherwood number with S/Dj 
+when the separation distance between the jet origin and the 
+water surface is relatively small. For example, for S/Dj = 5, 
+the minimum and maximum values of Sh/Re0-8 are 1.083 and 
+1.695. As the separation distance increases, there is a marked 
+decrease in the variation of Sh/Re08 with Dw/Dj, so that for 
+S/Dj = 15, Sh/Re08 is confined to the range between 1.058 
+and 1.323. Notwithstanding the just-documented fact that the 
+overall variation of Sh with Dw/Dj is quite sensitive to S/DJt 
+the sensitivity dies away at larger Dw/Dj, where all the results 
+tend to merge. 
+All of the curves in Fig. 8 are characterized by a common 
+shape, which includes an initial rise, the attainment of a max­
+imum, and a sharp dropoff which becomes increasingly more 
+gradual at larger D„/Dj. As noted earlier, the maximum in the 
+Sh versus Dw/Dj distribution should not be regarded as in­
+dicating a maximum value of the mass transfer coefficient. 
+Rather, the maximum in Sh is due to the conflict between K 
+and Dw. Indeed, it is readily shown that the mass transfer 
+coefficient decreases monotonically with D„/Dj over the in­
+vestigated range. 
+Figure 9 presents the variation of Sh/Re0-8 with S/DJt with 
+Dw/Dj as the curve parameter. Again, the data points appear­
+ing in the figure correspond to the least-squares horizontal 
+lines in Figs. 2-6. As expected, the mass transfer coefficient 
+drops off as the separation distance increases. 
+The figure shows that the variation of Sh/Re0-8 with S/Dj at 
+a fixed value of Dw/Dj is well represented by a straight line. 
+The slope of the straight line is markedly affected by the 
+Dw/Dj ratio. At small values of Dw/Dj, the transfer coeffi­
+cient is quite sensitive to the separation distance, while at large 
+DK/Dj, it is virtually independent of the separation distance. 
+With regard to comparisons with the literature, it was 
+already noted in the Introduction that prior jet-related mass 
+transfer experiments appear to be limited to impingement on 
+solid surfaces. In the absence of prior liquid-surface impinge­
+ment results, the present Sherwood numbers will be compared 
+with those for impingement on a solid surface. 
+An empirical correlation of Sherwood number data for jet 
+impingement on solid surfaces was presented in [1]. That cor­
+relation, when rephrased in terms of the present notation and 
+evaluated for Sc = 0.6, is 
+Sh = 1.614F(Re)[CD,/£>,) - 2.2}/{{DJDj) + 0.2((S/Dj) - 6)] 
+(13) 
+where Dw/Dj>5. For the Reynolds number range between 
+2000 and 30,000, which includes the range investigated here, 
+F(Re)=1.36Re° (14) 
+At higher Reynolds numbers, the exponent increases, attain­
+ing a value of 0.775 for Re between 120,000 and 400,000. 
+The Re0-574 and Re0-8 dependences of the Sherwood 
+number, respectively, for solid-surface impingement and 
+liquid-surface impingement, provide clear evidence of the ma­
+jor differences in the transfer processes which prevail in the 
+two situations. The solid-surface case is characterized by 
+laminar flow over a smooth, flat surface. On the other hand, 
+the liquid-surface case corresponds to turbulent flow over a 
+compliant surface which deforms in response to the airflow 
+and whose deformation, in turn, affects the airflow pattern. 
+Careful visual observations made during the course of the ex­
+periments revealed a depression of the water surface in the im­
+pingement zone, with the size and depth of the depression 
+depending on the Reynolds number and on the separation 
+distance. In the region away from the impingement zone, sur­
+face waves were in evidence. From the standpoint of the 
+airflow, these waves acted like major roughness elements, in 
+all likelihood causing flow separation. At Reynolds numbers 
+higher than those for which data were collected, the relatively 
+deep depression caused by the impinging jet tended to be 
+unstable, and the surface waves were large and irregular. 
+It is believed that both the surface depression in the im­
+pingement zone and the waves situated in the region away 
+from the impingement zone contribute to diminished rates of 
+mass transfer. This conjecture is substantiated by comparisons 
+between the present data and equations (13)-(14). Such com­
+parisons show that the Sherwood numbers for impingement 
+on a liquid surface are consistently lower than those for im­
+pingement on a solid surface. 
+Concluding Remarks 
+The experimental work reported here is, seemingly, the first 
+study of evaporation from a liquid surface due to jet impinge­
+ment. With water as the evaporating liquid and ambient air as 
+the impinging jet, parametric variations were made of the jet 
+velocity and diameter, the separation distance between the jet 
+origin and the water surface, and the diameter of the water 
+surface. In dimensionless terms, these parameters can be 
+represented by S/Dj, D,v/Dj, and Re, where S is the separa­
+tion distance, D„ and Dj are the water surface and jet 
+diameters, and Re is the jet-origin Reynolds number. The in­
+vestigated ranges of these groups extended from 5 to 15 for 
+S/Dj, from 7.68 to 23.47 for Dw/Dj, and from 3800 to 15,000 
+for Re. The experiments yielded mass transfer coefficients, 
+which were presented in terms of the Sherwood number Sh 
+based on the water surface diameter. 
+It was found that for all of the investigated operating condi­
+tions, the Sherwood number varied with the 0.8 power of the 
+Reynolds number. Furthermore, at a fixed Reynolds number 
+and Dw/Dj ratio, the Sherwood number decreased linearly as 
+the separation distance between the jet origin and the water 
+416/Vol. 108, MAY 1986 Transactions of the ASME 
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/pdfaccess.ashx?url=/data/journals/jhtrao/27485/ on 03/08/2017 Terms of Use: http://www.asme.org/about-asme/terms-of-use
+
+===== PAGE 7 =====
+surface increased. The decrease was significant at small values 
+of D„/Dj, but, at large values of Dw/Dj, the Sherwood 
+number was virtually independent of the separation distance. 
+The mass transfer coefficient decreased monotonically with 
+increases in the diameter of the water surface (although the 
+Sherwood number displayed a local maximum). The overall 
+change of the coefficient in response to changes in the water 
+surface diameter was greatest at small separation distances. 
+Supplementary experiments involving different jet 
+diameters and different water surface diameters, but with a 
+common value of D„/Dj, affirmed the universality of the 
+Dw/Dj ratio as a correlation parameter. Other experiments 
+demonstrated that the Sherwood number results were indepen­
+dent of the densities of the water vapor at the liquid surface 
+and in the impinging jet. 
+Comparisons with the literature showed that the Sherwood 
+numbers for jet impingement on the liquid surface are lower 
+than those for jet impingement on a solid surface. 
+References 
+1 Martin, H., "Heat and Mass Transfer Between Impinging Gas Jets and 
+Solid Surfaces," Advances in Heat Transfer, Vol. 13, 1977, pp. 1-60. 
+2 ASHRAE Handbook-1981 Fundamentals, American Society of 
+Heating, Refrigerating, and Air Conditioning Engineers, Atlanta, GA, 1981. 
+3 Threlkeld, 3. L., Thermal Environmental Engineering, Prentice-Hall, 
+Englewood Cliffs, NJ, 1970. 
+4 Mason, E. A., and Monchick, L., "Survey of the Equation of State and 
+Properties of Moist Air," in: Humidity and Moisture, A. Wexler, ed., Vol. 3, 
+Reinhold, New York, 1965. 
+Journal of Heat Transfer MAY 1986, Vol. 108/417 
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/pdfaccess.ashx?url=/data/journals/jhtrao/27485/ on 03/08/2017 Terms of Use: http://www.asme.org/about-asme/terms-of-use

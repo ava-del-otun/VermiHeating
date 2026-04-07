@@ -1,0 +1,8 @@
+============================================================
+BOTTOM-MAT REDUCED MODEL RUN INDEX
+============================================================
+heating folder: S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\bottom_mats_vertical_plume\outputs_bottom_mats_vertical_plume\heating
+cooling folder: S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\bottom_mats_vertical_plume\outputs_bottom_mats_vertical_plume\cooling
+year_round folder: S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\bottom_mats_vertical_plume\outputs_bottom_mats_vertical_plume\year_round
+combined dashboard: S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\bottom_mats_vertical_plume\outputs_bottom_mats_vertical_plume\combined_heating_cooling_dashboard.png
+============================================================

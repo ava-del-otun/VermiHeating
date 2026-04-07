@@ -1,0 +1,298 @@
+\subsection{Detailed Methodology for Section 18: Annual Climate and Year-Round Operating Layer}
+
+This section documents, in report form, how I implemented the annual climate and daily duty simulation described by Section 18 (\(229\)--\(251\)). I wrote this layer to convert monthly climate statistics into a physically consistent daily operating profile, then compute daily heating or cooling duty, bed temperature response, electricity use, cost, and water replacement.
+
+\paragraph{Important modeling clarification (Gaussian terminology).}
+Section 18 uses periodic Gaussian-kernel regression (weighted averaging), not Gaussian Process Regression (GPR). In this implementation, no posterior covariance model is solved and no Bayesian kernel matrix inversion is performed. Instead, each day is computed as a distance-weighted average of monthly anchors using a Gaussian weighting function, with circular (wraparound) day distance.
+
+\subsubsection*{18.1 Climate anchors and regression baseline (\(229\), \(230\))}
+
+I began with monthly Connecticut anchors:
+\begin{itemize}[leftmargin=*]
+\item monthly mean temperature \(\bar T_m\),
+\item monthly standard deviation \(\sigma_m\),
+\item month lengths from the annual configuration.
+\end{itemize}
+
+I mapped each month to a day-of-year anchor at the month midpoint and evaluated all 365 representative days. For each day \(d\), I computed a Gaussian-weighted average:
+\[
+\hat y(d)=\frac{\sum_i w_i(d)y_i}{\sum_i w_i(d)},
+\qquad
+w_i(d)=\exp\!\left[-\frac{1}{2}\left(\frac{\delta_i(d)}{h}\right)^2\right],
+\]
+with circular distance
+\[
+\delta_i(d)=\min\!\left(|d-d_i|,\ P-|d-d_i|\right),
+\]
+where \(P=365\) days and \(h\) is the configured bandwidth (default \(18\) days). I applied this same regression twice:
+\begin{enumerate}[leftmargin=*]
+\item once to monthly means to get daily baseline ambient \(T_{\infty,\mathrm{base}}(d)\),
+\item once to monthly standard deviations to get daily \(\sigma(d)\) for climate-context reporting.
+\end{enumerate}
+
+The circular distance is essential because it treats late December and early January as neighboring points, preventing an artificial year-boundary discontinuity.
+
+\subsubsection*{18.2 Freeze-day allocation and anomaly override (\(231\)--\(234\))}
+
+The NOAA-derived freeze expectation in each month is fractional (e.g., \(26.3\) days). I converted these to integer monthly counts with largest-remainder allocation:
+\[
+n_{f,m}=\mathrm{LR}(F_m).
+\]
+This preserves the rounded annual total while distributing the extra days to months with the largest fractional parts.
+
+After obtaining integer freeze counts, I placed freeze days within each month using Gaussian-centered day scoring:
+\[
+w_{f,m}(i)=\exp\!\left[-\frac{(i-\mu_{f,m})^2}{2s_{f,m}^2}\right],
+\]
+then applied repulsion during sequential selection:
+\[
+\tilde w_{f,m}(i)=
+w_{f,m}(i)\prod_{j\in\mathcal{S}_{f,m}}
+\left[1-0.65\exp\!\left(-\frac{(i-j)^2}{2r_{f,m}^2}\right)\right].
+\]
+This avoids unrealistic clustering of all freeze days on adjacent dates.
+
+For selected freeze days, I overrode the ambient profile using:
+\[
+T_m(d)=\min\!\left(T_{\mathrm{base},m}(d),\,\bar T_m-\Delta T_{f,m}\right).
+\]
+Operationally, this means freeze days are forced cold enough to reflect observed freeze anomalies, but never warmed above the smooth baseline.
+
+\subsubsection*{18.3 Heat-wave allocation and anomaly override (\(235\)--\(238\))}
+
+I treated heat waves similarly, but with two monthly allocations:
+\[
+n_{s,m}=\mathrm{LR}(S_m),
+\qquad
+n_{h,m}=\mathrm{LR}(H_m),
+\]
+where \(n_{s,m}\) is spell starts and \(n_{h,m}\) is total heat-wave days.
+
+Start days were weighted around the observed mean start day:
+\[
+w_{h,m}(i)=\exp\!\left[-\frac{(i-\mu_{h,m})^2}{2s_{h,m}^2}\right],
+\]
+with the same repulsion form:
+\[
+\tilde w_{h,m}(i)=
+w_{h,m}(i)\prod_{j\in\mathcal{S}_{h,m}}
+\left[1-0.65\exp\!\left(-\frac{(i-j)^2}{2r_{h,m}^2}\right)\right].
+\]
+
+In the implementation, each heat-wave spell is constrained to a minimum of 3 consecutive days, then extra allocated days are distributed across spells. Starts are clipped so spells do not overlap and remain in month bounds.
+
+For selected heat-wave days, the ambient override is:
+\[
+T_m(d)=\max\!\left(T_m(d),\,\bar T_m+\Delta T_{h,m}\right).
+\]
+This forces heat-wave days sufficiently warm while preserving the prior profile on non-heat-wave days.
+
+\subsubsection*{18.4 Daily heating and cooling loads (\(239\), \(240\))}
+
+For each representative day \(d\), after final ambient assignment \(T_\infty(d)\), I rebuilt the bin thermal-loss model and computed required loads:
+\[
+Q_{\mathrm{req},h}(d)=UA_{\mathrm{bin}}\max\!\left(T_{h,\mathrm{set}}-T_\infty(d),\,0\right),
+\]
+\[
+Q_{\mathrm{req},c}(d)=UA_{\mathrm{bin}}\max\!\left(T_\infty(d)-T_{c,\mathrm{set}},\,0\right).
+\]
+The first equation activates only when ambient is below heating setpoint; the second activates only when ambient is above cooling setpoint.
+
+\subsubsection*{18.5 Capacity re-solve and duty application (\(241\)--\(246\))}
+
+For each day, I did not reuse fixed design capacities. Instead, I re-solved the selected heating or cooling operating point at that day's ambient:
+\[
+Q_{h,\mathrm{cap}}(d)=Q_{\mathrm{to\,bed},h}(T_\infty(d)),
+\quad
+P_{h,\mathrm{elec}}(d)=P_h(T_\infty(d)),
+\]
+\[
+Q_{c,\mathrm{cap}}(d)=-Q_{\mathrm{to\,bed},c}(T_\infty(d)),
+\quad
+P_{c,\mathrm{elec}}(d)=P_{\mathrm{spot\,cooler}}(d)+P_{\mathrm{assist\,blower}}(d).
+\]
+
+I then computed required duty:
+\[
+D_h^\ast(d)=\frac{Q_{\mathrm{req},h}(d)}{Q_{h,\mathrm{cap}}(d)},
+\qquad
+D_c^\ast(d)=\frac{Q_{\mathrm{req},c}(d)}{Q_{c,\mathrm{cap}}(d)},
+\]
+and clipped applied duty to physical bounds:
+\[
+D_h(d)=\min(\max(D_h^\ast(d),0),1),
+\qquad
+D_c(d)=\min(\max(D_c^\ast(d),0),1).
+\]
+
+The applied bed load is then:
+\[
+Q_{\mathrm{bed}}(d)=
+\begin{cases}
+D_h(d)\,Q_{h,\mathrm{cap}}(d), & \text{heating day},\\
+-D_c(d)\,Q_{c,\mathrm{cap}}(d), & \text{cooling day},\\
+0, & \text{idle day}.
+\end{cases}
+\]
+
+If required duty exceeds unity, I preserve \(D=1\) as the applied maximum and record unmet load separately; this is how capacity shortfall is represented without violating equipment limits.
+
+\subsubsection*{18.6 Daily bed temperatures, electricity, cost, and water (\(247\)--\(251\))}
+
+Given applied \(Q_{\mathrm{bed}}(d)\), I solved the same two-node steady bed model used elsewhere:
+\[
+\begin{bmatrix}
+UA_{b,\infty}+UA_{bt} & -UA_{bt}\\
+-UA_{bt} & UA_{t,\infty}+UA_{bt}
+\end{bmatrix}
+\begin{bmatrix}
+T_b(d)\\
+T_t(d)
+\end{bmatrix}
+=
+\begin{bmatrix}
+f_bQ_{\mathrm{bed}}(d)+UA_{b,\infty}T_\infty(d)\\
+(1-f_b)Q_{\mathrm{bed}}(d)+UA_{t,\infty}T_\infty(d)
+\end{bmatrix}.
+\]
+
+I computed daily electrical energy by mode:
+\[
+E_h(d)=\frac{P_{h,\mathrm{elec}}(d)\,D_h(d)\,24}{1000},
+\qquad
+E_c(d)=\frac{P_{c,\mathrm{elec}}(d)\,D_c(d)\,24}{1000},
+\]
+then
+\[
+E_{\mathrm{day}}=E_h(d)+E_c(d).
+\]
+
+Daily cost is:
+\[
+C(d)=c_{\mathrm{elec}}E_{\mathrm{day}},
+\]
+and daily water replacement estimate is:
+\[
+m_{\mathrm{water}}(d)=\dot m_{\mathrm{water},24h}\,D(d),
+\]
+where \(D(d)\) is the active heating or cooling duty on that day.
+
+\subsubsection*{18.7 Literature-backed microbial heat source \(q_{\text{bio}}\) for winter heating}
+
+To model partial winter reliance on in-bed microbial activity, I added an explicit volumetric source term \(q_{\text{bio}}\) in the bottom-mat reduced heating solver. The source is parameterized from oxygen uptake rate (OUR) and oxygen-to-heat conversion enthalpy, then converted to volumetric units for direct insertion into the bed energy equation.
+
+\paragraph{Primary source anchors used in this implementation.}
+\begin{itemize}[leftmargin=*]
+\item Sonowal et al. report dewatered-sludge vermicomposting OUR values of \(18.9\pm0.5\) mg \(O_2\)/g VS/day initially, and late-stage values as low as \(2.0\)--\(3.1\) mg \(O_2\)/g VS/day [R20].
+\item de Guardia et al. use the biodegradation heat model \(H_{\text{BIO}}=r_{O_2}h_{\text{BIO}}\), and report literature \(h_{\text{BIO}}\) spans roughly \(304\)--\(448\) kJ/mol \(O_2\), with \(440\) kJ/mol \(O_2\) used in their calibrated runs [R19].
+\item Harper et al. report an empirical oxygen-to-heat slope of about \(9.8\) MJ/kg \(O_2\), equivalent to \(313.6\) kJ/mol \(O_2\), providing a lower empirical conversion anchor [R18].
+\item Gea et al. show OUR is the most reliable process activity indicator under dynamic aeration monitoring, and provide broad OUR ranges across wastes that support dynamic activity modeling rather than static maturity-only values [R21].
+\end{itemize}
+
+\paragraph{Step 1: OUR time profile at the selected winter operating stage.}
+I represent process-stage decay from an initial value to a mature value with:
+\[
+\mathrm{OUR}(t_d)=\mathrm{OUR}_{\mathrm{mature}}
+\;+\;
+\bigl(\mathrm{OUR}_{\mathrm{initial}}-\mathrm{OUR}_{\mathrm{mature}}\bigr)
+\exp(-k_d t_d),
+\]
+where \(t_d\) is operating day in days and \(k_d\) is in day\(^{-1}\). The default \(k_d=0.0353\ \text{day}^{-1}\) is the mean implied by reported 45-day fold reductions from Sonowal et al. [R20].
+
+\paragraph{Step 2: Convert OUR to heat per unit VS mass.}
+Using the selected scenario enthalpy \(h_{O_2}\) (kJ/mol \(O_2\)):
+\[
+q_{\text{bio,VS}}
+\;[\mathrm{W/kgVS}]
+=
+\mathrm{OUR}
+\;[\mathrm{mg}\ O_2/\mathrm{gVS/day}]
+\cdot
+\frac{h_{O_2}}{32}
+\cdot
+\frac{1000}{86400}.
+\]
+The script exposes scenario bounds:
+\begin{itemize}[leftmargin=*]
+\item conservative: \(h_{O_2}=313.6\) kJ/mol \(O_2\) (Harper anchor),
+\item base: \(h_{O_2}=376.8\) kJ/mol \(O_2\) (midpoint working value),
+\item aggressive: \(h_{O_2}=440\) kJ/mol \(O_2\) (de Guardia working value).
+\end{itemize}
+
+\paragraph{Step 3: Convert to volumetric source term for the bed field solve.}
+\[
+q_{\text{bio,vol}}
+\;[\mathrm{W/m^3}]
+=
+q_{\text{bio,VS}}
+\cdot
+\rho_{\text{bulk}}
+\cdot
+f_{\text{VS,wet}},
+\]
+where \(\rho_{\text{bulk}}\) is wet bulk density and \(f_{\text{VS,wet}}\) is wet-mass VS fraction.
+
+\paragraph{Step 4: Apply local temperature response and clipping.}
+I use a bounded \(Q_{10}\) scaling:
+\[
+f_T(T)=\mathrm{clip}\!\left(
+Q_{10}^{(T-T_{\text{ref}})/10},
+f_{T,\min},
+f_{T,\max}
+\right),
+\qquad
+q_{\text{bio,local}}=q_{\text{bio,vol}}\,f_T(T).
+\]
+Defaults are \(Q_{10}=2.0\), \(T_{\text{ref}}=22^\circ\mathrm{C}\), and clip \(0.35\)--\(1.65\), preventing runaway positive feedback in the explicit relaxation loop.
+
+\paragraph{Step 5: Insert into the bed PDE update.}
+For the 2D reduced field, the interior update adds:
+\[
+\frac{\partial T}{\partial t}
+\supset
+\frac{q_{\text{bio,local}}}{\rho c_p},
+\]
+so the implemented source competes directly with evaporation and wall-loss sinks in the same units.
+
+\paragraph{Step 6: Net winter external-heating requirement.}
+For duty and feasibility calculations, the winter external requirement is decomposed as:
+\[
+Q_{\text{loss,gross}} = UA\,(T_{\text{set}}-T_\infty),
+\qquad
+Q_{\text{ext,req}}=\max\!\left(Q_{\text{loss,gross}}-Q_{\text{bio,ref}},\,0\right),
+\]
+where \(Q_{\text{bio,ref}}\) is the temperature-adjusted reference bioheat at \(T_{\text{set}}\). This is now printed explicitly in the heating summary as gross loss, microbial credit, and residual external requirement.
+
+\subsubsection*{18.8 Practical interpretation for report writing}
+
+The implemented \(q_{\text{bio}}\) model is intentionally transparent and auditable:
+\begin{itemize}[leftmargin=*]
+\item every conversion step is explicit (OUR \(\rightarrow\) W/kgVS \(\rightarrow\) W/m\(^3\)),
+\item all literature-sensitive terms are configuration parameters (OUR bounds, \(h_{O_2}\) scenario, decay rate, VS fraction),
+\item solver outputs now separate mat heat and microbial heat contributions,
+\item the net-load decomposition is reported explicitly, so winter feasibility claims can be traced to assumptions instead of hidden fitting.
+\end{itemize}
+
+\subsubsection*{Implementation trace (how I actually executed it in code)}
+
+I executed this workflow through the following function chain:
+\begin{itemize}[leftmargin=*]
+\item configuration and climate defaults: \code{year\_round\_analysis\_config(...)},
+\item integer allocation and event placement: \code{largest\_remainder\_allocation(...)}, \code{gaussian\_weighted\_day\_selection(...)}, \code{heatwave\_day\_mask(...)},
+\item baseline regression and anomaly overlays: \code{circular\_gaussian\_kernel\_regression(...)}, \code{build\_representative\_climate\_year(...)},
+\item microbial source assembly for winter heating:
+\code{\_bioheat\_base\_terms(...)}, \code{\_bioheat\_temperature\_factor(...)}, \code{\_bioheat\_reference\_power\_w(...)},
+\item daily simulation task: \code{simulate\_year\_round\_day\_task(...)},
+\item ambient-specific re-solve of operating points:
+\code{simulate\_heating\_reference\_point(...)} and \code{simulate\_summer\_cooling\_point(...)},
+\item bottom-mat field solve with explicit \(q_{\text{bio}}\) insertion:
+\code{simulate\_bottom\_mats\_state(...)},
+\item daily and annual aggregation: \code{build\_year\_round\_payload(...)},
+\item report export: \code{write\_year\_round\_summary(...)}.
+\end{itemize}
+
+\subsubsection*{Reproducibility notes}
+
+To ensure reproducibility, I preserved deterministic selection rules (argmax with fixed formulas and no random seed usage), explicit clipping/guardrails for non-physical values, and explicit annual summary totals for freeze days, heat-wave starts, heat-wave days, energy, cost, water, and unmet-load equivalent.
+
+In summary, the Section 18 implementation is a deterministic, equation-driven annual operations layer: smooth baseline climate from monthly anchors, deterministic event overlays, ambient-specific capacity re-solving, physically bounded duty application, and day-level thermo-economic output accumulation.

@@ -1,0 +1,166 @@
+
+18 Annual climate and year-round operating layer
+18.1 Climate anchors and regression baseline
+The annual layer stores for each monthma Connecticut monthly mean temperature ¯Tm and monthly
+standard deviationσ m derived from the NOAA series described inHeatTransferStudy/VermiHea
+tLoss.tex:L2576-L2616. The representative-year ambient baseline uses circular Gaussian-kernel
+regression:
+ˆy(d) =
+P
+i wi(d)yiP
+i wi(d) , w i(d) = exp
+"
+−1
+2
+ δi(d)
+h
+2#
+,(229)
+with wraparound day distance
+δi(d) = min(|d−d i|, P− |d−d i|).(230)
+This same periodic Gaussian regression is applied both to the monthly mean anchors and to the
+monthly standard-deviation anchorsheat_transfer_study.py:L4794-L4808;heat_transfer_st
+udy.py:L4866-L4879.
+18.2 Freeze-day allocation and anomaly override
+Expected monthly freeze-day counts are converted to representative integer counts by largest-
+remainder allocation:
+nf,m = LR(Fm).(231)
+Within each month, day-of-month weights are centered on the observed mean freeze dayµ f,m:
+wf,m(i) = exp
+"
+−(i−µ f,m)2
+2s2
+f,m
+#
+,(232)
+and sequential selection applies a repulsion modier
+˜wf,m(i) =w f,m(i)
+Y
+j∈Sf,m
+"
+1−0.65 exp
+ 
+−(i−j) 2
+2r2
+f,m
+!#
+.(233)
+On the selected freeze days, the ambient prole is overridden by
+Tm(d) = min
+
+Tbase,m(d), ¯Tm −∆T f,m
+
+.(234)
+These relations correspond toheat_transfer_study.py:L4683-L4732;heat_transfer_study.py:
+L4893-L4906.
+18.3 Heat-wave allocation and anomaly override
+Monthly spell starts and total heat-wave days are likewise allocated by largest-remainder rounding:
+ns,m = LR(Sm), n h,m = LR(Hm).(235)
+The start-day weighting is
+wh,m(i) = exp
+"
+−(i−µ h,m)2
+2s2
+h,m
+#
+,(236)
+37
+
+===== PAGE 38 =====
+with repulsion-modied score
+˜wh,m(i) =w h,m(i)
+Y
+j∈Sh,m
+"
+1−0.65 exp
+ 
+−(i−j) 2
+2r2
+h,m
+!#
+.(237)
+Each selected heat-wave spell is forced to last at least three days in the code, and the ambient
+override is
+Tm(d) = max
+
+Tm(d), ¯Tm + ∆Th,m
+
+.(238)
+These relations correspond toheat_transfer_study.py:L4735-L4791;heat_transfer_study.py:
+L4907-L4911.
+18.4 Daily heating and cooling loads
+For each representative dayd, the required heating and cooling loads are
+Qreq,h(d) =U A bin max(Th,set −T ∞(d),0),(239)
+Qreq,c(d) =U A bin max(T∞(d)−T c,set,0),(240)
+which are implemented by rebuilding the bin model at the day's ambient and calling the same
+lumped-loss routine used elsewhereheat_transfer_study.py:L4977-L4983.
+18.5 Reference-point capacity re-solve and duty application
+The annual layer re-solves the selected heating and cooling operating points at each day's ambient
+temperature to obtain
+Qh,cap(d) =Q to bed,h(T∞(d)), P h,elec(d) =P h(T∞(d)),(241)
+Qc,cap(d) =−Q to bed,c(T∞(d)), P c,elec(d) =P spot cooler(d) +P assist blower(d).(242)
+The required duty fractions are
+D∗
+h(d) = Qreq,h(d)
+Qh,cap(d) , D ∗
+c(d) = Qreq,c(d)
+Qc,cap(d) ,(243)
+and the applied duties are clipped at unity:
+fday =
+
+
+
+min
+ 
+max
+ ˙Qload
+˙Qnom
+,0
+!
+,1
+!
+, ˙Qnom >0,
+0, ˙Qnom = 0and ˙Qload ≤0,
+1, ˙Qnom = 0and ˙Qload >0,
+(244)
+which, in mode-specic notation, are exactly
+Dh(d) = min(max(D∗
+h(d),0),1), D c(d) = min(max(D∗
+c(d),0),1).(245)
+The applied bed load is therefore
+Qbed(d) =
+
+
+
+Dh(d)Q h,cap(d),heating day,
+−Dc(d)Q c,cap(d),cooling day,
+0,idle day.
+(246)
+38
+
+===== PAGE 39 =====
+18.6 Daily bed temperatures, electricity, cost, and water
+The daily bed temperatures are obtained from the same two-node steady system:
+U Ab,∞ +U A bt −U Abt
+−U Abt U At,∞ +U A bt
+ Tb(d)
+Tt(d)
+
+=
+ fbQbed(d) +U A b,∞T∞(d)
+(1−f b)Qbed(d) +U A t,∞T∞(d)
+
+.(247)
+Daily heating and cooling electricity are
+Eh(d) = Ph,elec(d)D h(d) 24
+1000 , E c(d) = Pc,elec(d)D c(d) 24
+1000 ,(248)
+so the total day electrical energy is
+Eday =E h(d) +E c(d).(249)
+With electricity pricec elec, the daily cost is
+C(d) =c elecEday,(250)
+and the daily water-replacement estimate is
+mwater(d) = ˙mwater,24h D(d),(251)
+whereD(d)is the active heating or cooling duty fraction for that day. These are repository numerical
+constructs driven by the same daily re-solved heating/cooling reference pointsheat_transfer_st
+udy.py:L4966-L5072.

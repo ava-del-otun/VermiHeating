@@ -1,0 +1,220 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{siunitx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\title{Physics and Math Reference: Bottom-Mat Vertical-Plume Reduced Model}
+\author{VermiHeating Reduced Study}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Scope}
+This reference documents the model implemented in
+\texttt{heat\_transfer\_study\_bottom\_mats\_vertical.py}.
+The model combines:
+\begin{itemize}
+\item base heating from four electric mats,
+\item buoyancy-driven vertical vapor/air transport through porous media,
+\item passive stack-driven throughflow between bottom drainage openings and top aeration openings,
+\item Ergun closure for frictional pressure loss,
+\item Sherwood-based evaporation mass transfer and latent sink,
+\item temperature-dependent microbial heat generation $q_{\text{bio}}$.
+\end{itemize}
+Cooling-mode calculations are delegated to the recreated reduced model
+(\texttt{heat\_transfer\_study\_recreated.py}) and share the same bottle-column
+cooling assumptions and volumetric bottle-cap logic.
+
+\section{Geometry and Electrical Input}
+Bed dimensions:
+\begin{align*}
+L &= \SI{48}{in} = \SI{1.2192}{m},
+\quad W = \SI{24}{in} = \SI{0.6096}{m},
+\quad H = \SI{24}{in} = \SI{0.6096}{m}.
+\end{align*}
+
+Four mats are arranged in a $2\times 2$ touching footprint:
+\begin{align*}
+L_h &= 2\times \SI{20.75}{in} = \SI{41.5}{in},
+\quad W_h = 2\times \SI{10}{in} = \SI{20}{in}.
+\end{align*}
+
+Each mat is rated at \SI{17.5}{W} at \SI{120}{VAC}, so maximum electrical input is
+\begin{align*}
+P_{\text{elec,max}} = 4\times \SI{17.5}{W} = \SI{70}{W}.
+\end{align*}
+At duty $\delta\in[0,1]$ and coupling efficiency $\eta_c$:
+\begin{align*}
+P_{\text{to bed}} = \delta\,P_{\text{elec,max}}\,\eta_c.
+\end{align*}
+
+\section{Porous-Bed Energy Model}
+The operating-point control state is a \textbf{single lumped bed node}:
+\begin{align}
+C_{\text{bed}}\frac{dT_{\text{bed}}}{dt} =
+Q_{\text{mat}} + Q_{\text{bio}}
+- UA\,(T_{\text{bed}}-T_\infty)
+- Q_{\text{lat,eff}},
+\end{align}
+with steady form
+\begin{align}
+T_{\text{bed,ss}} = T_\infty + \frac{Q_{\text{mat}}+Q_{\text{bio}}-Q_{\text{lat,eff}}}{UA}.
+\end{align}
+
+The code still computes a 2D side-view diagnostic field $T(x,z)$ for visualization and
+transport closure. This field uses diffusion, upward advection, wall/lid/bottom losses,
+latent sink, and microbial source:
+\begin{align}
+\frac{\partial T}{\partial t} =
+\alpha\left(\frac{\partial^2T}{\partial x^2}+\frac{\partial^2T}{\partial z^2}\right)
+- u_z\frac{\partial T}{\partial z}
+- \frac{\dot q_{\text{lat}}}{\rho c_p}
+- k_{\text{wall}}(T-T_\infty)
++ \frac{q_{\text{bio}}}{\rho c_p}.
+\end{align}
+
+\noindent with
+\begin{align*}
+\alpha = \frac{k_{\text{eff}}}{\rho c_p}, \qquad
+k_{\text{wall}} = \frac{2U_{\text{front/back}}}{\rho c_p W}.
+\end{align*}
+
+Boundary treatment:
+\begin{itemize}
+\item bottom: localized Neumann heat flux over heated footprint,
+\item lid: low-$U$ convective loss to ambient,
+\item side ends (lengthwise): convective loss to ambient.
+\end{itemize}
+
+\section{Buoyancy, Ergun, and Passive-Opening Closure}
+The local buoyancy pressure head over height $H$ is approximated as
+\begin{align}
+\Delta p_{\text{buoy}} \approx \rho_a g\beta\,\Delta T\,H,
+\quad \beta\approx \frac{1}{T_\infty+273.15}.
+\end{align}
+
+Superficial velocity is closed with Ergun:
+\begin{align}
+\frac{\Delta p}{H}=
+\underbrace{\frac{150\mu(1-\varepsilon)^2}{\varepsilon^3 d_p^2}u}_{\text{viscous}}
++
+\underbrace{\frac{1.75\rho_a(1-\varepsilon)}{\varepsilon^3 d_p}u^2}_{\text{inertial}}.
+\end{align}
+The quadratic is solved for $u\ge0$ using the buoyancy-induced pressure gradient.
+
+For non-sealed operation (bottom drainage + top aeration openings), throughflow is
+additionally limited by passive opening capacity:
+\begin{align}
+u_{\text{stack}} =
+\frac{A_{\text{eff}}}{A_{\text{bed}}}
+\sqrt{\frac{2gH\Delta T}{T_\infty+273.15}},
+\qquad
+A_{\text{eff}}^{-2} = (C_{d,b}A_b)^{-2} + (C_{d,t}A_t)^{-2},
+\end{align}
+and the model uses
+\begin{align}
+u = \min\left(u_{\text{Ergun}},\,u_{\text{stack}}\right).
+\end{align}
+
+\section{Mass Transfer and Latent Cooling}
+Evaporation uses a Sherwood relation with porous-particle diameter scale $d_p$:
+\begin{align}
+Sh = 2 + 1.1\,Re^{0.6}Sc^{1/3},
+\qquad k_m = \frac{Sh\,D_v}{d_p},
+\end{align}
+\begin{align}
+\dot m_{\text{evap,vol}} = k_m a_s\left(\rho_{v,\text{sat}}(T)-\rho_{v,\infty}\right)_+,
+\qquad
+\dot q_{\text{lat}} = \dot m_{\text{evap,vol}} h_{fg}.
+\end{align}
+An availability cap is applied so latent extraction cannot exceed configured
+transport-limited sensible availability.
+
+For open passive venting, vapor concentration is mixed between local saturated tendency
+and ambient inlet humidity using a velocity-based mixing weight. Two closure factors are
+then applied:
+\begin{align}
+\dot q_{\text{lat,eff}} &= (1-f_{\text{rec}})\,\dot q_{\text{lat,gross}}, \\
+\dot m_{\text{loss}} &= f_{\text{loss}}\,\dot m_{\text{evap,gross}},
+\end{align}
+where $f_{\text{rec}}$ is latent-recovery fraction (internal condensation recycle)
+and $f_{\text{loss}}$ is net external moisture-loss fraction to surroundings.
+
+\section{Microbial Heat Source $q_{\text{bio}}$}
+The microbial source is parameterized from oxygen uptake rate (OUR):
+\begin{align}
+OUR(t) = OUR_{\infty} + (OUR_0-OUR_{\infty})e^{-kt},
+\end{align}
+with optional direct override.
+Using VS mass $m_{VS}$ and respiratory enthalpy $\Delta H_{O_2}$
+(\si{kJ.mol^{-1}O2}):
+\begin{align}
+\dot n_{O_2} &= \frac{OUR\cdot m_{VS}\cdot 10^{-3}\cdot 10^{-6}}{86400}
+\frac{1000}{32},
+\\
+Q_{\text{bio}} &= \dot n_{O_2}\,\Delta H_{O_2}\,1000.
+\end{align}
+Volumetric form:
+\begin{align}
+q_{\text{bio,base}} = \frac{Q_{\text{bio}}}{V_{\text{bed}}},
+\end{align}
+and temperature modulation (Q10 form):
+\begin{align}
+f_T = \mathrm{clip}\left(Q_{10}^{(T-T_{ref})/10},f_{\min},f_{\max}\right),
+\qquad q_{\text{bio}} = q_{\text{bio,base}}f_T.
+\end{align}
+
+Implemented scenarios for $\Delta H_{O_2}$ are:
+\begin{itemize}
+\item conservative: \SI{313.6}{kJ.mol^{-1}O2},
+\item base: \SI{376.8}{kJ.mol^{-1}O2},
+\item aggressive: \SI{440.0}{kJ.mol^{-1}O2}.
+\end{itemize}
+
+\section{Cooling-Column Bottle Capacity Constraint}
+The cooling branch uses a strict volumetric cap for frozen bottles packed inside the
+central column. Each bottle is modeled as a cylinder
+(\SI{0.18}{m} height, \SI{0.07}{m} diameter), and effective count is limited by
+\begin{align}
+N_{\text{eff}} = \min\left(N_{\text{requested}},
+\left\lfloor \phi\frac{V_{\text{column}}}{V_{\text{bottle}}}\right\rfloor\right),
+\end{align}
+where $\phi$ is configured packing fraction.
+
+\section{Numerical Notes}
+\begin{itemize}
+\item The heating sweep uses a reduced-resolution ``quick'' solve.
+\item Buoyancy velocity in the energy advection operator is multiplied by
+\texttt{energyAdvectionFactor} to represent that only a fraction of local
+plume circulation behaves as through-domain advective transport.
+\item The saved side-view maps are generated at a thermally representative duty
+(closest mean bed temperature to design setpoint) to avoid non-representative
+saturation artifacts when full-duty points are constraint-limited.
+\item Outputs include with/without-microbial maps and delta map,
+plus \texttt{.npz} field data.
+\item Control/optimization temperatures are single-node lumped temperatures; legacy
+bottom/top keys are retained as aliases for compatibility.
+\end{itemize}
+
+\section{Literature Basis Used in This Implementation}
+\begin{itemize}
+\item \textbf{Harper et al. (1992), \emph{Physical management and interpretation of an environmentally controlled composting ecosystem}}: enclosed compost mass-balance framing with inlet/exhaust terms (p.\ 3), water-vapor-dominated mass loss during cooldown/aerated operation (p.\ 7), and heat-production interpretation vs oxygen demand/consumption (pp.\ 2, 10).
+\item \textbf{de~Guardia et al. (2012), \emph{Characterization and modelling of the heat transfers in a pilot-scale reactor during composting under forced aeration}}: lumped heat-transfer structure including heat generation, evaporation, and convection under aeration (p.\ 3), plus observed heat/moisture sensitivity to aeration-rate changes (p.\ 12).
+\item \textbf{Gea et al., \emph{Monitoring the biological activity of the composting process: OUR, RI, and RQ}}: OUR/respiration as biological activity proxy (pp.\ 1, 5), and explicit note that forced aeration improves oxygen supply in biologically active regions (p.\ 6), supporting airflow-linked bioheat coupling.
+\item \textbf{Suthar et al., \emph{Stability Analysis of Dewatered Sludge ... During Vermicomposting}}: practical vermicomposting bin geometry with both drainage and aeration perforations (p.\ 2), consistent with the open-bottom/open-top passive-flow boundary representation used here.
+\end{itemize}
+
+\section{Key Outputs}
+Heating output folder includes:
+\begin{itemize}
+\item \texttt{heating\_bottom\_mats\_sweep.png},
+\item \texttt{heating\_sideview\_lengthwise\_heatmap.png},
+\item \texttt{heating\_sideview\_lengthwise\_heatmap\_with\_bio.png},
+\item \texttt{heating\_sideview\_lengthwise\_heatmap\_without\_bio.png},
+\item \texttt{heating\_sideview\_lengthwise\_heatmap\_bio\_delta.png},
+\item \texttt{heating\_sideview\_field\_bottom\_mats.npz}.
+\end{itemize}
+
+\end{document}

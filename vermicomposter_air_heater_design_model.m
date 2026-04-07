@@ -1001,14 +1001,14 @@ ventHoleArea_m2 = min(topArea_m2, ...
 coveredTopArea_m2 = max(topArea_m2 - ventHoleArea_m2, 0);
 
 % [R4] Free convection from a vertical surface in stagnant air.
-hExt_W_m2K = naturalConvectionVerticalPlateH( ...
+hSide_W_m2K = naturalConvectionVerticalPlateH( ...
     params.bin.setpoint_C, ...
     params.environment.greenhouseAir_C, ...
     params.environment.referencePlateLength_m, ...
     params.environment.pressure_Pa);
 
 % [R5] Thermal resistances in series: U = 1/sum(R_i)
-Uwall_W_m2K = overallWallU(params.binWall, hExt_W_m2K);
+Uwall_W_m2K = overallWallU(params.binWall, hSide_W_m2K);
 
 AbottomNode_m2 = bottomArea_m2 + 0.5 * sideArea_m2;
 topWallArea_m2 = 0.5 * sideArea_m2;
@@ -1066,7 +1066,8 @@ UAinternal_W_K = params.bin.k_W_mK * interfaceArea_m2 / interfaceThickness_m;
 
 % [R5] Bi = h*Lc/k, with Lc = V/A
 Lc_m = volume_m3 / max(totalArea_m2, 1e-9);
-Bi_lumped = hExt_W_m2K * Lc_m / max(params.bin.k_W_mK, 1e-9);
+Bi_lumped = hSide_W_m2K * Lc_m / max(params.bin.k_W_mK, 1e-9);
+Uext_W_m2K = UAtotalAmbient_W_K / max(totalArea_m2, 1e-9);
 
 binModel = struct();
 binModel.totalArea_m2 = totalArea_m2;
@@ -1075,7 +1076,8 @@ binModel.topArea_m2 = topArea_m2;
 binModel.coveredTopArea_m2 = coveredTopArea_m2;
 binModel.openTopArea_m2 = effectiveOpenTopArea_m2;
 binModel.ventHoleArea_m2 = ventHoleArea_m2;
-binModel.externalH_W_m2K = hExt_W_m2K;
+binModel.externalH_W_m2K = hSide_W_m2K;
+binModel.externalU_W_m2K = Uext_W_m2K;
 binModel.topAmbientH_W_m2K = hTopAmbient_W_m2K;
 binModel.Uwall_W_m2K = Uwall_W_m2K;
 binModel.UAtotalAmbient_W_K = UAtotalAmbient_W_K;
@@ -1115,6 +1117,7 @@ loss.cooldown_time_h = t_h;
 loss.cooldown_C = cooldown_C;
 loss.Bi_lumped = binModel.Bi_lumped;
 loss.lumpedStrictlyValid = binModel.Bi_lumped < 0.1;
+loss.externalU_W_m2K = binModel.externalU_W_m2K;
 end
 
 function U_W_m2K = overallWallU(wall, hOutside_W_m2K)
@@ -1825,7 +1828,7 @@ dx_m = L_m / N;
 ID_m = params.heaterTube.ID_m;
 OD_m = params.heaterTube.OD_m;
 Atube_m2 = pi * ID_m^2 / 4;
-Poutside_m = pi * OD_m;
+PoutsideExposed_m = pi * (OD_m + 2 * max(params.heaterTube.insulationThickness_m, 0));
 Tair_K = airIn_K;
 
 propsIn = airProps(airIn_K, params.environment.pressure_Pa);
@@ -1866,7 +1869,7 @@ for i = 1:N
     Uloss_W_m2K = heaterTubeOverallU(params, hInsideWall_W_m2K);
 
     % [R5] q_loss = U*A*DeltaT from the heater shell to surroundings.
-    qLoss_W = Uloss_W_m2K * Poutside_m * dx_m * ...
+    qLoss_W = Uloss_W_m2K * PoutsideExposed_m * dx_m * ...
         max((Tair_K - 273.15) - Tamb_C, 0);
 
     qGen_W = power_W * dx_m / max(L_m, 1e-9);
@@ -1899,15 +1902,37 @@ heater.hWireMean_W_m2K = mean(hWireProfile);
 heater.deltaP_Pa = dpFriction_Pa;
 end
 
+function U_W_m2K = cylindricalOverallUOutsideBasis(Di_m, DoWall_m, hInside_W_m2K, wallK_W_mK, hOutside_W_m2K, Dexposed_m, insulationK_W_mK)
+if nargin < 6 || isempty(Dexposed_m)
+    Dexposed_m = DoWall_m;
+end
+if nargin < 7
+    insulationK_W_mK = [];
+end
+
+Di_m = max(Di_m, 1e-12);
+DoWall_m = max(DoWall_m, Di_m);
+Dexposed_m = max(Dexposed_m, DoWall_m);
+
+Rin = Dexposed_m / max(Di_m * max(hInside_W_m2K, 1e-9), 1e-9);
+Rwall = Dexposed_m * log(max(DoWall_m / Di_m, 1.0)) / ...
+    max(2 * max(wallK_W_mK, 1e-9), 1e-9);
+Rins = 0.0;
+if Dexposed_m > DoWall_m
+    Rins = Dexposed_m * log(max(Dexposed_m / DoWall_m, 1.0)) / ...
+        max(2 * max(insulationK_W_mK, 1e-9), 1e-9);
+end
+Rout = 1 / max(hOutside_W_m2K, 1e-9);
+U_W_m2K = 1 / max(Rin + Rwall + Rins + Rout, 1e-9);
+end
+
 function U_W_m2K = heaterTubeOverallU(params, hInsideWall_W_m2K)
-% [R5] Radial resistance network approximated as series resistances.
-Rin = 1 / max(hInsideWall_W_m2K, 1e-9);
-Rwall = (params.heaterTube.OD_m - params.heaterTube.ID_m) / ...
-    (2 * max(params.heaterTube.wallK_W_mK, 1e-9));
-Rins = params.heaterTube.insulationThickness_m / ...
-    max(params.heaterTube.insulationK_W_mK, 1e-9);
-Rout = 1 / max(params.heaterTube.externalH_W_m2K, 1e-9);
-U_W_m2K = 1 / (Rin + Rwall + Rins + Rout);
+% [R5] Exact cylindrical radial resistance network on the exposed outer-area basis.
+Dexposed_m = params.heaterTube.OD_m + 2 * max(params.heaterTube.insulationThickness_m, 0);
+U_W_m2K = cylindricalOverallUOutsideBasis( ...
+    params.heaterTube.ID_m, params.heaterTube.OD_m, hInsideWall_W_m2K, ...
+    params.heaterTube.wallK_W_mK, params.heaterTube.externalH_W_m2K, ...
+    Dexposed_m, params.heaterTube.insulationK_W_mK);
 end
 
 function aeration = solveAerationTube(params, TairIn_C, Tbed_C, mdotIn_kg_s)
@@ -2007,10 +2032,8 @@ for i = 1:N
         NuTube * props.k_W_mK / ID_m;
     hOutside_W_m2K = params.calibration.bedHTMultiplier * params.aeration.bedH_W_m2K;
 
-    U_W_m2K = 1 / ( ...
-        1 / max(hInside_W_m2K, 1e-9) + ...
-        (OD_m - ID_m) / (2 * max(params.aeration.wallK_W_mK, 1e-9)) + ...
-        1 / max(hOutside_W_m2K, 1e-9));
+    U_W_m2K = cylindricalOverallUOutsideBasis( ...
+        ID_m, OD_m, hInside_W_m2K, params.aeration.wallK_W_mK, hOutside_W_m2K);
 
     [dm_kg_s, localBedGauge_Pa] = solveSegmentReleaseWithBedBackpressure( ...
         params, localGaugePressure_Pa, props.rho_kg_m3, props.mu_Pa_s, ...
@@ -2849,7 +2872,9 @@ fprintf('Lumped heat-loss requirement at %.1f C bed  : %.1f W\n', ...
     activeScenario.params.bin.setpoint_C, activeScenario.requiredHeat_W);
 fprintf('Overall UA to greenhouse air               : %.3f W/K\n', ...
     activeScenario.lumpedLoss.UA_W_K);
-fprintf('External natural-convection h estimate     : %.2f W/m^2-K\n', ...
+fprintf('Effective exterior U_ext                   : %.3f W/m^2-K\n', ...
+    activeScenario.binModel.externalU_W_m2K);
+fprintf('Side-wall natural-convection h estimate    : %.2f W/m^2-K\n', ...
     activeScenario.binModel.externalH_W_m2K);
 fprintf('Lumped time constant                       : %.1f h\n', ...
     activeScenario.lumpedLoss.tau_h);
@@ -3405,3 +3430,4 @@ for i = 1:numel(yVals)
         'FontSize', 8);
 end
 end
+

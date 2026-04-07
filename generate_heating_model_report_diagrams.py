@@ -177,11 +177,11 @@ def equation_flow():
 
     # Column 2: properties and base models
     box(ax, 28, 78, 22, 16, "Air properties\n\nmu(T): Sutherland\nk = mu c_p / Pr\nrho = p / (R T)", fc="#e0f2fe", fs=15)
-    box(ax, 28, 56, 22, 16, "Natural convection outside bin\n\nRa = g beta DeltaT L^3 / (nu alpha)\nNu = Churchill-Chu\nh_ext = Nu k / L", fc="#e0f2fe", fs=14)
+    box(ax, 28, 56, 22, 16, "Natural convection outside bin\n\nRa = g beta DeltaT L^3 / (nu alpha)\nNu = Churchill-Chu\nh_side = Nu k / L", fc="#e0f2fe", fs=14)
     box(ax, 28, 34, 22, 16, "Wire geometry and resistivity\n\nL_turn = sqrt((pi D)^2 + pitch^2)\nL_wire = N_turns L_turn\nR' = rho(T) / A", fc="#f3e8ff", fs=14)
 
     # Column 3: bin losses and heater branch
-    box(ax, 55, 78, 22, 16, "Bin loss model\n\nU_wall = 1 / sum(R_i)\nQ_loss = U A (T_bin - T_inf)\ntau = C / (U A)\nBi = h Lc / k", fc="#fef3c7", fs=14)
+    box(ax, 55, 78, 22, 16, "Bin loss model\n\nUA_tot = sum(U_j A_j)\nU_ext = UA_tot / A_ext\nQ_loss = U_ext A_ext DeltaT\nBi = h_ref Lc / k", fc="#fef3c7", fs=14)
     box(ax, 55, 56, 22, 16, "Branch electrical model\n\nR_branch = R' L_wire\nI_branch = V / R_branch\nP_branch = V I_branch", fc="#fee2e2", fs=15)
     box(ax, 55, 34, 22, 16, "Branch flow split\n\nm_dot_branch = m_dot_total / N_tubes\nu = m_dot / (rho A)", fc="#dcfce7", fs=15)
 
@@ -212,7 +212,7 @@ def equation_flow():
         line_arrow(ax, p0, p1, color="#111827", lw=2.0, ms=14)
 
     # Cross-links
-    line_arrow(ax, (39, 78), (66, 72), text="h_ext feeds U_wall", color="#2563eb", text_xy=(52, 76), fs=11)
+    line_arrow(ax, (39, 78), (66, 72), text="h_side feeds U_ext", color="#2563eb", text_xy=(52, 76), fs=11)
     line_arrow(ax, (39, 42), (66, 56), text="R' and L_wire feed branch R", color="#7c3aed", text_xy=(52, 50), fs=11)
     line_arrow(ax, (66, 34), (93, 78), text="branch velocity feeds Re_wire", color="#b91c1c", text_xy=(79, 58), fs=11)
     line_arrow(ax, (66, 34), (93, 56), text="branch velocity feeds Re_tube", color="#b91c1c", text_xy=(79, 46), fs=11)

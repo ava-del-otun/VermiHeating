@@ -1,0 +1,2596 @@
+
+
+===== PAGE 1 =====
+Physics and Mathematics Reference
+Generated 2026-03-19
+1 Physical system overview
+The audited execution graph models three coupled analysis layers.
+1. A MATLAB heating model evaluates a discrete operating grid for a resistive nichrome coil inside
+a heater tube, followed by an aeration-tube network embedded in the vermicomposter bedverm
+icomposter_air_heater_design_model.m:L1172-L1677;vermicomposter_air_heater_desi
+gn_model.m:L1803-L2248.
+2. A Python summer branch replaces the electrical heater with a spot-cooled plenum and assist
+blower, then reuses the same reduced-order aeration, evaporation, and two-node bed closures
+with a blower/system operating-point correction when the requested ow exceeds the available
+assist-blower staticheat_transfer_study.py:L2760- L3378;heat_transfer_study.py:
+L4326-L4438.
+3. A Python annual layer reuses the selected heating and cooling reference points against a
+representative-year ambient driverheat_transfer_study.py:L4547-L5012;heat_transfer_st
+udy.py:L5013-L5496.
+The physically important paths are electrical Joule heating of the wire, wire-to-air convection, heater-
+shell loss to ambient, sensible air-to-bed transfer through the aeration tube wall, direct discharge
+enthalpy through the perforations, latent heat consumption by evaporation, and bed-to-ambient
+loss through the vessel wall and top boundary condition.
+This document is intentionally more explicit thanHeatTransferStudy/VermiHeatLoss.tex. It
+restates the implemented equation families, identies where they appear in the repository narrative,
+and records the exact code locations where each block is implemented or approximated.
+2 Modeling boundaries and scope
+MATLAB is the authoritative source of the winter/heating operating-point grid and geometry-
+driven heater calculationsvermicomposter_air_heater_design_model.m:L1172-L1677.
+Python is authoritative for the nal reported heating recommendation, the full summer cooling
+workow, the annual layer, and the current text summaries and plotsheat_transfer_study.py:
+L2220-L2499;heat_transfer_study.py:L2534-L3292;heat_transfer_study.py:L5013-L70
+20.
+The model is reduced-order. Tubes are one-dimensional marching domains; the bed is a two-node
+lumped thermal network; plume and habitat calculations are post-processing estimates rather
+than CFDvermicomposter_air_heater_design_model.m:L1803-L2248;heat_transfer_stud
+y.py:L1062-L1595.
+1
+
+===== PAGE 2 =====
+The summer branch reuses the same bin wall, aeration-tube, evaporation, and two-node closures,
+but replaces electrical heating with spot-cooled inlet air and an assist-blower operating-point
+closureheat_transfer_study.py:L2760-L3378.
+This reference documents only equations actually found in the repository. WhereHeatTransfer
+Study/VermiHeatLoss.texcontains broader narrative or optional transient discussion not used
+by the rooted execution graph, that is called out explicitly.
+3 Modeling assumptions
+Air is treated as an ideal gas with Sutherland-law viscosity and xedc p andP rin the property
+packageheat_transfer_study.py:L3607-L3675;vermicomposter_air_heater_design_model
+.m:L2333-L2359.
+Heater and aeration tubes are discretized axially and solved by explicit marching rather than
+simultaneous PDE solutionvermicomposter_air_heater_design_model.m:L1803-L1999;
+heat_transfer_study.py:L2707-L2959.
+Parallel aeration branches are identical at a given operating point. Total heat, water loss, and
+power are assembled from per-tube or per-string contributionsvermicomposter_air_heater_de
+sign_model.m:L1497-L1677.
+The bed is represented by bottom and top thermal nodes with a single internal conductance
+between themvermicomposter_air_heater_design_model.m:L971-L1075;heat_transfer_st
+udy.py:L4326-L4438.
+Evaporation is represented as a local latent sink limited by diusion, carrying capacity, and
+available sensible heat; there is no resolved liquid transport eld in the compostvermicompost
+er_air_heater_design_model.m:L2000-L2122;heat_transfer_study.py:L2567-L2603.
+The vented-cover top is a repository-specic mixed boundary condition: insulated cover over most
+of the top plus free convection over a small vent areavermicomposter_air_heater_design_mod
+el.m:L971-L1075;HeatTransferStudy/VermiHeatLoss.tex:L785-L847.
+Summer spot-cooler behavior is a surrogate model based on congured rated quantities and simple
+psychrometric limiting, not a rst-principles vapor-compression cycle modelheat_transfer_st
+udy.py:L2605-L2705.
+4 Energy balances
+4.1 Air and psychrometric property package
+Dry-air density is evaluated as
+ρ= p
+RT .(1)
+Dynamic viscosity uses the Sutherland form
+µ=µ 0
+ T
+T0
+3/2 T0 +S
+T+S .(2)
+Thermal conductivity is then reconstructed from
+k= µcp
+P r .(3)
+2
+
+===== PAGE 3 =====
+For the summer psychrometric branch, humidity ratio is computed from vapor partial pressurep v
+as
+w= 0.62198 pv
+p−p v
+,(4)
+and, for a given relative humidityϕ,
+pv =ϕ p sat(T).(5)
+Herep sat(T)denotes the pure-water saturation pressure used by the implemented humid-air algebra.
+In the Python summer branch, that saturation-pressure call, the dew-point inversion built on it,
+and the latent-heat calls used later in the evaporation section are all routed through the imported
+IAPWS_95.pybackend; the detailed WagnerPruss form is developed later in the moisture section.
+Type.Equation (1) is exact for the ideal-gas approximation adopted here; (2) is a tted transport-
+property relation; (3) is a derived closure using xedc p andP r; (4)(5) are exact algebraic
+psychrometric relations for the implemented moisture basis.
+Repository-native narrative.H e a t T r a n s f e r S t u d y / V e r m i H e a t L o s s . t e x : L 1 1- L 37;
+HeatTransferStudy/VermiHeatLoss.tex:L1089-L1235;HeatTransferStudy/VermiHeatL
+oss.tex:L2084-L2245.
+Implementation.vermicomposter_air_heater_design_model.m:L2333-L2359;IAPWS_95.py:
+L614-L674;heat_transfer_study.py:L3946-L4003.
+Deviation note.The property package uses constantc p andP rrather than temperature-
+dependent tabulated humid-air properties.
+4.2 Tube-ow partitions, perforations, and electrical grouping
+Let the total imposed inlet volumetric ow be ˙Vtot and the number of parallel aeration branches be
+Ntubes. The per-tube inlet volumetric ow is
+˙Vtube,in =
+˙Vtot
+Ntubes
+.(6)
+Using the inlet densityρ in, the corresponding per-tube inlet mass ow is
+˙mtube,in =ρ in ˙Vtube,in.(7)
+For an aeration tube discretized intoN aer axial segments withN h perforation holes of diameterd h,
+Ah = πd2
+h
+4 , A h,tube =N hAh, A h,seg = Nh
+Naer
+Ah,(8)
+Following the general orice discharge relation compiled by Idel'chik ([R12], pp. 3132 of the acces-
+sible English translation), the closed-end aeration-tube model treats the segmentwise released mass
+ow as
+˙mrel,i =C dAh,seg
+p
+2ρi∆pi,∆p i = max(ptube,i −p bed,i,0).(9)
+Herep bed,i is the local bed-side gauge pressure returned by the segmentwise porous-bed backpressure
+closure in Section 5. Becausep bed,i itself depends on˙m rel,i through that Ergun-based closure,
+(9) is an implicit local scalar relation rather than a one-shot explicit discharge evaluation. The
+corresponding segment release fraction is therefore an output,
+ϕrel,i = ˙mrel,i
+˙mtube,in
+,
+NaerX
+i=1
+ϕrel,i = 1,(10)
+3
+
+===== PAGE 4 =====
+where the unity sum follows from the same steady closed-end mass balance used later in the axial
+march: the segment update is˙m rem,i+1 = ˙mrem,i −˙mrel,i with˙m rem,1 = ˙mtube,in, and the inlet gauge
+pressure is chosen so that the terminal residual at the cap satises˙m rem,Naer+1 ≈0. Therefore
+NaerX
+i=1
+˙mrel,i = ˙mtube,in −˙mrem,Naer+1 ≈˙mtube,in,
+so P
+i ϕrel,i = 1holds to the mass-balance tolerance of the closed-end shooting solve rather than by
+an independent ad hoc normalization. Operationally, for a prescribed˙m tube,in, the code solves these
+fractions by a scalar shooting method on inlet gauge pressure. It begins from a whole-hole-area
+estimate
+pin,hi ∼ 1
+2ρref
+ ˙mtube,in
+CdAh,tot
+2
+,
+then marches the tube segment by segment at that trial pressure. In segmenti, it solves the
+implicit local release equation (9) together with the porous-bed backpressure closure by bounded
+scalar bisection on˙m rel,i ∈[0,˙m rem,i], updates˙m rem,i+1, computes the local friction drop, and
+reduces the downstream tube pressure before moving to the next segment. After the last segment,
+the scalar residual for the trial inlet pressure is the remaining axial ow˙m rem,Naer+1. If that residual
+is still too large, the upper pressure bound is doubled until a bracket is found, and the code then
+bisects on inlet gauge pressure to nd the smallest value for which
+˙mrem,Naer+1 ≤max
+ 
+10−9,10 −4 ˙mtube,in
+
+.
+The converged segmentwise releases˙m rel,i from that nal marched state are then reported asϕ rel,i =
+˙mrel,i/˙mtube,in. and the local mean perforation-exit velocity is
+uh,i =
+˙Vrel,i
+Ah,seg
+.(11)
+The coil helix geometry is built from the mean coil diameterD mean, pitchp, and axial coil span
+Lcoil. The per-turn length is
+Lturn =
+p
+(πDmean)2 +p 2,(12)
+and the wire length is
+Lwire =N turnsLturn, N turns ≈ Lcoil
+p .(13)
+With wire resistivityρ wire(T)and cross-sectional areaA wire,
+Rtube =ρ wire(Tavg) Lwire
+Awire
+.(14)
+The current heating implementation does not assume that every heater tube is wired directly in
+parallel. Instead, each electricalstringis one current path made by wiring one or more identical
+heater tubes in series, and the supply sees several such strings in parallel. Agroupis the subset of
+strings that all have the same number of series-connected tubes, so they share the same current and
+per-tube power calculation. For groupg, letn s,g be the number of tubes in series in each string,
+and letn str,g be the number of parallel strings having that same series count. For example,8total
+4
+
+===== PAGE 5 =====
+tubes default to four identical2-tube strings, written4×2S;7total tubes default to one3-tube
+string in parallel with two2-tube strings, written1×3S + 2×2S. Then
+Itube,g = V
+ns,gRtube
+,(15)
+Ptube,g =I 2
+tube,gRtube,(16)
+and withn tubes,g =n s,gnstr,g,
+Itot =
+X
+g
+nstr,gItube,g, P tot =
+X
+g
+ntubes,gPtube,g.(17)
+The heater-tube air inlet is the greenhouse ambient state,
+Tair,in =T ∞,(18)
+and the aeration-tube inlet is the heater-tube outlet,
+Tair,in,aer =T air,out,heater.(19)
+For any tube of outer diameterD o, the outside perimeter used to convert an axial length to an
+external heat-transfer area is
+Pout =πD o, A seg,out =P out∆x.(20)
+Type.Equations (6), (7), (8), (10), and (20) are exact algebraic bookkeeping relations on the
+reduced-order model state. Equation (9) is the adopted closed-end perforation discharge closure
+based on [R12], pp. 3132, coupled to the segmentwise Ergun bed-backpressure closure introduced
+later in Section 5.
+Repository-native narrative.The same physical quantities appear inHeatTransferStudy/Ve
+rmiHeatLoss.tex:L961-L1034,HeatTransferStudy/VermiHeatLoss.tex:L1560-L1738, and
+HeatTransferStudy/VermiHeatLoss.tex:L2302-L2444.
+Implementation.vermicomposter_air_heater_design_model.m:L763-L875;vermicompo
+ster_air_heater_design_model.m:L1497-L1677;heat_transfer_study.py:L3895-L3924;
+vermicomposter_air_heater_design_model.m:L1684-L1727.
+Deviation note.The MATLAB implementation permits mixed string sizes for odd tube counts;
+the equations above are therefore written in grouped summation form rather than assuming a single
+equivalent series-parallel pattern.
+4.3 Heater-tube energy balance
+With heater lengthL heater discretized intoN heater segments,
+∆xheater = Lheater
+Nheater
+,(21)
+and the local generated electrical heat assigned to segmentiis
+qgen,i =P branch
+∆xheater
+Lheater
+.(22)
+5
+
+===== PAGE 6 =====
+For heater segmenti, the air-energy update is
+Tair,i+1 =T air,i + qgen,i −q loss,i
+˙mcp
+.(23)
+Wire temperature is then recovered from the local wire-to-air temperature rise
+∆Twire,i = qgen,i
+hwire,iA′
+wire∆x , T wire,i =T air,i + ∆Twire,i.(24)
+The segmentwise heater-shell loss is
+qloss,i =U heaterPout∆xheater (Tair,i −T ∞).(25)
+Type.Equation (22) is exact segment bookkeeping on the reduced model. Equation (23) is a
+discretized one-dimensional steady energy balance. Equations (24) and (25) are reduced-order
+algebraic temperature-drop and shell-loss closures.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L38-L121.
+Implementation.vermicomposter_air_heater_design_model.m:L1803-L1894;heat_transfe
+r_study.py:L3775-L3895.
+Deviation note.The wire-to-air temperature dierence is represented by a direct convective drop
+rather than a resolved wire conduction model.
+4.4 Aeration-tube segment balance
+With aeration lengthL aer discretized intoN aer segments,
+∆xaer = Laer
+Naer
+,(26)
+with the remaining in-tube mass ow marched by
+˙mrem,i+1 = ˙mrem,i −˙mrel,i,˙m rem,1 = ˙mtube,in,˙m rem,Naer+1 = 0.(27)
+The inlet gauge pressure is the value for which the coupled perforation-discharge march (9) and
+axial tube-friction march satisfy the terminal closed-end condition above. The mean throughow
+carried by segmentiis
+˙mmean,i = ˙mrem,i − 1
+2 ˙mrel,i.(28)
+This is the arithmetic average of the segment-inlet and segment-outlet axial throughows,
+˙mmean,i = ˙mrem,i + ˙mrem,i+1
+2 ,
+obtained by substituting (27). The model uses that midpoint ow as the segment-average air heat-
+capacity rate for the wall-exchange step, which is why it appears in the exponential wall factor (36)
+and inq wall,i. Using the segment average is a reduced-order approximation to continuously decreas-
+ing axial ow within a perforated segment: the inlet ow would overestimate the retained stream's
+thermal capacity over the whole segment, while the outlet ow would underestimate it. Thus the
+model doesnotforce the last segment's axial throughow to zero. Rather, the nal segment may
+still carry a nonzero inlet and mean throughow while releasing the remaining mass, and the zero-
+ow condition applies only to the post-segment residual˙m rem,Naer+1 at the closed cap. This discrete
+6
+
+===== PAGE 7 =====
+closure is physically consistent provided the nal modeled segment truly extends to the sealed end
+and contains the last active sidewall perforations near that sealed end. The end cap itself is not
+assumed to be perforated. Under that geometry, the nal segment can legitimately carry nonzero
+axial ow while its released side ux drives the downstream residual to zero at the cap. If the real
+hardware instead includes an unperforated dead-end tail after the last perforation row, that tail
+should be modeled as an additional no-release terminal section; otherwise the present discretization
+lumps too much distal release directly against the cap and overcompresses the true near-tip pres-
+sure and release prole. The pressure-side closure for the same aeration march, including the local
+tube-to-bed driving pressure, the segment friction update, the reported branch pressure require-
+ment, the distribution-network losses, and the full heating/cooling total pressure-drop assemblies,
+is consolidated in Section 5. For aeration segmenti, the net bed-side energy contribution is
+qbed,i =q wall,i +q jet,i −q evap,i.(29)
+Hereq wall,i is the wall-mediated sensible exchange with the bed,q jet,i is the direct released-air
+enthalpy term, andq evap,i is the latent sink associated with the selected evaporation rate. The
+wall and release-temperature closures are introduced immediately below in this subsection; the
+evaporation closure is developed later in the moisture section. Summing over the segment set gives
+Qbed,branch =
+X
+i
+qbed,i,(30)
+and the total bed heat rate acrossN tubes identical branches is
+Qbed,total =N tubesQbed,branch.(31)
+Both current rooted branches apply the same wall exchange through an exponential segment factor,
+d
+dx[ ˙mmean,icp (T−T bed,ref)] =−U aerPout (T−T bed,ref),(32)
+which is the standard one-dimensional segment energy balance for a plug-ow air stream exchanging
+heat with a local bed-side temperature reservoirT bed,ref through the overall conductanceU aerPout.
+Over one discrete segment, the implementation holds˙m mean,i,c p,U aer, andT bed,ref constant, so
+integrating (32) over∆x aer gives
+d(T−T bed,ref)
+T−T bed,ref
+=− UaerPout
+˙mmean,icp
+dx,(33)
+and therefore, from the segment inletx= 0withT=T air,i to the segment outletx= ∆x aer with
+T=T air,after wall,i,
+Z Tair,after wall,i−Tbed,ref
+Tair,i−Tbed,ref
+dθ
+θ =−
+Z ∆xaer
+0
+UaerPout
+˙mmean,icp
+dx=− UaerPout∆xaer
+˙mmean,icp
+,(34)
+so that
+ln
+ Tair,after wall,i −T bed,ref
+Tair,i −T bed,ref
+
+=− UaerPout∆xaer
+˙mmean,icp
+.(35)
+Applying the exponential function to both sides of (35) then gives the segment decay factor. This is
+not a separate tted relation; it is the direct algebraic solution of the standard rst-order constant-
+property wall-exchange balance represented by (32), consistent with the generic heat-transfer treat-
+ment cited in [R5].
+Θi = exp
+
+− UaerPout∆xaer
+˙mmean,icp
+
+,(36)
+7
+
+===== PAGE 8 =====
+Tair,after wall,i −T bed,ref
+Tair,i −T bed,ref
+= Θi,(37)
+soΘ i is literally the fraction of the segment-inlet temperature excess aboveT bed,ref that remains
+after wall exchange across one aeration segment. Values near 1 indicate weak decay over that
+segment, whereas values near 0 indicate strong relaxation of the retained tube air toward the bed-
+side reference temperature.
+Tair,after wall,i =T bed,ref + (Tair,i −T bed,ref) Θi,(38)
+This quantity is therefore aderived segment-outlet retained-air temperature, not a separate state
+that stores the inside-convection, wall-conduction, and outside-transfer contributions individually.
+Those mechanisms enter only through the upstream denition ofU aer and hence throughΘ i; once
+(38) is evaluated,T air,after wall,i is just the resulting outlet temperature of the retained tube air. and
+the retained in-tube air state is marched to the next aeration segment by
+Tair,i+1 =T air,after wall,i.(39)
+with
+qwall,i = ˙mmean,icp (Tair,i −T air,after wall,i).(40)
+The discharge-enthalpy term uses the segment-average release temperature
+Trel,i = Tair,i +T air,after wall,i
+2 .(41)
+Type.Derived reduced-order balance.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L151-L205;HeatTr
+ansferStudy/VermiHeatLoss.tex:L1586-L1609;HeatTransferStudy/VermiHeatLoss.tex:
+L2168-L2238.
+Implementation.vermicomposter_air_heater_design_model.m:L1895-L2076;heat_transfe
+r_study.py:L2987-L3277;heat_transfer_study.py:L4182-L4323.
+Deviation note.The model treats released-air sensible exchange as a lumped enthalpy source
+rather than resolving jets in the pore space. The inlet gauge pressure is obtained by scalar shoot-
+ing/bisection, so the terminal condition˙m rem,Naer+1 = 0is satised to numerical tolerance rather
+than by closed-form inversion.
+4.5 Two-node bed balance
+HereT b andT t are the bottom-node and top-node bed temperatures, respectively;T ∞ is the ambient
+air temperature;Q b andQ t are the net bed heat inputs assigned to the bottom and top nodes;U A b,∞
+andU A t,∞ are the bottom-to-ambient and top-to-ambient conductances; andU A 12 is the internal
+conductance coupling the two bed nodes. The split factorf b assigns a fraction of the total bed heat
+rateQ bed,total to the bottom node. The bottom and top bed nodes are solved from the steady2×2
+linear system U Ab,∞ +U A 12 −U A12
+−U A12 U At,∞ +U A 12
+ Tb
+Tt
+
+=
+Qb +U A b,∞T∞
+Qt +U A t,∞T∞
+
+,(42)
+with
+Qb =f bQbed,total, Q t = (1−f b)Qbed,total.(43)
+8
+
+===== PAGE 9 =====
+In variable-role terms,T b andT t are the dependent unknown node temperatures solved from the
+linear system. The ambient temperatureT ∞, the total bed heat rateQ bed,total, the split factor
+fb, and the conductancesU A b,∞,U A t,∞, andU A 12 are treated as known inputs for the current
+operating point. The quantitiesQ b andQ t are therefore not additional unknowns; they are derived
+forcing terms assembled fromQ bed,total andf b.
+Physically, (42) enforces steady energy balance on two lumped bed control volumes. The bottom
+node exchanges heat with ambient throughU A b,∞, exchanges heat with the top node throughU A 12,
+and receives the assigned bed loadQ b. The top node does the analogous thing withU A t,∞,U A 12,
+andQ t. The diagonal terms in the matrix collect heat leakage out of each node, the o-diagonal
+terms represent internal node-to-node coupling, and the right-hand side collects the externally im-
+posed heating/cooling plus the ambient forcing.
+Numerically, this is solved as a direct dense2×2linear solve, not by iteration: MATLAB uses left
+divisionA\b, and Python usesnp.linalg.solve. In the rooted heating path and in the annual
+layer, that direct solve is the entire bed-temperature step once the conductances andQ bed,total are
+known. In the summer cooling branch, the same direct two-node solve is nested inside an outer
+scalar xed-point/bisection closure for the bed reference temperature, but the inner two-node kernel
+itself remains this direct algebraic solve.
+Type.Derived algebraic reduction of a two-node thermal network.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L365-L424;HeatTran
+sferStudy/VermiHeatLoss.tex:L2010-L2079.
+Implementation.vermicomposter_air_heater_design_model.m:L2233-L2248;heat_transfe
+r_study.py:L4432-L4438.
+Deviation note.The current rooted execution path does not use the optional transient MATLAB
+PID simulation; the authoritative audit path is the steady algebraic solve above.
+5 Fluid mechanics, pressure-loss assumptions, and pressure-drop
+model
+This section consolidates the uid-mechanical assumptions and the exact pressure-drop quantities
+reported by the current code.
+Fluid-mechanical assumptions used by the pressure-loss and aeration-discharge model.
+Internal passages are treated as smooth circular tubes. Tube friction is represented by Darcy
+Weisbach pressure loss with64/Rein laminar ow and Churchill's explicit smooth-tube relation
+otherwise, and abrupt area changes are represented by standard minor-loss coecients rather
+than resolved separation or secondary-ow models.
+Flow is not treated with a full compressible momentum formulation. The code does update
+local density from the ideal-gas relation using the local temperature and pressure state, but the
+friction, minor-loss, and perforation-discharge closures are all used in their incompressible-form
+reduced-order versions.
+The optional upstream header loss and the unresolved internal splitter/manifold loss are repre-
+sented by textbook tting-loss surrogates from the CrowlLouvar2-Kmethod.
+Parallel aeration branches are assumed identical at a given operating point, so one representative
+closed-end perforated branch is marched axially and then scaled up.
+Perforations are smeared uniformly over the congured segment count rather than resolved hole
+by hole. The end cap itself is not perforated.
+9
+
+===== PAGE 10 =====
+When an open top or top vent is present, the bed-side pressure opposing perforation discharge is
+derived segmentwise from a reduced-order Ergun porous-bed escape model leading to the open
+top or nearest vent. If no such ambient-side opening exists, the current code falls back to the
+congured bed-side boundary gauge pressure.
+The porous-bed closure is still reduced-order: it uses one representative tube-center height and
+one tributary top area per tube segment rather than a full three-dimensional porous-bed or
+headspace-ow network.
+The marched tube gauge pressure is not allowed to fall below the local bed-side gauge pressure
+used for that segment, so the reduced-order march does not permit reversal of the intended
+discharge direction.
+All pressures in the aeration branch march are written on a gauge basis unless explicitly noted
+otherwise. Letp tube,i denote the local tube gauge pressure at the inlet of aeration segmenti, let
+pout,offset denote the congured outlet-boundary gauge-pressure oset supplied throughbedSideG
+augePressure_Pa, letp out,bnd denote the outlet-boundary gauge pressure at the end of the porous
+escape path, letp bed,i denote the local bed-side gauge pressure predicted for segmenti, and let
+pin,gauge denote the aeration-branch inlet gauge pressure returned by the closed-end shooting solve.
+Herep out,bnd is the pressure at the top opening or vent outlet reached by the porous escape path,
+not the pressure adjacent to the tube wall. For one branch assigned an equal share ofN vent identical
+circular top vents of diameterD vent, the total branch-share vent area is
+Avent,branch = NventπD2
+vent
+4Ntubes
+.(44)
+By denition, the outlet-boundary gauge pressurep out,bnd is
+pout,bnd =
+
+
+
+pout,offset,open top,
+pout,offset + 1
+2ρout
+ ˙mtube,in
+Cd,ventAvent,branch
+2
+,covered top plus vents,
+pout,offset,no explicit top opening modeled.
+(45)
+HereC d,vent = 0.63is the simple-hole discharge coecient implied by the CrowlLouvar entrance-
+plus-exit loss treatment for a hole, for which they note P Kf = 1.5and thereforeC d ≈0.63from
+equation (4-40) [R14, p. 126]. The boundary densityρ out is evaluated with the same air-property
+package used elsewhere in the branch march, at the current bed-reference temperature and ambient
+absolute pressurep ∞. Thus an open top uses a direct atmospheric boundary up to the congured
+gauge oset, a covered vented top adds a CrowlLouvar vent-hole discharge backpressure, and a fully
+closed-top case still falls back to the congured oset because no outlet geometry is available from
+which to derive a separate top-side discharge loss. Under the repository defaultp out,offset = 0 Pa
+gauge, the open-top case therefore corresponds to an atmospheric boundary. The local absolute
+pressure used for property evaluation is
+pabs,i =p ∞ + max(ptube,i, pout,bnd),(46)
+wherep ∞ is the ambient absolute pressure. For the distribution network,u header is the mean
+velocity in the upstream header,u conn is the mean velocity in the branch connector,D header is the
+header inside diameter,D split,in is the splitter-inlet inside diameter,D conn is the branch-connector
+inside diameter,D down is the downstream branch-tube diameter seen by the connector-to-branch
+10
+
+===== PAGE 11 =====
+transition, andL conn is the branch-connector length. Because the CrowlLouvar2-Ktting method
+is tabulated on an inch basis while the present document is written in SI units, use
+1 in = 0.0254 m, D in = D
+0.0254 , D conn,in = Dconn
+0.0254 ,
+when inserting SI diameters into the2-Kformulas below. The connector friction factorf conn is the
+Churchill friction factor evaluated at the connector Reynolds number
+Reconn = ρuconnDconn
+µ .
+If a header is present, it is the shared upstream passage between the blower outlet and the splitter
+inlet; if no distinct common passage exists there, the model setsheaderEnabled=falseand omits
+the header term entirely.
+The code constructs Reynolds number in the standard form
+Re= ρuD
+µ .(47)
+For laminar internal ow, the Darcy friction factor is
+f= 64
+Re .(48)
+For turbulent internal ow, the implemented smooth-tube Churchill expression is
+A=
+
+2.457 ln
+ 1
+(7/Re)0.9
+16
+, B=
+37530
+Re
+16
+,(49)
+f= 8
+" 8
+Re
+12
++ 1
+(A+B) 3/2
+#1/12
+.(50)
+Tube friction losses are accumulated with DarcyWeisbach:
+∆pf =f L
+D
+ρu2
+2 .(51)
+For the reduced-order porous escape model surrounding one representative aeration branch, let the
+lled bed height be
+Hfill =H binffill,(52)
+whereH bin is the bin interior height andf fill is the lled-volume fraction. In this porous-escape
+geometry,xdenotes the axial coordinate measured from the upstream aeration-tube inlet toward
+the closed end, andydenotes the vertical coordinate measured upward from the bin oor. The index
+i= 1, . . . , N aer enumerates the uniformly discretized aeration segments, so with∆x aer =L aer/Naer
+the segment-center location is derived directly from the midpoint of segmenti. The quantityy tube,rep
+is not a solved axial prole; it is the one representative tube-center height used by the reduced-order
+porous-bed closure for all segments. If the user suppliesrepresentativeTubeCenterHeight_m, the
+code uses that value directly. Otherwise it defaults to a heuristic representative height of0.10H fill,
+clamped so the tube center remains at least one tube radius above the bin oor and one tube radius
+below the lled top surface.
+11
+
+===== PAGE 12 =====
+Let the tributary top area assigned to one tube segment be
+Abed,trib = Wbin∆xaer
+Ntubes
+, x i =
+
+i− 1
+2
+
+∆xaer.(53)
+This tributary area is derived from an equal-strip allocation: each segment is assigned a bed strip of
+axial length∆x aer, full bin widthW bin, and one-N tubes share of that top area because the parallel
+aeration tubes are assumed hydraulically identical in the present reduced-order closure. If the top
+is open, the porous escape length for each segment is taken as the vertical distance to the lled top
+surface,
+Lbed,i =H fill −y tube,rep.(54)
+If the top is covered but vented withN vent equal vents assumed evenly spaced over the aeration
+lengthL aer, then the vent-center locations are
+xvent,j =
+
+j− 1
+2
+ Laer
+Nvent
+,(55)
+wherej= 1, . . . , N vent is simply the vent index. The present model does not solve vent positions
+from geometry data; it derives them from the simplifying assumption thatN vent identical vents are
+evenly spaced over the covered aeration lengthL aer. and the porous escape length for segmentiis
+approximated by the straight-line distance to the nearest vent center,
+Lbed,i =
+s
+(Hfill −y tube,rep)2 +
+
+min
+j
+|xi −x vent,j|
+2
+.(56)
+The local supercial bed velocity associated with one segment release is then
+ubed,i = ˙mrel,i
+ρiAbed,trib
+,(57)
+which is obtained directly from continuity on the porous-bed side using the released mass ow˙m rel,i,
+the segment-iair densityρ i, and the tributary bed areaA bed,trib. The present model uses this as a
+supercialvelocity, meaning it is based on the total assigned cross-sectional bed area rather than on
+only the void area. It is therefore the standard Ergun velocity scale; the corresponding interstitial
+pore velocity would beu bed,i/ε, but that is not the quantity inserted into the current closure. and
+the segmentwise Ergun pressure gradient is
+∆pErgun,i
+Lbed,i
+= 150(1−ε) 2
+ε3
+µiubed,i
+d2p
++ 1.751−ε
+ε3
+ρiu2
+bed,i
+dp
+,(58)
+whereεis the bed porosity (void fraction) used by the porous-ow closure. In the current repository,
+the default value is held constant at
+ε= 0.801 + 0.799
+2 = 0.800,
+taken as the arithmetic mean of the Table 2 pre-composting total-porosity values at COM day 21 and
+day 63, which bracket the repository's nominal 30-day pre-composting window [R16, Table 2, p. 299].
+The present reduced-order model keeps that porosity constant rather than evolving it in time because
+the same source shows only weak variation during the combined composting-plus-vermicomposting
+process: in the C + V data, total porosity changes from79.9to81.0%v/v between day 63 and
+12
+
+===== PAGE 13 =====
+day 203, a spread of only1.1percentage points over140days [R16, Table 2, p. 299]. A user override
+remains available throughbedPorosityif later material-specic measurements are preferred. The
+localρ i andµ i are the segment-iair density and viscosity returned by the same local air-property
+package used elsewhere in the branch march. The quantityd p is the representative particle diameter
+used by the porous-ow closure. In the current repository, if no explicitbedParticleDiameter_m
+override is supplied, the Ergun model defaults to
+dp =d 32,
+reusing the same Table 3 Sauter mean diameter dened later by (124) for the particle-surface
+wetted-area estimate so that the porous-ow and surface-area submodels share the same default
+particle-size basis. A separate override remains available if later hydraulic calibration indicates that
+the eective porous-ow diameter should dier from the surface-area diameter. The code then takes
+the local bed-side gauge pressure as
+pbed,i =p out,bnd + ∆pErgun,i.(59)
+If no open top or top vent is present, the present reduced-order implementation does not dene a
+separate ambient-side porous escape path and therefore falls back to
+pbed,i =p out,offset.
+For the closed-end aeration branch, the local pressure dierence driving perforation discharge is
+∆pi = max(ptube,i −p bed,i,0),(60)
+so the local release law (9) is evaluated on that tube-to-bed pressure dierence. The explicit Darcy
+friction drop marched across aeration segmentiis
+∆pseg,i =f i
+∆xaer
+Daer
+ρiu2
+i
+2 ,(61)
+with axial pressure update
+ptube,i+1 = max(ptube,i −∆p seg,i, p bed,i), p tube,1 =p in,gauge.(62)
+The accumulated explicit tube-friction contribution is therefore
+∆ptube,fric =
+NaerX
+i=1
+∆pseg,i.(63)
+This quantity is the accumulated explicit frictiondrop, not a local tube-pressure state. The local
+tube gauge pressure at segmentiisp tube,i, whereas the cumulative friction drop up to that location
+may be written
+∆p(i)
+tube,fric =
+i−1X
+k=1
+∆pseg,k.(64)
+If the bed-pressure oor in (62) never activates, then
+ptube,i =p in,gauge −∆p (i)
+tube,fric.(65)
+13
+
+===== PAGE 14 =====
+More generally,p in,gauge −p tube,i is the realized cumulative drop to that location, while∆p tube,fric
+denotes only the explicit Darcy friction contribution summed over the aeration segments. The
+reported aeration-branch pressure requirement is the inlet gauge pressure returned by the closed-
+end discharge-plus-friction shooting solve,
+∆paer,reported =p in,gauge,(66)
+rather than∆p tube,fric alone. Under the default open-top and zero-oset conguration,p out,bnd = 0
+and this reported quantity is the branch pressure drop from the aeration inlet to the atmospheric
+outlet boundary seen by the porous escape path. Abrupt expansion is modeled as
+ζexp =
+
+1− A1
+A2
+2
+,∆p exp =ζ exp
+ρu2
+1
+2 .(67)
+HereA 1 andA 2 are the upstream and downstream cross-sectional areas of the local area change,
+andu 1 is the upstream mean velocity. For a conical contraction from the larger areaA 1 to the
+smaller areaA 2, let
+ϵ= A2
+A1
+,
+and letθdenote the included cone angle. The conical contraction surrogate uses an Idel'chik
+bellmouth coecientC(ϵ, θ)and applies
+ζcontr =C(ϵ, θ)
+1
+ϵ −1
+
+,∆p contr =ζ contr
+ρu2
+2
+2 .(68)
+Hereu 2 is the mean velocity in the smaller downstream passage. Whenever the text later writes a
+shorthand such as
+∆pcontr( ˙m, D1, D2, θ),
+it means: evaluate (68) for a contraction carrying mass ow˙mfrom upstream diameterD 1 to
+downstream diameterD 2 at cone angleθ, with
+A1 = πD2
+1
+4 , A 2 = πD2
+2
+4 , ϵ= A2
+A1
+, u 2 = 4 ˙m
+ρπD2
+2
+.
+Likewise, the shorthand
+∆pexp( ˙m, D1, D2)
+means: evaluate (67) for an abrupt expansion carrying mass ow˙mfrom upstream diameterD 1 to
+downstream diameterD 2, with
+A1 = πD2
+1
+4 , A 2 = πD2
+2
+4 , u 1 = 4 ˙m
+ρπD2
+1
+.
+These are only compact notational shorthands for repeated use of the already dened minor-loss
+relations; they are not separate empirical formulas.
+Following the CrowlLouvar presentation of Hooper's2-Kmethod [R14, pp. 124126], the tting-
+loss coecient for a resolved tting is
+Kf = K1
+Re +K ∞
+
+1 + 1
+Din
+
+,(69)
+14
+
+===== PAGE 15 =====
+whereD in is the ow-path inside diameter expressed in inches. For entrances and exits, Crowl and
+Louvar modify that relation to
+Kentr/exit = K1
+Re +K ∞.(70)
+In the present repository, the optional upstream-header term is idealized as a normal entrance into
+the separate header, so the code uses
+Kheader = 160
+Reheader
++ 0.50, Re header = ρuheaderDheader
+µ .(71)
+Crowl and Louvar list these normal-entrance constants immediately below equation (4-39), stating
+K1 = 160andK ∞ = 0.50for a normal entrance [R14, p. 126]. IfheaderEnabled=false, the model
+omits that header term entirely.
+The commercial4-way shuto manifold does not publish an internal hydraulic-loss model, so one
+branch path through the splitter body is approximated as a standard threaded tee used as an elbow
+followed by one full-line open gate/ball/plug valve, both on the connector basis from Table 4-2 [R14,
+p. 125]:
+Ktee,branch = 500
+Reconn
++ 0.70
+
+1 + 1
+Dconn,in
+
+,(72)
+Kvalve,full = 300
+Reconn
++ 0.10
+
+1 + 1
+Dconn,in
+
+,(73)
+and therefore
+Ksplitter,body =K tee,branch +K valve,full (74)
+This remains a hardware surrogate because the manifold's actual internal geometry is unresolved,
+but it is now tied to explicit textbook tting rows rather than to an arbitrary user-specied lumped
+K.
+The individual distribution-network components reported by the code are all optional in the sense
+that they appear only when the corresponding geometric element exists in the modeled distribution
+path. Thus:
+∆p header appears only when a separate upstream header is enabled.
+∆p header→splitter appears only when that separate header exists and contracts into the splitter
+inlet.
+∆p splitter appears only when ow passes through the splitter/manifold body.
+∆p connector,fric appears only whenL conn >0.
+∆p connector→branch appears only when the downstream branch-tube diameter diers from the con-
+nector diameter.
+Written individually, these contributions are
+∆pheader =K header
+ρu2
+header
+2 ,(75)
+∆pheader→splitter = ∆pcontr( ˙msplit, Dheader, Dsplit,in, θcone),(76)
+∆psplitter =K splitter,body
+ρu2
+conn
+2 ,(77)
+∆pconnector,fric =f conn
+Lconn
+Dconn
+ρu2
+conn
+2 ,(78)
+15
+
+===== PAGE 16 =====
+and
+∆pconnector→branch =
+
+
+
+∆pcontr( ˙mbranch, Dconn, Ddown, θcone), D down < Dconn,
+∆pexp( ˙mbranch, Dconn, Ddown), D down > Dconn,
+0, D down =D conn.
+(79)
+Here˙m split is the mass ow entering the splitter inlet,˙m branch is the mass ow in one representative
+branch connector, andθ cone is the congured included contraction-cone angle used in the Idel'chik
+contraction surrogate. The total distribution-network loss is the sum of whichever of these optional
+terms are active for the chosen geometry and conguration:
+∆pdist = ∆pheader + ∆pheader→splitter + ∆psplitter + ∆pconnector,fric + ∆pconnector→branch.(80)
+For the summer cooling branch, the exact reported total is
+∆ptot,cool = ∆paer,reported + ∆pdist.(81)
+For heating electrical-topology groupg, the heater-tube internal friction contribution is
+∆pheater,g =
+X
+j
+fj
+∆xheater
+Dheater
+ρju2
+j
+2 ,(82)
+the branch expansion loss from the heater tube into the larger aeration tube is∆p exp,g, and the
+exact reported branch total is
+∆pbranch,g = ∆pheater,g + ∆pexp,g + ∆paer,reported,g.(83)
+Because multiple series-group topologies can coexist in parallel, the reported winter total takes the
+largest branch requirement across groups and then adds the shared distribution network:
+∆ptot,heat = max
+g
+(∆pbranch,g) + ∆pdist.(84)
+For mixed series-group topologies, the current Python implementation further solves a redistribution
+closure instead of freezing equal branch ow across all groups. Dene the group-private branch-path
+requirement as
+∆ppath,g( ˙mg) = ∆pdist,private,g( ˙mg) + ∆pheater,g( ˙mg) + ∆pexp,g( ˙mg) + ∆paer,g( ˙mg),(85)
+with
+∆pheater,g = ∆pheater,fric,g + ∆pcoil,g.(86)
+The coil-obstruction reduced-order model is evaluated segmentwise as
+∆pcoil,g =
+X
+j
+"
+Mcoil CD,coil
+ρju2
+n,j
+2
+ aproj
+Atube
+
+∆xheater
+#
+, u n,j =u bulk,j ϕhelix.(87)
+Herea proj is the wire projected frontal area per unit heater length,A tube is the heater internal
+ow area,ϕ helix is the helix-angle factor,C D,coil isheaterTube.coilDragCoefficient, andM coil is
+heaterTube.coilLossMultiplier. This term is a reduced-order surrogate informed by Idel'chik's
+wire-ribbing/spiral-ribbed resistance discussions [R17], not a direct one-chart transcription.
+16
+
+===== PAGE 17 =====
+The redistribution closure introduces a common group-path pressure∆p branch,common such that
+∆ppath,g( ˙mg) = ∆pbranch,common,∀g,(88)
+and enforces total-ow consistency,
+X
+g
+ntubes,g ˙mg = ˙mtot.(89)
+Equation (88) doesnotimply equal˙m g across groups. It states that each active group connects the
+same splitter-outlet node to the same downstream outlet-boundary node, so each group is evaluated
+at its own˙m g but must satisfy the same node-to-node pressure requirement. Writing common-node
+pressures explicitly,
+∆pdist,common =p 0 −p s,∆p path,g( ˙mg) =p s −p out,(90)
+and therefore
+∆ptot,heat =p 0 −p out = ∆pdist,common + ∆pbranch,common.(91)
+The group-specic branch drops are not summed acrossg: they are parallel alternatives between
+the same two nodes, not serial elements traversed by one uid parcel.
+Algorithmically, for a trial∆p branch,common, each group inverts (88) by bounded bisection to obtain
+˙mg, then an outer bisection adjusts the trial pressure to satisfy (89). In residual form,
+R(∆pbranch,common) =
+X
+g
+ntubes,g ˙mg(∆pbranch,common)−˙m tot = 0.(92)
+The explicit outer bracket and bisection used for (92) can be written as
+∆p(0)
+lo = 0,∆p (0)
+hi = max
+g
+
+∆ppath,g
+ ˙mtot
+ntubes,g
+
+,(93)
+where the equal-share ow˙m tot/ntubes,g is used only to construct a conservative upper bracket and
+is not the nal mixed-group operating point unless the groups are hydraulically identical.
+∆p(k)
+mid = ∆p(k)
+lo + ∆p(k)
+hi
+2 ,(94)
+with update 
+
+
+∆p(k+1)
+hi = ∆p(k)
+mid,∆p (k+1)
+lo = ∆p(k)
+lo , R
+
+∆p(k)
+mid
+
+≥0,
+∆p(k+1)
+lo = ∆p(k)
+mid,∆p (k+1)
+hi = ∆p(k)
+hi , R
+
+∆p(k)
+mid
+
+<0,
+(95)
+and stop criterion
+∆p(k)
+hi −∆p (k)
+lo ≤max
+
+10−6,10 −6 max
+h
+∆p(k)
+hi ,1
+i
+.(96)
+For a given trial pressure∆p branch,common, the inner group inversion in (88) uses
+˙m(0)
+lo,g = 0,˙m (0)
+hi,g = ˙mtot
+ntubes,g
+,(97)
+˙m(n)
+mid,g =
+˙m(n)
+lo,g + ˙m(n)
+hi,g
+2 ,(98)
+17
+
+===== PAGE 18 =====
+then (
+˙m(n+1)
+lo,g = ˙m(n)
+mid,g,˙m (n+1)
+hi,g = ˙m(n)
+hi,g,∆p path,g( ˙m(n)
+mid,g)≤∆p branch,common,
+˙m(n+1)
+hi,g = ˙m(n)
+mid,g,˙m (n+1)
+lo,g = ˙m(n)
+lo,g,∆p path,g( ˙m(n)
+mid,g)>∆p branch,common,
+(99)
+with evaluated midpoint
+˙m(n)
+eval,g = max
+
+˙m(n)
+mid,g,˙mmin,branch
+
+,(100)
+where˙m min,branch is the solver-side small-ow oor used only to keep state evaluation well posed.
+The accepted value is˙m g ≈˙m(n)
+lo,g at convergence under
+˙m(n)
+hi,g −˙m(n)
+lo,g ≤max
+
+10−9,10 −6 max
+h
+˙m(n)
+hi,g,1
+i
+.(101)
+These equations are the document-side statement of the implemented bracket/bisection closure.
+Under this mixed-group closure, the reported winter total is
+∆ptot,heat = ∆pdist,common + ∆pbranch,common,(102)
+which reduces to (84) when only one group exists. IfheaderEnabled=false, then∆p dist,common = 0
+and the modeled total is the solved branch-common pressure alone.
+Type.Equations (47)(102) are standard uid-mechanics relations plus a repository-congured
+network assembly, textbook-derived tting surrogates for unresolved hardware, the segmentwise Er-
+gun porous-bed backpressure reduction, and the closed-end branch shooting closure.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L862-L961;HeatTran
+sferStudy/VermiHeatLoss.tex:L1899-L2009.
+Implementation.vermicomposter_air_heater_design_model.m:L1542-L1668;vermicompost
+er_air_heater_design_model.m:L1948-L2034;vermicomposter_air_heater_design_model.m:
+L2203-L2341;heat_transfer_study.py:L3128-L3246;heat_transfer_study.py:L4515-L4618;
+heat_transfer_study.py:L4698-L4827.
+Primary-source citations.Equations (49)(50) follow Churchill's explicit all-regime friction rela-
+tion [R3, pp. 9192]. Equation (58) uses the standard Ergun packed-bed pressure-drop relation [R15].
+The constant default porosity used with that closure is taken from the total-porosity values reported
+in Fornes et al., Table 2 [R16, p. 299]. Equation (67) uses the Idel'chik sudden-expansion coecient
+on the upstream-velocity basis [R6, p. 112]. Equation (68) uses Idel'chik's contraction relation,
+equation (3-3) [R12, pp. 8384]. Equation (69) matches Crowl and Louvar's statement of Hooper's
+2-Ktting method, equation (4-38) [R14, p. 124]. Equation (70) matches their entrance/exit modi-
+cation, equation (4-39), with the normal-entrance constants used in (71) taken from the same page
+[R14, p. 126]. The tee and full-line valve constants used in (72) and (73) come from Table 4-2 [R14,
+p. 125]. The vented-top outlet-boundary closure (45) uses the same source's simple-hole discussion
+below equation (4-40), where Crowl and Louvar note P Kf = 1.5andC d ≈0.63for a hole [R14,
+p. 126]. Equation (87) is a repository-specic reduced-order projected-area drag surrogate moti-
+vated by Idel'chik's wire-ribbing and spiral-ribbed air-heater resistance discussions [R17].
+Deviation note.The header and splitter-body terms are still surrogates for unresolved hardware,
+but they are now based on textbook2-Ktting rows rather than on arbitrary standalone lumped
+K-values. The bed-side backpressure is likewise still reduced-order: the current implementation uses
+one representative tube-center height, one tributary top area per segment, the nearest-top-opening
+path length, and a branch-share vent-hole outlet closure when vents exist, but it does not solve
+a full three-dimensional porous-bed or vent-network ow eld. The reported aeration-branch pres-
+sure requirement is the inlet gauge pressure needed by the coupled closed-end discharge-plus-friction
+march, not merely the sum of the explicit tube-friction terms.
+18
+
+===== PAGE 19 =====
+6 Internal convection correlations
+The internal convection coecient is always formed from
+h= N u k
+D .(103)
+For laminar developing ow, the implemented Hausen-type relation is
+Gz=Re P r D
+L ,(104)
+N u= 3.66 + 0.0668Gz
+1 + 0.04Gz2/3 , Re <2300.(105)
+For turbulent ow, the implemented Gnielinski relation is
+N u= max
+
+3.66, (f /8)(Re−1000)P r
+1 + 12.7(f /8)1/2(P r2/3 −1)
+
+, Re≥2300.(106)
+Type.Empirical correlations.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L80-L103;HeatTran
+sferStudy/VermiHeatLoss.tex:L862-L961.
+Implementation.vermicomposter_air_heater_design_model.m:L2382-L2398;heat_transfe
+r_study.py:L3764-L3774.
+Primary-source citations.Equation (105) is the Hausen entry-region correlation [R13, pp. 91
+98]. Equation (106) follows Gnielinski's turbulent tube-ow relation [R2, pp. 359368].
+Deviation note.The same branch logic is used for both heater and aeration tubes. No separate
+roughness correction or transitional blending beyond the branch cuto is implemented.
+7 External convection correlations
+For crossow around the heater wire and perforation-scale characteristic diameter, the code uses
+the ChurchillBernstein correlation
+N u= 0.3 + 0.62Re1/2P r1/3
+
+1 + (0.4/P r)2/31/4
+"
+1 +
+ Re
+282000
+5/8#4/5
+.(107)
+For external vertical walls, the Rayleigh number is
+Ra= gβ∆T L3
+να ,(108)
+and the ChurchillChu plate relation is
+N u=
+"
+0.825 + 0.387Ra1/6
+ 
+1 + (0.492/P r)9/168/27
+#2
+, h= N uk
+L .(109)
+For horizontal top or vent surfaces, the implemented piecewise free-convection relation is
+N u=
+
+
+
+0.54Ra1/4, T s ≥T ∞, Ra≤10 7,
+0.15Ra1/3, T s ≥T ∞, Ra >10 7,
+0.27Ra1/4, T s < T ∞.
+(110)
+19
+
+===== PAGE 20 =====
+For the Rayleigh evaluation in (108), the implemented property state is the lm state
+Tf = Ts +T ∞
+2 , β= 1
+Tf,K
+,∆T=|T s −T ∞|, α= k
+ρcp
+,(111)
+withT f,K =T f + 273.15. Thus, conceptually:βis the thermal-expansion term driving buoyancy,
+∆Tis the wall-to-ambient buoyancy temperature dierence, andαis thermal diusivity.
+For the elevated bottom, the same horizontal-plate family is used with downward-facing orientation
+logic (stable/unstable branch inverted relative to upward-facing surfaces):
+N ubottom =
+
+
+
+0.27Ra1/4
+bottom, T s,bottom ≥T ∞ (stable; heated downward-facing),
+0.54Ra1/4
+bottom, T s,bottom < T ∞, Ra bottom ≤10 7 (unstable),
+0.15Ra1/3
+bottom, T s,bottom < T ∞, Ra bottom >10 7 (unstable).
+(112)
+Here stable and unstable refer to buoyancy stability of the adjacent air layer, not numerical
+stability: unstable orientation promotes overturning/plume formation and higher free-convection
+transport, while stable orientation suppresses overturning.
+For insulated side walls, covered tops, and elevated bottoms,T s denotes the exterior insulation-
+surface temperature from the wall-stack xed-point solve; for open top/vent openings, the same
+correlation family is applied to the exposed top-surface temperature proxy.
+Type.Empirical correlations.
+Repository-native narrative.H e a t T r a n s f e r S t u d y / V e r m i H e a t L o s s . t e x : L 3 0- L 57;
+HeatTransferStudy/VermiHeatLoss.tex:L203-L244;HeatTransferStudy/VermiHeatLoss.tex:
+L862-L961.
+Implementation.vermicomposter_air_heater_design_model.m:L1111-L1155;vermicompost
+er_air_heater_design_model.m:L2372-L2381;heat_transfer_study.py:L3710-L3754.
+Primary-source citations.Equation (107) is Churchill and Bernstein's overall cylinder-in-
+crossow correlation, equation (9) [R1, p. 303]. Equation (109) is the ChurchillChu isothermal
+vertical-plate relation, equation (9) [R4, p. 1325].
+Deviation note.The same ChurchillBernstein form is reused for wire cooling; hole-scale evap-
+oration coupling in the current Python path uses the Frössling-Sherwood closure documented in
+Section 11.
+8 Conduction and thermal resistance networks
+The implemented wall-stack coecient is
+Uwall =
+ 1
+hinside,bin
++ tsheet
+ksheet
++ tins
+kins
++ 1
+hext
+−1
+.(113)
+The same algebraic structure is used for the heater tube and aeration tube:
+Uheater =
+ Dheater,exp
+Di,heater hinside,heater
++ Dheater,exp
+2kwall,heater
+ln Do,heater
+Di,heater
++ Dheater,exp
+2kins,heater
+ln Dheater,exp
+Do,heater
++ 1
+houtside,heater
+−1
+,
+(114)
+Uaer =
+ Do,aer
+Di,aer hinside,aer
++ Do,aer
+2kwall,aer
+ln Do,aer
+Di,aer
++ 1
+houtside,aer
+−1
+.(115)
+20
+
+===== PAGE 21 =====
+The coecients used in these resistance networks are dened explicitly as
+hinside,bin =h bin,in,cfg, h inside,heater =M wall
+N uheaterk
+Di,heater
+, h outside,heater =h heater,ext,cfg,(116)
+hinside,aer =M wall
+N uaerk
+Di,aer
+, h outside,aer =M bedhbed,cfg, h wire =M wire
+N uwirek
+Dwire
+.(117)
+HereM wire ≡calibration.hWireMultiplier,M wall ≡calibration.hWallMultiplier, and
+Mbed ≡calibration.bedHTMultiplier. The congured scalar coecients areh bin,in,cfg ≡
+binWall.internalH_W_m2K,h heater,ext,cfg ≡heaterTube.externalH_W_m2K, andh bed,cfg ≡
+aeration.bedH_W_m2K. In the current default JSON,h bin,in,cfg = 6.0 W m −2 K−1,h heater,ext,cfg =
+10.0 W m−2 K−1,h bed,cfg = 8.0 W m−2 K−1, andM wire =M wall =M bed = 1.0.Type.Simplied
+thermal resistance networks.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L103- L200;
+HeatTransferStudy/VermiHeatLoss.tex:L203-L244.
+Implementation.vermicomposter_air_heater_design_model.m:L1102-L1110;vermicompost
+er_air_heater_design_model.m:L1884-L1894;heat_transfer_study.py:L3737-L3778.
+Deviation note.Tube-wall radial terms now use exact cylindricalln(r o/ri)resistances on an
+outer-area basis, consistent with the current Python implementation (cylindrical_tube_ove
+rall_u_on_outer_basis). The exponential factorΘ i is not a tted correlation; it is the exact
+segmentwise solution of (32) under the repository's piecewise-constant marching assumptions,
+consistent with the generic thermal-resistance and dierential energy-balance background cited in
+[R5].
+9 Heater-side overall heat transfer treatment
+The wire-side convective coecient is
+hwire = N uwirek
+Dwire
+,(118)
+withN u wire given by (107). The heater external perimeter used in the shell-loss term is
+Pheater,ext =πD heater,exp,(119)
+so the heater-shell loss per segment is
+qloss,i =U heaterPheater,ext∆x(T air,i −T ∞),(120)
+and the local net air heating is
+qto air,i =q gen,i −q loss,i.(121)
+Type.Derived reduced-order heater balance.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L38-L121;HeatTran
+sferStudy/VermiHeatLoss.tex:L1738-L1898.
+Implementation.vermicomposter_air_heater_design_model.m:L1803-L1894;heat_transfe
+r_study.py:L3775-L3895.
+Deviation note.The Python physics re-solver mirrors the MATLAB heater equations for annual
+and diagnostic use, but the winter operating grid itself still originates from MATLAB.
+21
+
+===== PAGE 22 =====
+10 Aeration-tube heat transfer model
+The wall-mediated sensible contribution is evaluated from the exact segment exchange after applying
+the wall factor (36)(38),
+qwall,i = ˙mmean,icp (Tair,i −T air,after wall,i).(122)
+HereT air,i denotes the air temperature entering aeration segmenti, not a constant heater-exit tem-
+perature carried unchanged along the tube. In the winter branch,T air,1 is the heater-tube outlet
+temperature (19); in the summer branch,T air,1 is reset to the actual spot-cooler supply temperature
+before the aeration march begins. In the implemented reduced-order closure, the released-air en-
+thalpy term and evaporation term modify the bed-side energy balance and the remaining mass ow,
+but the retained in-tube air temperature state itself advances through (39) after the wall exchange.
+The direct released-air enthalpy term is
+qjet,i = ˙mrel,icp (Trel,i −T bed,ref).(123)
+Both current rooted branches use the same closed-end discharge law (9) and wall-factor exchange
+(36)(40). The winter branch suppliesT bed,ref =T bed, whereas the summer branch supplies the
+self-consistent branch reference temperature from the two-node cooling solve. In both cases, the
+net bed contribution still follows (29), so the sign ofq jet,i and of the total segment contribution
+naturally reverses between heating and cooling.
+Type.Derived reduced-order segment model.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L151-L205;HeatTran
+sferStudy/VermiHeatLoss.tex:L2168-L2238.
+Implementation.vermicomposter_air_heater_design_model.m:L1895-L2076;heat_transfe
+r_study.py:L2987-L3277;heat_transfer_study.py:L4182-L4323.
+Deviation note.The local released-air term remains a lumped enthalpy source or sink; the model
+still does not resolve the discharged jet eld in the surrounding porous bed.
+11 Warm-air release / jet-heating treatment
+The released-air term (123) is the model's surrogate for direct pore-space heating or cooling by
+discharged air. It should be interpreted as an enthalpy source or sink attached to the released
+fraction˙m rel,i, not as a resolved jet correlation. In the summer branch, the same equation is reused
+withT air < Tbed,ref , soq jet,i becomes negative and contributes to net cooling. The associated radial
+plume cooling, worm-safe distance, and habitat-exclusion mathematics are documented in full in
+the later plume/habitat section beginning at (138).
+Type.Reduced-order enthalpy model plus repository-specic plume post-processing.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L1342-L1585.
+Implementation.heat_transfer_study.py:L1062-L1306;heat_transfer_study.py:L1686-L
+1736.
+Deviation note.The plume model is not used to modify the main tube-marching solution; it is a
+separate post-processing estimate.
+22
+
+===== PAGE 23 =====
+12 Moisture, evaporation, and latent-heat treatment
+The current wetted-area basis can be the top plan area, a manual area, or a particle-surface estimate
+derived from the Table 3 size fractions. For the particle-surface path, the Sauter mean diameter is
+1
+d32
+=
+X
+i
+wi
+di
+,(124)
+so the external surface area per occupied bed volume is
+aext = 6
+d32
+.(125)
+IfV fill is the lled bed volume andf access the accessible wet-surface fraction,
+Awet =f accessaextVfill.(126)
+The Python water-property package importsIAPWS_95.pyand uses it as the backend for all pure-
+water saturation properties used by the summer psychrometric and evaporation calculations. In
+that module, the saturation pressure is evaluated from the IAPWS ancillary relation
+ln
+ psat
+pc
+
+= Tc
+T
+6X
+i=1
+aiτ bi, τ= 1− T
+Tc
+,(127)
+and the saturated liquid and vapor densities are taken directly from the WagnerPruss auxiliary
+saturation relations
+ρℓ,sat
+ρc
+= 1 +
+6X
+i=1
+biτ ni,ln
+ ρv,sat
+ρc
+
+=
+6X
+i=1
+ciτ mi,(128)
+with(n i) = (1/3,2/3,5/3,16/3,43/3,110/3)and(m i) = (2/6,4/6,8/6,18/6,37/6,71/6). In the
+current implementation, these auxiliary densities dene the saturation states, and the corresponding
+saturated liquid and vapor enthalpies are then evaluated from the IAPWS-95 Helmholtz enthalpy
+relation at(ρ ℓ,sat, T)and(ρ v,sat, T). For humid-air calculations, the vapor-component saturation
+density still enters on the standard partial-pressure basisρ (air)
+v,sat =p sat/(RvT), because the air-side
+evaporation model tracks water vapor as a constituent of a gas mixture rather than as a pure
+saturated steam phase. The latent heat is obtained from that Helmholtz-based saturated enthalpy
+dierence,
+hf g(T) =h v,sat(T)−h ℓ,sat(T).(129)
+The model does not resolve the full three-dimensional jet/interfacial eld around each perforation.
+In the current Python implementation, hole-scale evaporation coupling uses a Frössling-Sherwood
+reduced-order closure. The local perforation discharge velocityu hole denes
+Rehole = ρuholeDhole
+µ ,(130)
+and withSc≈0.60, the Sherwood number is
+Shhole =M Sh
+
+2 + 0.552Re1/2
+holeSc1/3
+
+,(131)
+23
+
+===== PAGE 24 =====
+whereM Sh ≡calibration.evaporationSherwoodMultiplierwith backward-compatible fallback
+toevaporationHMultiplier. The eective vapor diusivity and mass-transfer coecient are then
+Dva = µ
+ρSc , h m = ShholeDva
+Dhole
+.(132)
+The vapor-density driving force is
+∆ρv = max[ρv,sat(Ts)−ρ v,∞,0].(133)
+In winter/heating and summer/cooling branches, the inlet relative humidity baseline is taken from
+evaporation.relativeHumidity; in summer, spot-cooler condensate removal can further update
+the eective inlet vapor state before these limits are evaluated. The diusion-limited, carrying-
+capacity-limited, and heat-limited evaporation rates are
+˙mdiff =h mAseg∆ρv,(134)
+˙mcap = ˙Vrel,seg∆ρv,(135)
+˙mheat = qavail
+hf g
+, q avail = max[ ˙mrel,segcp(Tair −T bed),0].(136)
+The implemented segment evaporation rate and latent sink are
+˙mevap,seg = max[0,min( ˙mdiff,˙mcap,˙mheat)], q evap,seg = ˙mevap,seghf g.(137)
+Type.Combination of IAPWS-based pure-water property evaluation, empirical transport relations,
+and repository-specic area bookkeeping.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L1015- L1369;
+HeatTransferStudy/VermiHeatLoss.tex:L1586-L1609;HeatTransferStudy/VermiHeatLos
+s.tex:L2238-L2245.
+Implementation.vermicomposter_air_heater_design_model.m:L891-L937;vermicompo
+ster_air_heater_design_model.m:L2000-L2122;IAPWS_95.py:L614-L691;heat_transfer_
+study.py:L1379-L1459;heat_transfer_study.py:L2794-L2823;heat_transfer_study.py:
+L3946-L4003.
+Primary-source citations.The particle-size fractions entering (124) come from Frederickson
+et al., Table 3 [R11, pp. S320S326]. Equation (127) matches the WagnerPruss vapor-pressure
+auxiliary equation, equation (2.5) [R9, p. 399]. The saturated-liquid and saturated-vapor density
+closures in (128) are WagnerPruss equations (2.6)(2.7) [R9, p. 399] and are now used directly in
+the Python implementation throughIAPWS_95.py. Equation (131) uses the Frössling Sherwood form
+documented in Towler and Sinnott [R8], and (132) gives the implementedh m conversion. Equation
+(129) is implemented from the IAPWS-95 Helmholtz enthalpy relation evaluated at those auxiliary
+saturation densities; Wagner and Pruss equations (2.10)(2.11) [R9, p. 400] are the corresponding
+literature-side saturation-boundary enthalpy relations, but they are not the direct computational
+path used in the current Python backend.
+Deviation note.The summer branch computes inlet humidity after spot-cooler condensate re-
+moval, so the eectiveρ v,∞ is not always the raw ambient-RH state.
+24
+
+===== PAGE 25 =====
+13 Radial plume, worm-safe stand-o, and habitat-exclusion post-
+processing
+The released-air post-processing model starts from the released mass ow rate per unit aeration-tube
+length,
+˙m′
+rel = ˙mtube,in
+Laer
+,(138)
+and the wetted-area density
+awet = Awet
+Vfill
+.(139)
+The local wet-surface sink temperature is clamped between the congured surface temperature, the
+bed-reference temperature, and the released-air temperature:
+Tsink = min(max(Ts,set, Tbed,ref), Tair,out).(140)
+The plume radius is grown as
+b(ς) = min(bmax, b 0 +α sprς),(141)
+so the contacted wetted area per radial length is
+A′
+wet(ς) =πa wetb(ς)2.(142)
+In the implemented plume post-processing, the sensible and evaporation-side coecients are reused
+from congured bed-side closures rather than re-derived from a new local Nusselt solve:
+hsens =M bedhbed,cfg, h evap =M Shhsens,(143)
+withM bed ≡calibration.bedHTMultiplierandM Sh ≡calibration.evaporationSherwoodMultiplier
+(legacy fallback toevaporationHMultiplier). The sensible and latent radial sink terms are
+q′
+sens(ς) =h sensA′
+wet(ς) (T−T sink),(144)
+q′
+lat(ς) = ˙m′
+evap(ς)h f g(Ts),(145)
+and the plume temperature satises
+˙m′
+relcp
+dT
+dς =−
+
+q′
+sens(ς) +q ′
+lat(ς)
+
+.(146)
+The local mass-transfer coecient is formed by the Lewis relation using local air properties,
+hm(ς) = hevap
+ρair(T)c p,airLe2/3 ,(147)
+which gives the potential diusion-driven evaporation rate per radial length,
+˙m′
+evap,pot =h m(ς)A ′
+wet(ς) [ρv,sat(Ts)−ρ v,bulk(ς)].(148)
+The code advances the plume humidity explicitly and caps the bulk vapor density at saturation
+at the updated plume temperatureheat_transfer_study.py:L1241-L1292. If the worm-safety
+threshold isT safe, the safe radial oset is the rstςsuch that
+T(ς) =T safe,(149)
+25
+
+===== PAGE 26 =====
+located in the code by interpolation on the numerically marched proleheat_transfer_study.py:
+L1307-L1332.
+For habitat accounting, the lled-bed height and volume are
+Hfill =f fillH, V fill =LW H fill,(150)
+with lled-bed cross section
+Ωfill ={(x, y) : 0≤x≤W,0≤y≤H fill}.(151)
+If the safe oset isς safe, the exclusion radius around each tube is
+Rexc =r 0 +ς safe.(152)
+For tubei, the local surface-oset coordinate of a Cartesian point(x, y)is
+ςi(x, y) =
+p
+(x−x i)2 + (y−y i)2 −r 0.(153)
+Hence the plume-dened unsafe conditionς i(x, y)≤ς safe is equivalent to
+p
+(x−x i)2 + (y−y i)2 ≤r 0 +ς safe =R exc,(154)
+so the cross-sectional exclusion set is the union of the corresponding disks. The pipe and exclusion
+indicator functions are
+Ipipe(x, y) =
+(
+1,∃i: (x−x i)2 + (y−y i)2 ≤r 2
+0,
+0,otherwise, (155)
+Iexc(x, y) =
+(
+1,∃i: (x−x i)2 + (y−y i)2 ≤R 2
+exc,
+0,otherwise. (156)
+The overlap-aware set measures for the pipe and plume-exclusion regions are
+Apipe,set =
+ZZ
+Ωfill
+Ipipe(x, y)dA,(157)
+Aexc,set =
+ZZ
+Ωfill
+Iexc(x, y)dA,(158)
+with volumes obtained by extrusion over aeration-tube length,
+Vpipe =A pipe,setLaer, V exc =A exc,setLaer.(159)
+The full unsafe set additionally includes wall-return bands and is assembled after those wall-band
+depths are dened. When the radial plume reaches the left, right, bottom, or top wall, the code
+computes an inside-wall temperature from the same wall stack used in the main bin-loss model,
+q′′
+wall = Tplume,wall −T ∞
+1
+hin
++ tsheet
+ksheet
++ tins
+kins
++ 1
+hext
+,(160)
+Twall,in =T plume,wall − q′′
+wall
+hin
+,(161)
+26
+
+===== PAGE 27 =====
+then converts that to an added unsafe band depth with a linear wall-normal interpolation between
+the bed temperature and the wall-contact temperatureheat_transfer_study.py:L1531-L1555. In
+the current implementation, nearest tube-center osets from each wall are computed directly from
+realized tube-center coordinates,
+δℓ = min
+i
+xi, δ r =W−max
+i
+xi, δ b = min
+i
+yi, δ t =H fill −max
+i
+yi,(162)
+so wall-depth limits are derived directly from these tube-to-wall center distances and no separate
+edge-index set is required for wall localization in this path. Under the default rule-based layout with
+fw,x =f w,y = 0.10, these reduce toδ ℓ =δ r = 0.10Wandδ b =δ t = 0.10Hfill. The corresponding
+wall-to-nearest-tube-surface plume-sampling osets are
+gℓ = max(δℓ −r 0,0), g r = max(δr −r 0,0), g b = max(δb −r 0,0), g t = max(δt −r 0,0),
+(163)
+and the geometric caps used in the wall-band depth interpolation are
+dmax
+ℓ =δ ℓ, d max
+r =δ r, d max
+b =δ b, d max
+t =δ t.(164)
+This is an explicit reduced-order assumption: once wall-driven warming has reached the nearest
+tube centerline from a given wall, additional bed-air temperature rise due only to wall convection
+is treated as comparatively unsubstantial because direct aeration from nearby tubes is assumed to
+dominate; accordingly, this wall-return contribution is not propagated as an extra modier of the
+plume prole or safe stand-o beyond that geometric limit. For each wallw∈ {ℓ, r, b, t}, the active
+band depth is
+dw =
+
+
+
+0, T wall,in,w ≤max(T bed,ref , Tsafe)ord max
+w ≤0,
+dmax
+w , T bed,ref ≥T safe,
+clip
+
+dmax
+w
+Twall,in,w −T safe
+Twall,in,w −T bed,ref
+,0, d max
+w
+
+,otherwise,
+(165)
+withd ℓ ≡d w=ℓ,d r ≡d w=r,d b ≡d w=b, andd t ≡d w=t. The wall-band indicator is
+Iwall(x, y) =
+(
+1, x≤d ℓ ∨x≥W−d r ∨y≤d b ∨y≥H fill −d t,
+0,otherwise, (166)
+whereI wall is a Boolean membership test on Cartesian points, not a returned coordinate. The full
+unsafe indicator is
+Iunsafe(x, y) = max(Iexc(x, y), Iwall(x, y)).(167)
+Dene the resulting unsafe set by
+Ωunsafe = Ωexc ∪Ω wall ={(x, y)∈Ω fill :I unsafe(x, y) = 1}.
+The area integrals are over Cartesian coordinates(x, y); indexiappears only insideI exc as a mem-
+bership test for disk inclusion. In other words,A unsafe,set is the union-aware planar set measure
+produced by the Boolean eldI unsafe(x, y), not a sum over separately indexed boundary coordi-
+nates. This union-aware Boolean construction automatically counts overlap between wall bands
+and tube-exclusion disks only once, becauseI unsafe saturates at 1.
+Aunsafe,set =
+ZZ
+Ωfill
+Iunsafe(x, y)dA.(168)
+27
+
+===== PAGE 28 =====
+Equivalent explicit bounds on the rectangular lled domain are
+Aunsafe,set =
+Z W
+0
+Z Hfill
+0
+Iunsafe(x, y)dy dx.(169)
+Vunsafe,set =A unsafe,setLaer.(170)
+Vunsafe,total =V unsafe,set.(171)
+Vunsafe,shell =V unsafe,total −V pipe.(172)
+Vhab =V fill −V unsafe,total.(173)
+For overlap reporting, the naive no-overlap sums are
+Apipe,sum =N tubesπr2
+0, A exc,sum =N tubesπR2
+exc,(174)
+with overlap corrections
+Apipe,ov =A pipe,sum −A pipe,set, A exc,ov =A exc,sum −A exc,set.(175)
+Numerically, these set areas are evaluated on a midpoint grid:
+Aset ≈
+ W Hfill
+N 2g
+ NgX
+j=1
+NgX
+k=1
+I(x ∗
+j , y∗
+k).(176)
+In code outputs, the corresponding keys remainpipe_area_union_m2,exclusion_area_union_m2,
+wall_area_union_m2, andunsafe_area_union_m2; there, union denotes the overlap-aware
+Boolean union operation used to construct the set indicator before area integration.
+Type.Repository-specic radial thermal/moisture post-processing and overlap-aware geometry
+bookkeeping.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L1277-L1571.
+Implementation.heat_transfer_study.py:L1119-L1367;heat_transfer_study.py:L1568-L
+1880.
+Deviation note.The plume model is not part of the core heater or cooling-march solve. It is a
+post-processing estimator used for the radial cooling plot and the habitat-exclusion metrics.
+14 Bin-wall and ambient heat-loss model
+The vessel geometry is
+Aside = 2HL+ 2HW, A bottom =LW, A top =LW.(177)
+WithN vent top vent holes of diameterd vent,
+Avent =N vent
+πd2
+vent
+4 , A top,cov =A top −A vent.(178)
+For open-top convection, the characteristic length is taken as
+Lc,top = Atop
+Ptop
+, P top = 2(L+W),(179)
+28
+
+===== PAGE 29 =====
+so the top natural-convection coecient is
+htop = N utopk
+Lc,top
+,(180)
+withN u top given by (110). The total vessel heat-loss forms can then be written explicitly as
+Qloss,closed =U wall(Aside +A bottom +A top)(Tbin −T ∞),(181)
+Qloss,open =U wall(Aside +A bottom)(Tbin −T ∞) +h topAtop(Tbin −T ∞).(182)
+For an open top, the top-node and total ambient conductances are
+U Atop,open =U wallAtop,wallshare +h topAtop,(183)
+U Atot,open =U wall(Aside +A bottom) +h topAtop.(184)
+For a covered top with a small vent,
+U Atop,vented =U wall(Atop,cov +A top,wallshare) +h top,ventAvent,(185)
+U Atot,vented =U wall(Aside +A bottom +A top,cov) +h top,ventAvent.(186)
+For a fully covered top,
+U Atot,closed =U wall(Aside +A bottom +A top).(187)
+The orientation-specic exterior coecients used by the wall stack are
+hside = N usidek
+Lside
+, h bottom = N ubottomk
+Lc,bottom
+, h top,cov = N utop,covk
+Lc,top
+, h top,vent = N utop,ventk
+Lc,vent
+,(188)
+where bothN u top,cov andN u top,vent are evaluated from the same horizontal free-convection family
+(110); the dierence is the characteristic length and area assignment of the covered-top region versus
+the vent opening.
+N utop,cov =N hor(Ratop,cov), N u top,vent =N hor(Ratop,vent),(189)
+with
+Lc,bottom = Abottom
+Pbottom
+, L c,vent = Avent
+Pvent
+.(190)
+Using the same planar wall stack form on each orientation,
+Uside =
+ 1
+hinside,bin
++ tsheet
+ksheet
++ tins
+kins
++ 1
+hside
+−1
+,(191)
+Ubottom =
+ 1
+hinside,bin
++ tsheet
+ksheet
++ tins
+kins
++ 1
+hbottom
+−1
+, U top,cov =
+ 1
+hinside,bin
++ tsheet
+ksheet
++ tins
+kins
++ 1
+htop,cov
+−1
+.
+(192)
+The geometry-inclusive exterior eective conductance and coecient can be written as
+U Atot,open =U sideAside +U bottomAbottom +h topAtop,
+U Atot,cov =U sideAside +U bottomAbottom +U top,covAtop,
+U Atot,vent =U sideAside +U bottomAbottom +U top,covAtop,cov +h top,ventAvent,
+(193)
+29
+
+===== PAGE 30 =====
+Aext =A side +A bottom +A top, U ext = U Atot
+Aext
+.(194)
+The lumped required heating or cooling load is
+Qreq =U A tot (Tset −T ∞).(195)
+The characteristic length and Biot estimate are
+Lc = Vfill
+Aside +A bottom +A top
+, Bi= hextLc
+kbed
+.(196)
+The lumped time constant is
+τ= C
+U Atot
+,(197)
+and the associated cooldown curve is
+T(t) =T ∞ + (T0 −T ∞)e −t/τ .(198)
+Type.Derived thermal-network relations plus a repository-specic vented-cover extension.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L603-L847.
+Implementation.vermicomposter_air_heater_design_model.m:L971-L1171;heat_transfer_
+study.py:L4326-L4431.
+Deviation note.The rooted execution path only plots the lumped cooldown curve whenBi <
+0.1; the equation exists regardless, but the code treats the plot as conditionally valid rather than
+unconditional.
+14.1 Summer spot-cooler and assist-blower surrogate
+In the summer branch, the requested sensible cooling duty for target supply temperatureT supply,target
+is
+˙Qreq,cool = max[ ˙mcp (Tamb −T supply,target),0].(199)
+The actual sensible cooling applied by the spot cooler is capped at the congured or derived sensible
+capacity:
+˙Qactual,cool = min
+
+˙Qreq,cool, ˙Qmax,cool
+
+, T supply =T amb −
+˙Qactual,cool
+˙mcp
+.(200)
+If a coecient of performance is supplied,
+Pspot =
+˙Qactual,cool
+COP .(201)
+The aeration-network inlet is then reset to the actual spot-cooler supply state,
+Tair,in =T supply,actual,(202)
+while the electrical heater is disabled:
+Ptot = 0, I tot = 0.(203)
+30
+
+===== PAGE 31 =====
+The post-cooler condensate calculation uses the dry-air ow rate˙m dry and the saturated outlet
+humidity ratiow sat,out:
+˙mcond,psych = max[ ˙mdry (win −w sat,out),0].(204)
+If a rated condensate capacity˙m cond,rated is provided, the applied condensate rate is
+˙mcond = min( ˙mcond,psych,˙mcond,rated),(205)
+otherwise˙m cond = ˙mcond,psych. The supply humidity ratio is then
+wout = max
+
+win − ˙mcond
+˙mdry
+,0
+
+.(206)
+The assist blower is represented by a linear static curve. With shuto pressure∆p shutoff, rated-duty
+point( ˙Vrated,∆p rated), and implied free-air ow ˙Vfree,
+˙Vfree = ˙Vrated
+∆pshutoff
+∆pshutoff −∆p rated
+,(207)
+∆pavail( ˙V) = max
+"
+∆pshutoff
+ 
+1−
+˙V
+˙Vfree
+!
+,0
+#
+.(208)
+The sampled summer ow is now treated as a requested target ˙Vreq, not as an automatically
+achieved operating point. The code rst evaluates the full reduced-order system pressure require-
+ment∆p tot( ˙V)from the spot-cooler state, distribution losses, closed-end aeration-tube march, evap-
+oration model, and two-node bed closure. It then forms the scalar blower/system residual
+R ˙V ( ˙V) = ∆p tot( ˙V)−∆p avail( ˙V).(209)
+The achieved cooling ow is
+˙Vach =
+
+
+
+˙Vreq, R ˙V ( ˙Vreq)≤0,
+˙V∈[0, ˙Vreq]such thatR ˙V ( ˙V) = 0, R ˙V ( ˙Vreq)>0.
+(210)
+All reported summer quantities are then recomputed at ˙Vach, so the returned aeration inlet gauge
+pressure, branch pressure prole, segment releases, and cooling duty are mechanically consistent
+with the assist-blower curve rather than merely post-checked against it. The total summer water-
+loss rate is
+˙mwater,day = 86400N tubes
+X
+i
+˙mevap,i,(211)
+the reported net cooling is
+Qcool = max(−Qbed,total,0),(212)
+and the corresponding lumped cooling requirement at the cooling setpoint is
+Qreq,cool =U A tot (T∞,summer −T set,cool).(213)
+Type.Repository-specic surrogate model. Equations (199)(201) are simplied sensible-capacity
+relations; (204)(206) are psychrometric mass-balance relations; (207)(210) are a linearized blower
+curve plus repository operating-point closure.
+Repository-native narrative.HeatTransferStudy/VermiHeatLoss.tex:L2084-L2284.
+Implementation.heat_transfer_study.py:L2760-L3378.
+Deviation note.The blower curve is still a two-point linear approximation rather than a full
+manufacturer fan map, and the spot-cooler model does not include a detailed refrigeration-cycle
+calculation. The new operating-point solve corrects the previous inconsistency where an infeasible
+requested ow could be marched thermally and only later agged by a static-pressure residual.
+31
+
+===== PAGE 32 =====
+14.2 Explicit assumptions for Sections 614
+Section 6 (Internal convection correlations): heater and aeration in-tube convection are treated
+as smooth, circular, one-dimensional internal ows with a laminar/turbulent branch switch at
+Re= 2300. The implementation does not include explicit roughness corrections, transition
+blending beyond that branch switch, or secondary-ow corrections.
+Section 7 (External convection correlations): external free-convection coecients are represented
+by ChurchillChu / horizontal-plate reduced-order closures evaluated at a lm state. For insulated
+boundaries,T s is theexterior insulation-surface temperature; for open/vent top openings, the
+same correlation family is applied to the exposed top-surface proxy.
+Section 8 (Conduction and thermal resistance networks): the vessel wall is modeled as a planar
+layered wall with lumped inside/outside convection resistances, while tube walls use exact cylin-
+drical logarithmic resistances on an exposed-outer-area basis. Material properties and congured
+h-values are treated as piecewise constants within each evaluation state.
+Section 9 (Heater-side treatment): wire-to-air convection is correlation-derived, but the heater-
+shell exterior coecient is a congured eective value representing unresolved ambient-side losses
+around the insulated heater tube. The helical-wire obstruction is captured by a reduced-order
+projected-area drag surrogate rather than by a resolved ribbed-passage CFD model.
+Section 10 (Aeration-tube model): the aeration tube is solved as a one-dimensional axial march
+with closed-end mass closure and segmentwise wall exchange. The released-air enthalpy and
+evaporation eects are coupled into segment energy bookkeeping, but the in-tube temperature
+state itself advances through the retained marching relation.
+Section 11 (Warm-air release / jet-heating): direct released-air heating/cooling is represented as
+an enthalpy source/sink term attached to released mass ow, not as a resolved jet-impingement
+eld. This term is sucient for branch-scale energy closure but does not capture three-dimensional
+local plume/recirculation structure.
+Section 12 (Moisture and latent heat): hole-scale evaporation coupling uses a Frössling-Sherwood
+mass-transfer closure driven by local perforation discharge velocity, with additional carrying-
+capacity and available-heat limits. Reusing this reduced-order closure is reasonable at the current
+model delity because it preserves the dominantRe-dependent transfer trend without adding a
+full interfacial transport solve.
+Section 13 (Radial plume and habitat exclusion): plume cooling and humidity evolution are post-
+processing estimates in a radial coordinateς, and unsafe habitat metrics are set-based geometric
+measures on the Cartesian bed cross-section. Wall-return heating is capped at nearest tube-center
+osets, assuming direct aeration dominates additional thermal inuence beyond that distance.
+Section 14 (Bin-wall and ambient heat loss): side, bottom, covered-top, and vent-opening contri-
+butions are modeled with orientation-specichandUvalues then collapsed to mode-dependent
+totalU A. Covered-top and vent-opening natural convection use the same horizontal Nusselt
+family with dierent characteristic lengths/areas.
+32
+
+===== PAGE 33 =====
+15 Constraints and feasibility conditions
+The current heating hard-constraint residual vector is
+gheat =
+
+
+max(0, I−I max)
+max(0, Twire −T wire,max)
+max(0, Tair,out −T air,out,max)
+max(0,∆p−∆p max)
+max(0,˙mwater −˙mwater,max)
+max(0, uh −u h,max)
+max(0, Tb,min −T b)
+max(0, Tt,min −T t)
+max(0, Tb −T b,max)
+max(0, Tt −T t,max)
+max(0,|T b −T t| −∆T max)
+max(0,dutyNeeded−1)
+max(0,−Q bed,total)
+
+
+.(214)
+The current cooling hard-constraint residual vector is
+gcool =
+
+
+max(0,∆p−∆p avail)
+max(0,∆p−∆p max)
+max(0,˙mwater −˙mwater,max)
+max(0, uh −u h,max)
+max(0, Tb,min −T b)
+max(0, Tt,min −T t)
+max(0, Tb −T b,max)
+max(0, Tt −T t,max)
+max(0,|T b −T t| −∆T max)
+max(0,−Q cool)
+
+
+,(215)
+whereQ cool = max(−Qbed,total,0).
+Type.Repository-dened feasibility residuals.
+Repository-native narrative.Heating constraints appear inHeatTransferStudy/VermiHeatL
+oss.tex:L1614-L1738. The historical summer lexicographic block atHeatTransferStudy/VermiH
+eatLoss.tex:L2251-L2279is intentionallynottreated as governing because the live Python code
+now uses constrained NSGA-II for cooling.
+Implementation.heat_transfer_study.py:L2220-L2451;heat_transfer_study.py:L2963-L
+3147.
+Deviation note.The cooling NSGA-II constraints require positive cooling capacity, but they do
+notcurrently enforceQ cool ≥Q req,cool. Cooling shortfall is computed for diagnostics, not as a hard
+feasibility constraint.
+16 Objective functions and optimization quantities
+Heating now uses constrained NSGA-II on the discrete candidate grid with objective vector
+fheat =
+
+
+Ptot
+−min(T b, Tt)
+|Tb −T t|
+
+ .(216)
+33
+
+===== PAGE 34 =====
+The reported heating design is then selected from the feasible Pareto set by the report-priority tuple
+πheat,report =
+
+
+−min(T b, Tt)
+Ptot
+|Tb −T t|
+− 1
+2(Tb +T t)
+max(0,dutyNeeded−1)
+
+
+.(217)
+Cooling now uses constrained NSGA-II as well. The default cooling objective vector is
+fcool =
+
+
+max(Tb, Tt)
+1
+2(Tb +T t)
+Pspot +P blower
+
+ ,(218)
+and the reported cooling design is selected from the feasible cooling Pareto set by
+πcool,report =
+
+
+max(Tb, Tt)
+1
+2(Tb +T t)
+Pspot +P blower
+˙Vtot
+|Tb −T t|
+−Qcool
+
+
+.(219)
+If no feasible cooling Pareto point exists, the code falls back to a best-available diagnostic ranking
+using the congured ordered tuple
+πcool,fallback =
+
+gσ(1), gσ(2), . . . , gσ(m)
+
+,(220)
+whereσis the conguredpriority_orderpermutation over the implemented cooling metrics and
+residualsheat_transfer_study.py:L3133-L3149;heat_transfer_study.py:L3173-L3177;
+heat_transfer_study.py:L3244-L3246. This is a live fallback/reporting rule, not the stale
+historical summer primary-selection rule described inHeatTransferStudy/VermiHeatLoss.tex:
+L2251-L2279.
+Type.Repository-dened optimization quantities.
+Repository-native narrative.Heating NSGA-II is described inHeatTransferStudy/VermiH
+eatLoss.tex:L1614-L1738. The stale summer lexicographic primary-selection narrative inHeat
+TransferStudy/VermiHeatLoss.tex:L2251-L2279is intentionally excluded from the governing-
+equation set here because it is not implemented.
+Implementation.heat_transfer_study.py:L51-L121;heat_transfer_study.py:L2181-L24
+99;heat_transfer_study.py:L3148-L3208;heat_transfer_study.py:L6220-L6490.
+Deviation note.NSGA-II is used on an already evaluated discrete set. It is not replacing the
+physics solve with a continuous surrogate optimizer.
+17 Numerical approximations, interpolation, and discretization
+The heating design space is generated by exhaustive discrete sweep in MATLAB, not by direct
+continuous optimizationvermicomposter_air_heater_design_model.m:L1172-L1476.
+Electrical resistance depends on average wire temperature, so each operating point uses a short
+xed-point iteration onT wire,avg vermicomposter_air_heater_design_model.m:L1497-L1536.
+34
+
+===== PAGE 35 =====
+Heater and aeration transport are solved by explicit axial marching over congured segment counts
+vermicomposter_air_heater_design_model.m:L1803-L1999;heat_transfer_study.py:
+L2707-L2959;heat_transfer_study.py:L3775-L3959.
+When the assist blower is enabled, the summer branch treats the sampled ow as a request and
+applies an outer scalar bisection on ˙Vso that∆p tot( ˙V)matches the available blower static if the
+requested ow is not directly achievableheat_transfer_study.py:L2793-L2858;heat_transfe
+r_study.py:L3061-L3378.
+The summer branch solves for a bed-reference temperature by bracketing and bisection over the
+scalar residual relating branch cooling to the lumped required cooling targetheat_transfer_st
+udy.py:L2774-L2899.
+Display interpolation in the plotting layer is presentation-only and does not alter the underlying
+evaluated candidate setheat_transfer_study.py:L555-L562.
+The annual climate layer uses periodic Gaussian-kernel regression over day-of-year and then over-
+lays freeze-day and heat-wave eventsheat_transfer_study.py:L4633-L4858.
+Radial plume and habitat calculations use midpoint-grid union-area estimates rather than closed-
+form geometric intersection formulasheat_transfer_study.py:L1383-L1595.
+NSGA-II is applied to integer-valued indices or discrete point indices throughpymoo; the optimizer
+explores the discrete repository candidate set rather than an interpolated continuous spaceheat
+_transfer_study.py:L2410-L2499;heat_transfer_study.py:L3123-L3208.
+Detailed marching and xed-point closures
+The current heating solver uses the temperature-dependent wire resistivity
+ρwire(T) =ρ wire,20 [1 +α wire(T−20 ◦C)],(221)
+which yields a tube or branch resistance of the form already introduced in (14). The xed-point
+iteration updates the average wire temperature by under-relaxation:
+T
+(k+1)
+wire = 0.65 T
+(k)
+wire + 0.35 T
+(k)
+wire,new,(222)
+and stops when T
+(k)
+wire,new − T
+(k)
+wire
+ <0.05 ◦C,(223)
+or when the congured iteration cap is reachedvermicomposter_air_heater_design_model.m:
+L1497-L1536. The winter aeration pressure-drop march uses the segment contribution
+∆pseg =f ∆x
+D
+ρu2
+2 ,(224)
+with the area-change and distribution-network losses added separately through the full Section 5
+assemblyvermicomposter_air_heater_design_model.m:L1953-L1956;vermicomposter_air_h
+eater_design_model.m:L2123-L2232.
+For the closed-end aeration inlet-pressure shooting solve, the scalar residual is the terminal remaining
+ow above the mass-balance tolerance,
+F(p in) = ˙mrem,Naer+1(pin)−max
+ 
+10−9,10 −4 ˙mtube,in
+
+.(225)
+Within each marched segment, the local released mass ow is itself found from an inner scalar root
+because the Ergun backpressure depends on the unknown release rate. With
+Gi( ˙mrel,i) =C dAh,seg
+q
+2ρi max(ptube,i −p bed,i( ˙mrel,i),0)−˙m rel,i,
+35
+
+===== PAGE 36 =====
+the code brackets˙m rel,i ∈[0,˙m rem,i]and applies bounded bisection on that interval until the local
+discharge and the local porous-bed backpressure closure are mutually consistent. If the release
+implied by the local pressure dierence exceeds the remaining segment inlet ow, the upper bound
+˙mrem,i is accepted directly. The code starts fromp lo = 0and an initial high-side estimate based
+on the whole-hole-area discharge approximation described earlier. A pressure bracket is considered
+found when the marched state at the current upper bound satises
+F(p hi)≤0,
+because the low side still leaves too much ow at the cap while the high side releases enough
+mass that the terminal residual is within tolerance. The code therefore doublesp hi until this
+condition is rst met, then bisects onp in within[p lo, phi]heat_transfer_study.py:L2914-L2955;
+vermicomposter_air_heater_design_model.m:L1895-L1946. If no such upper bound is found
+within the congured doubling limit, the highest tried pressure state is returned as the best available
+unresolved case. Here˙m rem,Naer+1 should be interpreted as the numerical residual of a trial pressure
+march, not as a physical steady leakage through the sealed cap. A trial inlet pressure that is too
+low leaves positive residual ow after the last perforated segment because the guessed pressure
+eld does not drive enough side release. A trial inlet pressure that is too high drives release too
+aggressively upstream and can deplete the branch early; because each segment release is clamped
+so it cannot exceed the remaining ow, the residual never becomes meaningfully negative. The
+accepted solution is therefore thesmallestbracketed inlet pressure that satises the closed-end mass-
+balance tolerance, not an arbitrary overpressured state. For optimizer hygiene, the live Python
+summer workow now records whether this inner pressure bracket was successfully found. Any
+summer point with an unresolved closed-end pressure solve is retained only for diagnostics and is
+automatically excluded from Pareto eligibility before NSGA-II rankingheat_transfer_study.py:
+L2914-L2955;heat_transfer_study.py:L3531-L3588. This prevents a bracket-failure edge
+case from contaminating the reported cooling Pareto set even though the unresolved point is still
+available for debugging output.
+The summer branch closes the bed-reference temperature by solving the scalar consistency condition
+R(Tbed,ref) = Tb(Tbed,ref) +T t(Tbed,ref)
+2 −T bed,ref = 0,(226)
+whereT b andT t are obtained from the two-node bed solve using the branch heat rate predicted at
+that trial reference temperatureheat_transfer_study.py:L2910-L2917. If the lower and upper
+trial bounds bracket a sign change, the code applies bisection:
+Tmid = Tlo +T hi
+2 ,(227)
+updating the bracket by the sign ofR(T mid)until either
+|R(Tmid)|<0.02or|T hi −T lo|<0.02,(228)
+otherwise the closer endpoint is retainedheat_transfer_study.py:L2918-L2947. These are
+repository numerical constructs rather than textbook closed forms.
+When the assist blower is enabled, the summer branch also closes the achieved airow through the
+scalar residual (209). If the requested airow already satisesR ˙V ( ˙Vreq)≤0, that request is retained.
+Otherwise the code bisects over[0, ˙Vreq], keeping the highest bracketed ow that still satisesR ˙V ≤0,
+until the ow bracket is smaller than10 −6 max( ˙Vreq,1)in code unitsheat_transfer_study.py:
+L2793-L2858. The branch thermodynamics are then recomputed at that achieved ow before the
+cooling metrics are reported.
+36
+
+===== PAGE 37 =====
+18 Annual climate and year-round operating layer
+18.1 Climate anchors and regression baseline
+The annual layer stores for each monthma Connecticut monthly mean temperature ¯Tm and monthly
+standard deviationσ m derived from the NOAA series described inHeatTransferStudy/VermiHea
+tLoss.tex:L2576-L2616. The representative-year ambient baseline uses circular Gaussian-kernel
+regression:
+ˆy(d) =
+P
+i wi(d)yiP
+i wi(d) , w i(d) = exp
+"
+−1
+2
+ δi(d)
+h
+2#
+,(229)
+with wraparound day distance
+δi(d) = min(|d−d i|, P− |d−d i|).(230)
+This same periodic Gaussian regression is applied both to the monthly mean anchors and to the
+monthly standard-deviation anchorsheat_transfer_study.py:L4794-L4808;heat_transfer_st
+udy.py:L4866-L4879.
+18.2 Freeze-day allocation and anomaly override
+Expected monthly freeze-day counts are converted to representative integer counts by largest-
+remainder allocation:
+nf,m = LR(Fm).(231)
+Within each month, day-of-month weights are centered on the observed mean freeze dayµ f,m:
+wf,m(i) = exp
+"
+−(i−µ f,m)2
+2s2
+f,m
+#
+,(232)
+and sequential selection applies a repulsion modier
+˜wf,m(i) =w f,m(i)
+Y
+j∈Sf,m
+"
+1−0.65 exp
+ 
+−(i−j) 2
+2r2
+f,m
+!#
+.(233)
+On the selected freeze days, the ambient prole is overridden by
+Tm(d) = min
+ 
+Tbase,m(d), ¯Tm −∆T f,m
+
+.(234)
+These relations correspond toheat_transfer_study.py:L4683-L4732;heat_transfer_study.py:
+L4893-L4906.
+18.3 Heat-wave allocation and anomaly override
+Monthly spell starts and total heat-wave days are likewise allocated by largest-remainder rounding:
+ns,m = LR(Sm), n h,m = LR(Hm).(235)
+The start-day weighting is
+wh,m(i) = exp
+"
+−(i−µ h,m)2
+2s2
+h,m
+#
+,(236)
+37
+
+===== PAGE 38 =====
+with repulsion-modied score
+˜wh,m(i) =w h,m(i)
+Y
+j∈Sh,m
+"
+1−0.65 exp
+ 
+−(i−j) 2
+2r2
+h,m
+!#
+.(237)
+Each selected heat-wave spell is forced to last at least three days in the code, and the ambient
+override is
+Tm(d) = max
+ 
+Tm(d), ¯Tm + ∆Th,m
+
+.(238)
+These relations correspond toheat_transfer_study.py:L4735-L4791;heat_transfer_study.py:
+L4907-L4911.
+18.4 Daily heating and cooling loads
+For each representative dayd, the required heating and cooling loads are
+Qreq,h(d) =U A bin max(Th,set −T ∞(d),0),(239)
+Qreq,c(d) =U A bin max(T∞(d)−T c,set,0),(240)
+which are implemented by rebuilding the bin model at the day's ambient and calling the same
+lumped-loss routine used elsewhereheat_transfer_study.py:L4977-L4983.
+18.5 Reference-point capacity re-solve and duty application
+The annual layer re-solves the selected heating and cooling operating points at each day's ambient
+temperature to obtain
+Qh,cap(d) =Q to bed,h(T∞(d)), P h,elec(d) =P h(T∞(d)),(241)
+Qc,cap(d) =−Q to bed,c(T∞(d)), P c,elec(d) =P spot cooler(d) +P assist blower(d).(242)
+The required duty fractions are
+D∗
+h(d) = Qreq,h(d)
+Qh,cap(d) , D ∗
+c(d) = Qreq,c(d)
+Qc,cap(d) ,(243)
+and the applied duties are clipped at unity:
+fday =
+
+
+
+min
+ 
+max
+ ˙Qload
+˙Qnom
+,0
+!
+,1
+!
+, ˙Qnom >0,
+0, ˙Qnom = 0and ˙Qload ≤0,
+1, ˙Qnom = 0and ˙Qload >0,
+(244)
+which, in mode-specic notation, are exactly
+Dh(d) = min(max(D∗
+h(d),0),1), D c(d) = min(max(D∗
+c(d),0),1).(245)
+The applied bed load is therefore
+Qbed(d) =
+
+
+
+Dh(d)Q h,cap(d),heating day,
+−Dc(d)Q c,cap(d),cooling day,
+0,idle day.
+(246)
+38
+
+===== PAGE 39 =====
+18.6 Daily bed temperatures, electricity, cost, and water
+The daily bed temperatures are obtained from the same two-node steady system:
+U Ab,∞ +U A bt −U Abt
+−U Abt U At,∞ +U A bt
+ Tb(d)
+Tt(d)
+
+=
+ fbQbed(d) +U A b,∞T∞(d)
+(1−f b)Qbed(d) +U A t,∞T∞(d)
+
+.(247)
+Daily heating and cooling electricity are
+Eh(d) = Ph,elec(d)D h(d) 24
+1000 , E c(d) = Pc,elec(d)D c(d) 24
+1000 ,(248)
+so the total day electrical energy is
+Eday =E h(d) +E c(d).(249)
+With electricity pricec elec, the daily cost is
+C(d) =c elecEday,(250)
+and the daily water-replacement estimate is
+mwater(d) = ˙mwater,24h D(d),(251)
+whereD(d)is the active heating or cooling duty fraction for that day. These are repository numerical
+constructs driven by the same daily re-solved heating/cooling reference pointsheat_transfer_st
+udy.py:L4966-L5072.
+19 Implementation notes and deviations from the written model
+The authoritative reported heating recommendation is now Python-side, even though MATLAB
+still generates the heating candidate physics. The rooted execution path therefore treats Python
+as the nal recommendation authorityheat_transfer_study.py:L6908-L6947;vermicompost
+er_air_heater_design_model.m:L536-L608.
+Maximum bottom and top bed temperatures are enforced in the Python-side heating and cooling
+feasibility logic; the MATLAB helperexplicitlySafe(...)still omits those maximavermicom
+poster_air_heater_design_model.m:L2647-L2659;heat_transfer_study.py:L2220-L2368;
+heat_transfer_study.py:L2963-L3112.
+Cooling selection is no longer lexicographic. The current code uses constrained NSGA-II plus a
+report-priority ordering inside the feasible cooling Pareto setheat_transfer_study.py:L3148-L
+3208;heat_transfer_study.py:L6220-L6490.
+Cooling shortfall is computed and printed, but not enforced as a hard cooling feasibility condition
+in the current NSGA-II implementationheat_transfer_study.py:L2915-L2959;heat_transfe
+r_study.py:L2963-L3112.
+The post-cooler relative humidity used by the summer evaporation model is recomputed after
+psychrometric condensate removal, limited by any congured rated condensate capacityheat_t
+ransfer_study.py:L2662-L2673.
+The rooted refresh/export path disables MATLAB plotting and transients in the generated export
+helper, so the rooted execution graph exercises steady heating physics rather than the optional
+MATLAB transient branchanalyze_vermicomposter_heater.py:L294-L304.
+39
+
+===== PAGE 40 =====
+20 Symbol glossary with units
+Symbol Meaning Units
+Ah area of one perforation holem 2
+Ah,seg total perforation area assigned to one aeration segmentm 2
+Abed,trib tributary porous-bed ow area assigned to one aeration segmentm 2
+Awet eective wetted area assigned to evaporationm 2
+Bilumped-capacitance Biot number 1
+Cd perforation discharge coecient 1
+cp specic heat of airJ kg −1 K−1
+d32 Sauter mean diameter used in particle-area estimatem
+dp representative particle diameter used in the Ergun porous-bed
+closure; defaults tod 32 unless overridden
+m
+Di, Do inner and outer tube diametersm
+εbed porosity used in the Ergun porous-bed closure 1
+fDarcy friction factor 1
+hconvective heat-transfer coecientW m −2 K−1
+hm mass-transfer coecientm s −1
+hf g latent heat of vaporizationJ kg −1
+Itot total electrical current drawA
+N u, Re, P r, Rastandard dimensionless groups 1
+Ptot total electrical powerW
+Qbed,total net total bed heat rate; negative in cooling modeW
+Qcool positive cooling capacity,max(−Q bed,total,0) W
+Qreq lumped required heating or cooling loadW
+Tb, Tt bottom and top bed-node temperatures ◦C
+T∞ ambient air temperature ◦C
+U Alumped conductanceW K −1
+Avent,branch total top-vent area assigned to one aeration branch in the
+outlet-boundary closure
+m2
+Cd,vent simple-hole vent discharge coecient used by the
+outlet-boundary closure
+1
+∆pi local tube-to-bed pressure dierence driving perforation
+discharge
+Pa
+Lbed,i representative porous escape length attached to aeration
+segmenti
+m
+pbed,i local bed-side gauge pressure adjacent to aeration segmentiPa
+pout,bnd derived outlet-boundary gauge pressure at the end of the porous
+escape path
+Pa
+pout,offset congured outlet-boundary gauge oset or closed-top fallback
+pressure
+Pa
+uh,i local mean hole exit velocitym s −1
+ubed,i supercial porous-bed velocity attached to aeration segmentim s −1
+ytube,rep representative tube-center height used by the porous-bed
+pressure model
+m
+ϕrel,i fraction of inlet tube mass released by aeration segmenti1
+˙mevap evaporation mass ow ratekg s −1
+˙Vtot total imposed volumetric ow ratem 3 s−1
+40
+
+===== PAGE 41 =====
+21 Bibliography / source notes
+R1 Churchill, S.W.; Bernstein, M. A Correlating Equation for Forced Convection From Gases and
+Liquids to a Circular Cylinder in Crossow.Journal of Heat Transfer99(2), 1977, pp. 300
+306. An accessible scan was used to verify that the implemented overall correlation appears as
+equation (9) on p. 303. The repository stores the citation string atvermicomposter_air_heate
+r_design_model.m:L4-L8.
+R2 Gnielinski, V. New Equations for Heat and Mass Transfer in Turbulent Pipe and Channel Flow.
+International Chemical Engineering16(2), 1976, pp. 359368. The article page range was inde-
+pendently veriable from accessible bibliographic records; the repository stores the citation string
+atvermicomposter_air_heater_design_model.m:L9-L10.
+R3 Churchill, S.W. Friction-Factor Equation Spans All Fluid-Flow Regimes.Chemical Engineering
+84(24), 1977, pp. 9192. The repository stores the citation string atvermicomposter_air_hea
+ter_design_model.m:L11-L12.
+R4 Churchill, S.W.; Chu, H.H.S. Correlating Equations for Laminar and Turbulent Free Convection
+from a Vertical Plate.International Journal of Heat and Mass Transfer18(11), 1975, pp. 1323
+1329. An accessible scan was used to verify that the implemented isothermal-wall relation appears
+as equation (9) on p. 1325. The repository stores the citation string atvermicomposter_air_h
+eater_design_model.m:L13-L15.
+R5 The repository cites Bergman, Lavine, Incropera, and DeWitt generically for thermal resistances,
+developing internal ow, lumped balances, and free convectionvermicomposter_air_heater_de
+sign_model.m:L16-L17. Edition and page numbers are not stored in the repository.
+R6 Idel'chik, I.E.Handbook of Hydraulic Resistance. The accessible English translation consulted
+online places the Section IV sudden-expansion discussion and the BordaCarnot coecient used
+here on p. 112. The repository source mapping for this usage isvermicomposter_air_heater_
+design_model.m:L2130-L2141;HeatTransferStudy/VermiHeatLoss.tex:L1976-L1984.
+R7 The helix geometry relation is documented as a repository-native design relation in comments
+and TeX narrativevermicomposter_air_heater_design_model.m:L1708-L1727;HeatTransf
+erStudy/VermiHeatLoss.tex:L38-L121.
+R8 Towler, G.; Sinnott, R.Chemical Engineering Design: Principles, Practice and Economics of
+Plant and Process Design, 3rd ed. Butterworth-Heinemann, 2022. Chapter 15 restates the
+Frössling formSh= 2 + 0.552Re 1/2Sc1/3, used here for the hole-scale Sherwood closure.
+R9 Wagner, W.; Pruss, A. The IAPWS Formulation 1995 for the Thermodynamic Properties of
+Ordinary Water Substance for General and Scientic Use.Journal of Physical and Chemical
+Reference Data31(2), 2002, pp. 387535. Section 2.3.1 reproduces the auxiliary saturation rela-
+tions used for vapor pressure and the saturated liquid and vapor densities, with the vapor-pressure
+equation at equation (2.5) on p. 399 and the density equations at equations (2.6)(2.7) on p. 399;
+Section 2.3.2 gives the saturation-boundary enthalpy relations at equations (2.10)(2.11) on p. 400.
+This is the same auxiliary saturation package that the paper notes had also appeared in the ear-
+lier supplementary-release lineage. In the current Python implementation,IAPWS_95.pysupplies
+the saturation-pressure call, directly evaluates equations (2.6)(2.7) for the saturated liquid and
+vapor densities, and then forms latent heat from Helmholtz-relation enthalpies evaluated at those
+saturation densities rather than by directly coding equations (2.10)(2.11); the repository com-
+mentary using these relations is atvermicomposter_air_heater_design_model.m:L18-L36;
+HeatTransferStudy/VermiHeatLoss.tex:L1089-L1167.
+R10 Kloppers, J.C.; Kröger, D.G. The Lewis factor and its inuence on the performance prediction
+of wet-cooling towers.International Journal of Thermal Sciences44(9), 2005, pp. 879884. This
+corrects the author names stored in some repository comments while preserving the same title
+41
+
+===== PAGE 42 =====
+and journal context. The repository narrative using the Lewis relation is atHeatTransferStud
+y/VermiHeatLoss.tex:L1174-L1180.
+R11 Frederickson, J.; Howell, G.; Hobson, A.M. Eect of pre-composting and vermicomposting on
+compost characteristics.European Journal of Soil Biology43(S1), 2007, pp. S320S326. Table 3
+supplies the particle-size fractions used for the wetted-area estimate. The repository reproduces
+those fractions atHeatTransferStudy/VermiHeatLoss.tex:L1015-L1088.
+R12 Idel'chik, I.E.Handbook of Hydraulic Resistance. The accessible English translation consulted
+online places the general incompressible orice-discharge relationQ=µF
+p
+2∆p/ρat equation (1-
+48) on p. 31, the thin-wall simplication at equation (1-49) on p. 31, and representative discharge-
+coecient values for orices on p. 32; the same translation places the Section III contraction
+discussion on pp. 8285 and equation (3-3), used here for the conical bellmouth contraction
+surrogate, on p. 83. The repository source mapping for these usages isvermicomposter_air_h
+eater_design_model.m:L1895-L2076;heat_transfer_study.py:L2825-L2849;vermicompo
+ster_air_heater_design_model.m:L2148-L2232;HeatTransferStudy/VermiHeatLoss.tex:
+L1943-L1955.
+R13 Hausen, H. Darstellung des Wärmeüberganges in Rohren durch verallgemeinerte Potenzbeziehun-
+gen.Zeitschrift des VDI, Beiheft Verfahrenstechnik8(4), 1943, pp. 9198. Later literature and
+thesis bibliographies preserve this citation; the repository uses the resulting Hausen-type form
+but does not currently store the primary citation string.
+R14 Crowl, D.A.; Louvar, J.F.Chemical Process Safety: Fundamentals with Applications, 2nd ed.
+Prentice Hall, 2002. Section 4-4, Flow of Liquids through Pipes, gives the2-Kmethod used here
+for tting-loss surrogates: equation (4-38) on p. 124, Table 4-2 on p. 125, and the entrance/exit
+modication at equation (4-39) on p. 126. The same p. 126 discussion below equation (4-40)
+notes that a simple hole has P Kf = 1.5, givingC d ≈0.63. The current repository uses those
+relations as reduced-order surrogates for the unresolved air-side header and splitter-body losses,
+with the optional header treated as a normal entrance, one splitter branch path treated as a
+standard threaded tee used as an elbow followed by one full-line open gate/ball/plug valve, and
+the vented-top outlet boundary treated as a simple-hole discharge.
+R15 Ergun, S. Fluid Flow Through Packed Columns.Chemical Engineering Progress48(2), 1952,
+pp. 8994. The current repository uses the standard Ergun packed-bed pressure-drop form as a
+segmentwise porous-bed backpressure surrogate between each aeration-segment release zone and
+the nearest top opening.
+R16 Fornes, F.; Mendoza-Hernández, D.; García-de-la-Fuente, R.; Abad, M.; Belda, R.M. Com-
+posting versus vermicomposting: A comparative study of organic matter evolution through
+straight and combined processes.Bioresource Technology118, 2012, pp. 296305. Table 2 on
+p. 299 reports total porosity for the composting (COM), vermicomposting (VER), and combined
+composting-plus-vermicomposting (C + V) stages. The current repository uses the COM day 21
+and day 63 total-porosity values (80.1and79.9%v/v) as the bracketing measurements around
+the nominal 30-day pre-composting interval, giving the default constantε= 0.80, and notes the
+weak variation of the C + V values over the later vermicomposting interval when justifying the
+constant-porosity simplication.
+R17 Idel'chik, I.E.Handbook of Hydraulic Resistance. For helical-coil obstruction context, the con-
+sulted scan was checked at the Tubes with wire ribbing entry in Section VIII (printed p. 337;
+PDF page 346) and at Spiral-ribbed air heater,, Diagram 12-21, in Section XII (printed p. 482;
+PDF page 491). The current repository uses these as source-backed motivation for the added
+coil-obstruction surrogate rather than as a direct one-chart closed-form t.
+NOAA and EIA URLs used by the annual layer are preserved in the conguration and narrative,
+not in a dedicated bibliography databaseHeatTransferStudy/VermiHeatLoss.tex:L2574-L31
+42
+
+===== PAGE 43 =====
+64;HeatTransferStudy/study_config.json:L289-L419.
+Implementation topic map
+Concept Governing equations and
+source status
+Implementation mapping and notes
+Tube ow,
+perforations,
+electrical
+grouping
+Equations:
+eq:volflow_per_tube
+eq:electrical_totals.
+Source status: repository
+bookkeeping plus [R12] for
+the closed-end perforation
+discharge relation.
+Implementation:
+vermicomposter_air_heater_design_model.m:
+L763-L875;
+vermicomposter_air_heater_design_model.m:
+L1497-L1677.
+Notes: series-parallel grouping allowed.
+Internal
+convection and
+friction
+Equations:
+eq:internal_laminar_nu,
+eq:internal_turbulent_nu,
+eq:
+churchill_friction_full.
+Source status: [R2], [R3],
+[R5].
+Implementation:
+vermicomposter_air_heater_design_model.m:
+L2382-L2407;
+heat_transfer_study.py:L3755-L3774.
+Notes: used in both heater and aeration branches.
+Heater axial
+energy balance
+Equations:
+eq:heater_segment_air,
+eq:wire_delta_t.
+Source status: [R1], [R5] plus
+repository discretization.
+Implementation:
+vermicomposter_air_heater_design_model.m:
+L1803-L1894;
+heat_transfer_study.py:L3775-L3895.
+Notes: explicit marching.
+Aeration
+wall/jet/latent
+coupling
+Equations:
+eq:released_massflow,eq:
+aeration_remaining_mdot,
+eq:cooling_wall_factor,
+eq:aeration_q_jet.
+Source status: [R5], [R12]
+plus repository reduction of
+sensible and latent paths.
+Implementation:
+vermicomposter_air_heater_design_model.m:
+L1895-L2076;
+heat_transfer_study.py:L2987-L3277;
+heat_transfer_study.py:L4182-L4323.
+Notes: same structure in heating and cooling.
+Evaporation and
+latent heat
+Equations:
+eq:sauter_diameter
+eq:evap_selected.
+Source status: [R1], [R9],
+[R10], [R11].
+Implementation:
+vermicomposter_air_heater_design_model.m:
+L891-L937;
+vermicomposter_air_heater_design_model.m:
+L2000-L2122;
+heat_transfer_study.py:L2567-L2603;
+heat_transfer_study.py:L3607-L3708.
+Notes: minimum of three limiting rates.
+Bin loss model
+and two-node
+bed
+Equations:
+eq:topmode_open
+eq:two_node_split.
+Source status: [R4], [R5] plus
+repository vented-cover
+extension.
+Implementation:
+vermicomposter_air_heater_design_model.m:
+L971-L1171;
+heat_transfer_study.py:L4326-L4438.
+Notes: lumped bed closure.
+43
+
+===== PAGE 44 =====
+Concept Governing equations and
+source status
+Implementation mapping and notes
+Cooling spot
+cooler and assist
+blower
+Equations: cooling and
+condensate relations in
+Sections 1215.
+Source status: repository
+surrogate model.
+Implementation:
+heat_transfer_study.py:L2534-L3292.
+Notes: includes condensate-limited RH update.
+Heating and
+cooling NSGA-II
+Equations:eq:heating_cons
+traint_residualseq:
+cooling_report_selection.
+Source status: repository
+implementation.
+Implementation:
+heat_transfer_study.py:L51-L121;
+heat_transfer_study.py:L2181-L2499;
+heat_transfer_study.py:L3148-L3208;
+heat_transfer_study.py:L6220-L6490.
+Notes: cooling now also NSGA-II.
+Annual climate
+and duty layer
+Equations:
+eq:kernel_baseline,
+eq:daily_duty,
+eq:daily_energy.
+Source status: repository
+numerical construct plus
+NOAA/EIA inputs.
+Implementation:
+heat_transfer_study.py:L4633-L5012.
+Notes: not a literature rst-principles climate
+model.
+44

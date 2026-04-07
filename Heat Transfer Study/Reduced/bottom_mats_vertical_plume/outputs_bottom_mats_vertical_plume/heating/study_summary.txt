@@ -1,0 +1,54 @@
+============================================================
+BOTTOM-MAT HEATING MODEL SUMMARY
+============================================================
+Heating method                      : bottom_mats_vertical_plume
+Model basis                         : single-lumped bed control state + 2D diagnostic field + buoyancy/Ergun upward porous transport + stack-limited venting + Sherwood latent sink + microbial q_bio source
+Bed geometry                         : 48.0 in (L) x 24.0 in (W) x 24.0 in (H)
+Mats                                 : 4 x 20.75 in x 10.00 in, touching 2x2 footprint
+Heated footprint                     : 41.50 in x 20.00 in (base plane)
+Mat power rating                     : 17.50 W each at 120.0 VAC
+Total electrical at 100% duty        : 70.00 W
+
+Microbial q_bio model (literature-backed):
+  Enabled                            : True
+  Scenario                           : base
+  Enthalpy per mol O2                : 376.80 kJ/mol O2
+  OUR at operating day               : 8.188 mg O2/g VS/day
+  q_bio base volumetric              : 130.553 W/m3
+  q_bio reference volumetric (Tset)  : 130.553 W/m3
+  q_bio reference total (Tset)       : 59.150 W
+
+Design-ambient heating requirement decomposition:
+  Gross envelope loss (UA*DeltaT)    : 109.997 W
+  Minus microbial credit             : 59.150 W
+  External mat heat required         : 50.848 W
+
+Recommended heating operating point:
+  Duty                               : 0.380
+  Electrical power                   : 26.63 W
+  Mat heat to bed                    : 25.30 W
+  Bioheat contribution               : 85.08 W
+  Total heat to bed                  : 110.38 W
+  Lumped bed temperature             : 30.37 C
+  Legacy bottom/top aliases          : 30.37 / 30.37 C
+  Physical field bottom/top means    : 32.27 / 26.64 C
+  Physical field gradient            : 5.63 C
+  Peak Ergun pressure drop           : 0.00 Pa
+  Mean superficial velocity          : 0.00058 m/s
+  Passive vent throughput            : 25.83 L/min
+  Water loss estimate (net)          : 0.4200 kg/day
+  Water loss estimate (gross evap)   : 1.2000 kg/day
+  Net moisture-loss fraction         : 0.350
+  Latent recovery fraction (effective): 0.350
+  Latent sink estimate               : 22.1181 W
+  Heat-map reference duty            : 0.339 (closest-to-design-mean-temperature point)
+
+Generated files:
+  - heating_sideview_lengthwise_heatmap.png
+  - heating_sideview_lengthwise_heatmap_with_bio.png
+  - heating_sideview_lengthwise_heatmap_without_bio.png
+  - heating_sideview_lengthwise_heatmap_bio_delta.png
+  - heating_bottom_mats_sweep.png
+  - heating_payload_bottom_mats.json
+  - heating_sideview_field_bottom_mats.npz
+============================================================

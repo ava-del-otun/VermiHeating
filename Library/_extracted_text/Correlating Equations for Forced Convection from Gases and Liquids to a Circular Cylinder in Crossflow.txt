@@ -1,0 +1,765 @@
+
+
+===== PAGE 1 =====
+S. W. Churchill 
+M. Bernstein1 
+Department of Chemical and Biochemical 
+Engineering, 
+University of Pennsylvania, 
+Philadelphia, Pa. 
+A Correlating Equation for Forced 
+Convection From Gases and Liquids 
+to a Circular Cylinder in Crossflow 
+A single comprehensive equation is developed for the rate of heat and mass transfer from 
+a circular cylinder in crossflow, covering a complete range of Pr (or Sc) and the entire 
+range of Re for which data are available. This expression is a lower bound (except possibly 
+for RePr < 0.2); free-stream turbulence, end effects, channel blockage, free convection, 
+etc., may increase the rate. In the complete absence of free convection, the theoretical ex­
+pression of Nakai and Okazaki may be more accurate for RePr < 0.2. The correlating 
+equation is based on theoretical results for the effect of Pr in the laminar boundary layer, 
+and on both theoretical and experimental results for the effect of Re. The process of corre­
+lation reveals the need for theoretical results for the effect of Pr in the region of the wake. 
+Additional experimental data for the effect of Pr at small Pe and for the effect of Re dur­
+ing the transition in the point of separation are also needed. 
+Introduction 
+Convective heat transfer from a cylinder in crossflow has been 
+the subject of repeated attempts at correlation and generalization 
+because of its importance in a variety of applications. These attempts 
+have not been completely successful because of: (1) the lack of a 
+comprehensive theory for the dependence on Pr even for the boundary 
+layer regime; (2) competitive theories for low Re; (3) the influence of 
+natural convection at very low Re;'(4) discrete transitions in the 
+boundary layer and the wake at high Re; (5) the influence and lack 
+of specification of free-stream turbulence; (6) the use of different and 
+undefined thermal boundary conditions; (7) significant variation in 
+physical properties between the surface and free stream and around 
+the surface; (8) the incorporation of erroneous physical properties in 
+older tabulated data; (9) end effects, particularly at low Re; (10) tunnel 
+blockage; (11) significant scatter in most of the many sets of data; and 
+(12) unresolved discrepancies between the various sets of data. 
+Douglas and Churchill [l]2 discovered that most of the experimental 
+data for gases at large temperature differences had been misinter­
+preted and misplotted in McAdams [2]. They reconstructed a general 
+1 Currently with Exxon, D104, Box 153, Florham Park, N. J. 
+2 Numbers in brackets designate References at end of paper. 
+Contributed by the Heat Transfer Division for publication in the JOURNAL 
+OF HEAT TRANSFER. Manuscript received by the Heat Transfer Division 
+September 2,1976. 
+graphical correlation for gases using the original measured quantities 
+and modern physical properties. Fand and Keswani [3] recently re­
+peated the conversion of Hilpert's [4] extensive data for air to modern 
+physical properties. 
+Douglas and Churchill also proposed a semitheoretical equation 
+for all Re and attributed the systematic deviation at low Re to free 
+convection. (This behavior has since been shown to be due to thick­
+ening of the boundary layer, as well as to free convection.) Perkins and 
+Leppert [5] developed graphical correlations and empirical equations 
+for liquids based on the models of Richardson [6] and of Douglas and 
+Churchill. Tsubouchi and Masuda [7] carried out a thorough exami­
+nation of the data for both liquids and gases. They proposed a new 
+equation for liquids and a slight modification of the equation of 
+Perkins and Leppert for both gases and liquids. Whitaker [8] proposed 
+a modified version of his own correlation for spheres rather than de­
+riving a new set of coefficients and exponents for cylinders. Fand and 
+Keswani [9] recently presented an empirical correlation for air only, 
+based on the data of Hilpert [4], Collis and Williams [10], and King 
+[11] only. Gnielinski [12] proposed correlation of the data for plates, 
+cylinders, and spheres at moderate Re by taking the square root of 
+the square of the correlations for the laminar and turbulent regimes; 
+however, he did not have access to the very recent data which greatly 
+extend the upward range of Re for cylinders. 
+The objective of this paper is to resolve, insofar as possible, the 
+discrepancies and complications enumerated in the first paragraph, 
+and to construct a simpler, more accurate, and more general corre­
+lation than those mentioned in the second and third paragraph of this 
+300 / VOL 99, MAY 1977 Transactions of the ASME 
+Copyright © 1977 by ASME
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/ on 01/26/2016 Terms of Use: http://www.asme.org/about-asme/terms-of-use
+
+===== PAGE 2 =====
+Table 1 Power-dependence provided by equation (2) 
+Pr 
+Power 
+0 
+0.500 
+10"2 
+0.486 
+10"' 
+0.452 
+0.7 
+0.401 
+1.0 
+0.391 
+10 
+0.351 
+102 
+0.337 
+103 
+0.334 0.3333 
+section. This is not a review. In view of the comprehensive reviews 
+mentioned in the foregoing and the other recent ones by Zhukauskas 
+[13] and Morgan [14], reference will be made only to those investi­
+gations directly relevant to the development of the correlations. 
+The recent data of Achenbach [15] and Zdanavichyus, et al. [16] 
+have helped greatly to resolve the previously controversial behavior 
+at high Re, and the recent papers by Morgan [14] and Katinas, et al. 
+[17] have helped to categorize the various investigations in terms of 
+blockage and free-stream turbulence. 
+The development herein of an overall correlating equation starts 
+with consideration of the laminar boundary layer regime. The 
+creeping-flow regime and the regime dominated by the wake are next 
+examined. These regimes do not overlap with the laminar boundary 
+layer regime, and interpolation is necessary. Finally, secondary effects 
+are considered, the various sets of data are interpreted briefly in terms 
+of the correlation, and conclusions are drawn. 
+Development of Correlating Equations 
+Laminar Boundary Layer Regime. The theoretical solutions 
+for the laminar boundary layer regime proved to be invaluable in 
+constructing correlating equations for forced convection to a flat plate 
+[18] and for free convection to a cylinder [19]. Unfortunately com­
+parable solutions are incomplete for forced convection to a cylin­
+der. 
+Squire [20], Eckert [21], and Levy [22] all computed theoretical 
+values of the Nusselt number at the forward stagnation point as a 
+function of the Prandtl number. The values of Squire and Eckert are 
+in reasonable agreement but those of Levy are somewhat lower. The 
+values of Squire and of Eckert were, therefore, utilized to derive an 
+empirical expression in the form of the general correlating equation 
+of Churchill and Usagi [23]. This model equates the nth power of the 
+dependent variable (here Nu) to the sum of the nth powers of the 
+limiting solutions for large and small values of the independent 
+variable (here Pr). The empirical exponent n is then evaluated from 
+experimental data or theoretical points for intermediate values of the 
+independent variable. In this application the best value of n appears 
+to be -4.0 resulting in the expression 
+Nus = 1.276 Re^Pr1^! + (0.412/Pr)2/3]1/4 (1) 
+It may be noted that the exponent of % (corresponding to n = -4) on 
+the term in brackets is identical to that derived by Churchill and Ozoe 
+[24, 25] for forced convection to both uniformly heated and isothermal 
+plates in the laminar boundary layer regime. However, the "central 
+values" of Pr for the flat plate (the values of Pr for which the limiting 
+solutions intersect) were much lower than 0.412. For free convection 
+the central values as well as the exponent were found by Churchill and 
+Churchill [26] to be essentially the same for all geometries. The dif­
+ference in the central values of Pr for forced convection undoubtedly 
+arises from the basic difference in the forced-flow pattern over the 
+cylinder and along the flat plate. The value of 0.412 is, in any event, 
+quite uncertain since it is the ratio of the coefficients of the limiting 
+solutions for Pr —>- 0 and °°, raised to the sixth power. 
+Pending the derivation of sufficient, precise values for the effect 
+of Pr on the mean rate of heat transfer over the entire cylinder, the 
+same dependence as in equation (1) will be postulated, yielding 
+Nu = A Re1/2Pr1/3/[l + (0.4/Pr)2/3] 1/4 (2) 
+The approximate, theoretical calculations of Masliyah and Epstein 
+[27] for Re = 1 and Pr from 0.7 to 40,000 indicate a value of 0.62 
+and the two, extrapolated, theoretical values of Jain and Goel [28] a 
+value of 0.64 for A. An arithmetic plot (not shown) of Nu versus $ = 
+ReI/zPrI/3/[l + (0.4/Pr)2/3]1/4 for experimental and theoretical values 
+covering a wide range of Re and Pr indicates that equation (2) with 
+A = 0.62 provides an excellent representation for 40 < Re < 10,000 
+corresponding to 5 < <j> < 80 for Pr = 0.7. This agreement is illustrated 
+in logarithmic form in Figs. 1 and 2. Equation (2) does not hold for 
+Re < 5 owing to thickening of the boundary layer as discussed in the 
+next section and does not hold for Re > 10,000 owing to the develop­
+ment of a significant contribution from the region of separation at the 
+rear of the cylinder, as discussed later. 
+The equivalent power dependence on Pr in equation (2), defined 
+as d(ln[Nu|)/d(ln|Pr)), varies from % to % as indicated in Table 1, thus 
+providing a rationalization for the different powers derived in prior 
+correlations of experimental data for different ranges of Pr. 
+Creeping-Flow Regime (Pe < 0.2). A number of theoretical 
+expressions have been derived for Pe -» 0, based on potential flow. 
+The most successful appears to be that of Nakai and Okazaki [29] 
+which can be written as 
+Nu = 1/(0.8237 - lnjPe1/2)), Pe < 0.2 (3) 
+Equation (3) agrees well with the computed values of Dennis, et al. 
+[30] and with the experimental data for various fluids, as indicated 
+by the dashed lines in Fig. 1 for Pr_=_0.001, 0.7, and 1000, and dis­
+cussed subsequently. The values of Nu computed from equation (2) 
+approach 0 as Pe —• 0, as would be expected for pure conduction from 
+an infinitely long cylinder to surroundings of infinite extent. The finite 
+values observed experimentally for Re -» 0 are presumably due to free 
+convection, end effects and finite surroundings. 
+^Nomenclature.. 
+A = dimensionless coefficient 
+D = cylinder diameter 
+DT = tunnel diameter 
+X) = diffusivity 
+g = gravitational acceleration 
+h = heat transfer coefficient 
+k = thermal conductivity 
+kc = mass transfer coefficient 
+L = cylinder length 
+n = arbitrary exponent in Churchill-Usagi 
+equation 
+Nu = Nusselt number = hD/k 
+Nu = mean Nusselt number 
+Nuo = mean Nusselt number for Re -» 0 
+Nur = Nusselt number in region of wake 
+Nus = Nusselt number at forward stagnation 
+point 
+Nu„ = mean Nusselt number for Re -• «> 
+Pe = Peclet number = RePr = DUb/a 
+Pr = Prandtl number = via 
+Ra = Rayleigh number = g/?ATD3/ra 
+Re = Reynolds number = DU\,h 
+Sc = Schmidt number = v/D 
+Sh = Sherwood number = kcD/3) 
+T = temperature 
+Tu — intensity of free-stream turbulence = 
+vW)Wt, 
+Ut = free-stream velocity 
+£/(,' = fluctuation in free-stream velocity 
+a = thermal diffusivity 
+P = volumetric coefficient of expansion with 
+temperature 
+AT=Tb- Tw 
+H = viscosity 
+v = kinematic viscosity 
+0 = Re^Pr1'3/!! + (0.4/Pr)2/3]1/4 
+Subscripts 
+b = free stream 
+/ = film, at (Tw + Tb)/2 
+w = wall 
+Journal of Heat Transfer MAY 1977, VOL 99 / 301 
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/ on 01/26/2016 Terms of Use: http://www.asme.org/about-asme/terms-of-use
+
+===== PAGE 3 =====
+Re 
+Power 
+0 
+0 
+10'2 
+0.069 
+Table 2 Power-dependence provided by equation (8) for Pr = 0.7 
+10-' 
+0.169 
+1 
+0.308 
+10 
+0.419 
+102 
+0.471 
+103 
+0.505 
+10" 
+0.552 
+105 
+0.671 
+10* 
+0.843 
+107 
+0.951 1.000 
+Intermediate Regime (Pe > 0.2, Re < 10,000). A considerable 
+gap exists between the range of applicability of equations (2) and (3). 
+This behavior can be approximated, as suggested by Tsubouchi and 
+Masuda [7] and others, by adding a constant term, Nuo, to the right-
+hand side of equation (2). A value of 0.3 resulting in 
+Nu = 0.3 + 0.62Re1/2Pr1/3/[l + (0.4/Pr)2/3] 1/4 (4) 
+represents the experimental data and computed values very well for 
+Pe > 0.2 and Re < 10,000 as indicated in Figs. 1 and 2. A slightly lower 
+value of Nuo would give a better prediction for Pe < 0.2 but at the 
+expense of a poorer prediction for Pe > 0.2. 
+The theoretical solution of King [11] for potential flow actually 
+yielded a value of 1/ir = 0.318 for Nuo but his choice of boundary 
+conditions has been called improper by Hill and Sleicher [31]. 
+Collis and Williams [10] assert that an expression of the form of 
+equation (4) is unsatisfactory because it cannot reproduce the discrete 
+change in slope which they observe with the onset of eddy-shedding 
+(Re = 44 for Pr = 0.7). However, such a discrete transition in Nu at 
+Re = 44 (0 = 5.16 for Pr = 0.7) is not apparent in Fig. 1 and can be 
+considered negligible for practical purposes. A possible explanation 
+is the derivation by Virk [32] of 
+Nur = 2VP~e75V (5) 
+for the rear half of the cylinder in the eddy-shedding regime of 40 < 
+Re < 2 X 105. The dependence on Re is thus the same as for the 
+boundary layer, although the indicated dependence on Pr differs. 
+Completely Turbulent Regime. The behavior for Re > 10,000 
+has been uncertain for some time owing to discrepancies between the 
+various sets of experimental data. Clark [33] predicted a linear de­
+pendence of Nu on Re in the region of the wake. Both van der Hegge 
+Zijnen [34] and Douglas and Churchill [1] utilized such a linear de­
+pendence in their correlating equations. Richardson [6, 35] asserted 
+that the rate of heat transfer in this region should be proportional to 
+Re2/3. This dependence and also Re0-8 have been utilized in a number 
+of correlating equations. The precise data of Hilpert [4] which extend 
+to Re = 233,000, indicate a linear dependence but have been subject 
+to some controversy since they generally fall below the data of other 
+investigators. The recent precise data of Zdanavichyus, et al. [16] and 
+of Achenbach [15] for air which extend to Re = 1.1 X 106 and Re = 4.2 
+X 106, respectively, now provide a sounder basis for interpretation 
+of the behavior at high Re. (Despite their relative precision, the data 
+of Achenbach for uniform wall temperature and Tu =; 0.0045 fall 
+above those of Zdanavichyus, et al., for uniform heat flux and Tu s, 
+0.027, even though the opposite effect would be expected.) The 
+evaluation of the role of blockage and free-stream turbulence by 
+Morgan [14] and others explains most of the discrepancies between 
+the other sets of data, at least qualitatively. 
+The data of both Zdanavichyus, et al., and Achenbach indicate that 
+Nu does not increase uniformly with Re but shows an upswing at 
+about Re = 106, a flattening out at about Re = 4 X 10B and a resumed 
+upswing approaching linearity with Re above Re = 2 X 106. These 
+transitions are associated with the downstream relocation of the point 
+of separation and the transition from a laminar to a turbulent 
+boundary layer. Reference to these papers is suggested for detailed 
+discussions of the behavior of the flow field. The changes in Nu are 
+surprisingly mild, considering the abrupt and significant changes in 
+the flow pattern. 
+The following asymptotic expression for very large Re can be de­
+rived from the data of Achenbach 
+30 
+10 
+10 ' 10 
+Re lat Pr =0.7) 
+10"' 1 10 10 10 
+Nu, 
+0.1 
+Equation (3 
+n T , 0.62 Rel/2Pr"3 
+rw(<u,2/3l,w 
+Pr J 
+Pr 
+1000,-' 
+,-<^>2/T 
+J- _d_ 
+0.01 0.1 1.0 10 
+Ref»2Pr,"y[W(0.4/Prf)2/3],M 
+Fig. 1 Low Reynolds number regime—Legend: @ Dennis, et al. [30] (com­
+puted); • Masliyah and Epstein [27] (computed); A Jain and Goel [28] 
+(computed); O Hilpert [4] (air); o Tsubouchi and Masuda [7] (air); D Collis 
+and Williams [10] (air); O Gebhart and Pera [36] (air); V Krall and Eckert [37] 
+(air (uniform heat flux));»Tsubouchi and Masuda [7], Davis [42] (water, oils 
+(Pr = 4-600)); x Sajben [31] (mercury (Pr = 0.0225)); + Beckers, et al. [43] 
+(paraffin oil (Pr = 1000)); > Ishiguro, et al. [40] (sodium (Pr = 0.0058 and 
+0.0073); A Dobry and Finn [46] (mass transfer (Sc = 1100 and 1400)) 
+40 
+302 / VOL 99, MAY 1977 Transactions of the AStVIE 
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/ on 01/26/2016 Terms of Use: http://www.asme.org/about-asme/terms-of-use
+
+===== PAGE 4 =====
+Fig. 2 High Reynolds number regime—Legend: O Hilpert [4] (air); D Collls 
+and Williams [10] (air); + Achenbach [15] (air); QZdanavichyus, et al. [16] 
+(air); V Krall and Eckert [37] (air (uniform heat flux)); (f> Schmidt and Wenner 
+[38] (air); < Lewis [39] (air); > Ishiguro, et al. [40] (sodium (Pr = 0.0058 and 
+0.0073)); • Zdanavichyus, et al. [16] (water); fj Fand and Keswani [44] 
+(water (smoothed values)); oFand [45] (water) 
+Nu„ = 0.00091 Re (6) 
+Postulating the same dependence on Pr as in the laminar-bound­
+ary-layer regime converts equation (6) to 
+Nu„ = 0.001168 RePr^/fl + (0.4/Pr)2/3]1/4 (7). 
+It should be emphasized that equations (6) and (7) are the apparent 
+asymptotes for the Achenbach data, not correlations for them. 
+Overall Correlation, <f> > 0.4. Combining equations (4) and (7) in 
+the form suggested by Churchill and Usagi [23], as discussed in the 
+foregoing, results in the test expression 
+(Nu-0.3)n = 
+•(• 
+O^Re^Pr1/3 
+[1 + (0.4/Pr)2/3]1/4 )" 
+/ O.OOlieSRePr1/3 
+41 + (0.4/Pr)2/3]1/4 )" 
+A value of 5/4 for the exponent, hence 
+— 0.62Re1/2Pr1/3 r 
+Nu = 0.3 + - l+i Re 14/5 
+(8) 
+(9) [1 + (0.4/Pr)2/3]1/4 1/ ' \28200oi 
+appears to provide a lower bound for RePr > 0.4 and a reasonable 
+approximation for all Re and Pr, with a few exceptions to be discussed 
+in the next section. 
+Equation (9) differs from prior correlating equations for forced 
+convection to cylinders in that it provides a varying power for Re and 
+Pr. The power of Pr was previously considered. The effective power 
+of Re in equation (9), defined as [3(ln(Nu|)/d(ln[Re))]pr depends on 
+Pr. The values in Table 2, which were computed for Pr = 0.7, range 
+from 0 to 1.0, and are in general agreement with the values determined 
+by the correlations for narrow ranges of Re by McAdams [2], Morgan 
+[14], and others. The values in Table 1 for the effective power of Pr 
+hold for equations (4) and (9) as well as (2) as long as Nu » NUQ. 
+Comparison of Correlating Equations With 
+Experimental Data 
+The effectiveness and limitations of the correlating equations (3), 
+(4), and (9) are indicated in Figs. 1 and 2 by comparison with a broad 
+range of experimental data. The properties and velocity were con­
+verted to the form of Figs. 1 and 2 insofar as possible. The sets of data 
+which are included are those which do not scatter excessively, and 
+which Morgan [14] and others have classified as relatively free from 
+the effects of temperature-difference, free-stream turbulence, aspect 
+ratio and tunnel-blockage. The many sets of early data (see, for ex­
+ample, Douglas and Churchill [1], Gnielinski [12], or Morgan [14] for 
+listings) which are not included, generally fall significantly above 
+equation (9) due to one or more of the foregoing effects. Corrections 
+for these secondary effects are considered in the following section. 
+The various sets of data for air [4, 7,10,15,16, 36-39] are seen to 
+be in good agreement with equation (9) for Pe > 0.2, corresponding 
+to Re = 0.285 and 0 = 0.416, with the following exceptions. The data 
+of Krall and Eckert [37] fall somewhat above equation (9) for their 
+lower range of Re, presumably due to uniform heating. In the range 
+40000 < Re < 400000 all of the data [4,15,16, 38, 39] fall decisively 
+above equation (9). This thermal* behavior is associated with the 
+downstream transition in the point of separation of the wake. A 
+somewhat better representation for the data in this range of Re is 
+obtained by taking n = 1 instead of % in equation (8) leading to 
+Journal of Heat Transfer MAY 1977, VOL 99 / 303 
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/ on 01/26/2016 Terms of Use: http://www.asme.org/about-asme/terms-of-use
+
+===== PAGE 5 =====
+— 0.62Re1/2Pr!/3 f / Re \i«1 , % 
+NU = 0-3 + [l + (0.4/Pr)2/3]141 + (^^) J (10) 
+Even so, some of the data of Achenbach [15] and of Lewis [39] fall 
+above equation (10). In the range 1000 < Re < 10,000 the precise data 
+of Hilpert [4] fall below equation (9). This latter discrepancy, which 
+has been noted by many previous investigators, may be due to some 
+experimental anomaly, as suggested by Morgan [14]. 
+Reliable data to test the dependence on Pr are somewhat limited. 
+The only reliable data for low Pr appear to be those of Sajben [34] for 
+mercury (Pr = 0.0225) and those of Ishiguro, et al. [40] for sodium (Pr 
+= 0.0058 and 0.0073). Representative values of Sajben read from a 
+graph, are included in Fig. 1. They are in general agreement with 
+equation (4) for Pe > 0.2, corresponding to <t> = 0.50, but fall below 
+both equations (4) and (3) for lower values. The measurements of 
+Ishiguro, et al., are for a nearly uniform heat flux density. The values 
+of Nu based on an integrated-mean temperature difference appear 
+to follow equation (4) even to Re = 10000, and hence fall below 
+equation (9) for Re > 103. Based on an integrated-mean heat transfer 
+coefficient they fall above equation (9). In any event they appear to 
+invalidate, for this range of Re, the postulate of potential flow, upon 
+which the theoretical solution of Grosh and Cess [41] is based. 
+The data of Tsubouchi and Masuda [7] and Davis [42] for various 
+fluids with 5 < Pr < 600 scatter randomly about equation (9). The 
+data of Beckers, et al. [43] for paraffin oil (Pr = 1000) agree with 
+equation (4) down to Pe = 0.2(<l> = 0.14) but fall far below the pre­
+diction of equation (3) for lower Pe. Their data for other fluids scatter 
+widely and were omitted. The data of van der Hegge Zijnen [34] are 
+given graphically in combined forms which preclude their inclusion 
+in Figs. 1 and 2. The data of Gebhart and Pera [36] for oils and small 
+wires were recognized by the investigators as anomalously high, ap­
+parently due to end effects. The data of Zdanavichyus, et al. [16] for 
+water follow equation (9) closely and those of Fand and Keswani [44] 
+are only slightly higher. The earlier data of Fand [45] for water fall 
+decisively below the correlation, and almost follow the extension of 
+equation (4), suggesting a possible delay in transition of the point of 
+separation in these experiments. 
+Although the correlation is presumed to hold for mass transfer with 
+Nu replaced by Sh and Pr by Sc, no data meeting the foregoing criteria 
+were found. However, the data of Dobry and Finn [46] for Sc = 1100 
+and 1400, although somewhat scattered, are seen to be in general 
+agreement with equation (9). 
+Secondary Effects 
+Physical Property Variation With Temperature. The effect 
+of large AT is not well resolved and is opposite in direction for liquids 
+and gases and for heating and cooling. Douglas and Churchill [1] were 
+reasonably successful in handling the effect of property variation for 
+gases and Tsubouchi and Masuda [7] for liquids simply by calculating 
+the properties (including p) at the film temperature (the arithmetic 
+average of the surface and free-stream temperatures). Collis and 
+Williams [10] assert that for gases Nu shduld additionally be multi­
+plied by (Tb/T[)QA1. Perkins and Leppert [5] and Whitaker [8] propose 
+the use of free-stream properties and the multiplication of Nu by 
+(tiw/nb)0'25 but Tsubouchi and Masuda contend an exponent of 0.14 
+is better than 0.25. Zhukauskas [13] proposes the use of the free-
+stream temperature and the multiplication of Nu by (Pib/Prw)" with 
+a = 0.25 for the turbulent regime and 0.17-0.19 for the laminar regime, 
+.but notes that Pr&/Pr,„ s MS/MW Fand and Keswani [44] propose 
+correlating Nuu,aNu(,1-° with RewbReb1-b and Pr„,cPrf,1_c but do 
+not achieve a significantly better fit than with properties at the film 
+temperature. After reviewing the various correlations, Morgan con­
+cludes that the dependence on physical properties is still undefined 
+and declares the need for additional experimental work. Wylie [47] 
+and Vaitekunas, et al. [48] have recently derived theoretical solutions 
+for laminar and turbulent boundary layers, respectively, with varying 
+physical properties and this approach may ultimately resolve the 
+dilemma. 
+In any event, equation (9) can be expected to give reasonable results 
+for moderate temperature differences for both liquids and gases if the 
+properties are evaluated at the film temperature. It can readily be 
+modified in accordance with any of the foregoing schemes for large 
+temperature differences. 
+Boundary Conditions. Most experiments and calculations have 
+been carried out for essentially a uniform surface temperature. 
+However, Boulos and Pei [49] utilized a uniform heat flux density and 
+concluded that this boundary condition resulted in a 10-20 percent 
+increase in Nu as compared to an isothermal surface. Some of their 
+measured values of Nus are below the boundary layer values, casting 
+doubt on the validity of this conclusion. Krall and Eckert [37] con­
+cluded that their measurements were 7 percent high for the same 
+reason. These observations are consistent with theoretical calculations 
+for the laminar boundary layer regime on a flat plate which indicate 
+a 37 percent increase in the local values of Nu but a 37 percent in­
+crease, 3 percent increase or 3 percent decrease depending on whether 
+Nu is based on the integrated-mean heat transfer coefficient, the in­
+tegrated-mean temperature-difference or the temperature difference 
+at the midpoint [18]. These results provide the basis for a first-order 
+estimation of a correction factor to equation (9) for a uniform heat 
+flux or other nonisothermal boundary condition 
+Blockage. Morgan [14] compared a number of the expressions 
+that have been proposed for the effect of the boundaries of the channel 
+in which the test cylinder is located, with the limited experimental 
+data for this effect. He concluded that the velocity in Re should be 
+increased by the factor 1 + 0.385 D/DT + 1.356 {D/DT)2 developed 
+by Vincenti and Graham [50] for small streamlined bodies in closed 
+circular tunnels. For a jet stream from a tunnel, Morgan suggests re­
+ducing the velbcity in Re by the factor 1 — 0.411 (D/Dr)2 which was 
+developed by Lock [51]. 
+Free-Stream Turbulence. Dyban and Epik [52] proposed the 
+expression 0.8 ReTu/(1500 + ReTu) to represent experimental data 
+for the fractional increase in Nu over the range 2000 < Re < 80,000 
+and 0.02 < Tu < 0.26. Morgan [14] reviewed the somewhat contra­
+dictory data and correlations and developed a graphical correlation 
+for the combined effects of free-stream turbulence and tunnel 
+blockage. 
+Aspect Ratio. Nu depends on the length of the cylinder owing 
+to three-dimensional disturbances in the velocity field at the ends, 
+and perhaps to longitudinal heat losses. These effects appear to be 
+significant only for very fine wires such as those used in anemometry. 
+Ohman [53] has shown that Nuo should have a minimum theoretical 
+value of 2/ln[2L/D) for a finite cylinder. Gebhart and Pera [36] ob­
+served significant effects for large Pr, even for LID = 16000. Morgan 
+[14] proposes multiplication of Nu for hot-wire anemometers by the 
+factor 1 + 7.5(D/L)1/2 + 3.5 X 104(D/L)2. 
+Free Convection. Since forced convection implies a temperature 
+difference, free convection must always be present to some degree. 
+From the general correlation of Churchill [54] for assisting, laminar 
+convection it follows that the fractional increase or decrease in Nu-
+Nuo due to a small degree of assisting or opposing free convection is 
+approximately 0.2 Ra3/4 [1 + (0.4/Pr)2/3]3/4/Re3/2Pr[l + (0.5/ 
+pr)9/i6]4/3# por very sman Re ancl Ra Nakai and Okazaki [29] show that 
+the absolute increase or decrease in 1/Nu due to a small degree of 
+opposing or assisting free convection is 0.65 NuRa/Pr2Re3. 
+Summary and Conclusions 
+1 Equation (9) is proposed as a lower bound for the computed and 
+experimental values of heat transfer by forced convection to a cylinder 
+in cross flow for all Re and Pr such that RePr > 0.2. 
+2 As a lower bound, equation (9) presumably represents the be­
+havior for low free-stream turbulence, an isothermal surface, negli­
+gible blockage, negligible end-effects, a small temperature difference 
+and negligible free convection. A possible exception is in the range 
+of 103 < Re < 104 where the data of Hilpert [4] for air and of Ishiguro, 
+et al. [40] for sodium appear to follow equation (4) rather than equa­
+tion (9). In the range of 7 X 104 < Re < 4 X 106, Nu may be signifi­
+cantly higher than predicted by equation (9) owing to a downstream 
+shift of the point of separation of the laminar boundary layer. Equa­
+tion (10) can be used as a lower bound and predictor in this range. 
+3 Equation (4) can be used as an approximation for equation (9) 
+304 / VOL 99, MAY 1977 Transactions of the ASME 
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/ on 01/26/2016 Terms of Use: http://www.asme.org/about-asme/terms-of-use
+
+===== PAGE 6 =====
+for Re < 4000 and all Pr. 
+4 Equation (3), which is based on the assumption of creeping flow, 
+should provide a better representation than equations (4) or (9) for 
+RePr < 0.2 if free convection and end-effects are negligible. It agrees 
+well with such experimental data for air, but has not been tested 
+critically for a wide range of Pr. 
+5 Equation (4) appears to provide reasonably good predictions 
+even for RePr < 0.2 and can be modified to provide an even better 
+representation for any single set of data by the proper, arbitrary choice 
+of Nu0. 
+6 Statistical methods were not used to evaluate the constants in 
+equations (4) and (9) nor to characterize the scatter since the various 
+sets of data are obviously of widely differing and unknown quality and 
+in some cases were determined with some uncertainty from graphs. 
+7 Equation (9) has the advantage over prior correlating equations 
+in that it takes into account the recent data of Achenbach [15] and 
+Zdanavichyus, et al. [16] for an extended range of Re. 
+8 Equation (9) differs from prior correlating equations in that it 
+is based, insofar as possible, on theoretical results, and provides a 
+continuously varying dependence on both Re and Pr. 
+9 The success of equation (9) is quite remarkable in view of the 
+many strong transitions in the flow field as documented by Collis and 
+Williams [10], Achenbach [16] and others for air. Fortunately, the 
+corresponding transitions in the heat transfer coefficient are quite 
+weak and compensatory with the exception noted previously for 1 X 
+10B < Re < 4 X 106. 
+10 An empirical equation could be constructed which follows 
+these transitions but the behavior is not yet clearly enough defined 
+to justify such a complex construction. 
+11 Expressions are suggested to estimate the increased or de­
+creased value of Nu due to free-stream turbulence, nonisothermal 
+boundary conditions, tunnel blockage, end-effects, large tempera­
+ture-differences and free convection. 
+12 Additional data are still needed for the very low and the in­
+termediate and high range of Re and for a wide range of Pr or Sc. In 
+order to be of value these measurements must be of good precision 
+and accuracy and free from the effects enumerated in conclusion 
+11. 
+13 Tabulations of experimental and computed values of Nu, Re, 
+and Pr should be included in future publications for the convenience 
+of subsequent workers. 
+14 Equation (9) and (4) are presumed to be applicable for mass 
+transfer with Sh and Sc substituted for Nu and Pr, although values 
+to test this generalization are rather limited. 
+Acknowledgment 
+The provision of the tabulated experimental values of reference 
+[15] by Dr. Elmar Achenbach and of reference [16] by Prof. A. A. 
+Zhukauskas is greatly appreciated. The criticisms and suggestions 
+of the anonymous reviewers were most helpful in improving this 
+paper. 
+References 
+1 Douglas, W. J. M., and Churchill, S. W., "Recorrelation of Data for 
+Convective Heat Transfer Between Gases and Single Cylinders With Large 
+Temperature Differences," Chemical Engineering Progress Symposium Series, 
+No. 18, Vol. 52,1956, pp. 23-28. 
+2 McAdams, W. H., Heat Transmission, Third ed., McGraw-Hill, New 
+York, 1954, p. 267. 
+3 Fand, R. M., and Keswani, K. K., "Recalculation of Hilpert's Constants," 
+JOURNAL OF HEAT TRANSFER, TRANS. ASME, Series C, Vol. 95,1973, 
+pp. 224-226. 
+4 Hilpert, R., "Warmeagabe von geheizten Drahten and Rohren im 
+Luftstrom," Forschungsarbeiten auf dem Gebiete des Ingenieurwesens, Vol. 
+4,1933, pp. 215-224. 
+5 Perkins, H. C, Jr., and Leppert, G., "Forced Convection Heat Transfer 
+From a Uniformly Heated Cylinder," JOURNAL OF HEAT TRANSFER, 
+TRANS. ASME, Series C, Vol. 84,1962, pp. 257-263. 
+6 Richardson, P. D., "Heat and Mass Transfer in Turbulent Separated 
+Flows," Chemical Engineering Science, Vol. 18,1963, pp. 149-155. 
+7 Tsubouchi, T., and Masuda, H., "On the Experimental Formulae of Heat 
+Transfer From Single Cylinders by Forced Convection," Reports of the Institute 
+of High Speed Mechanics, Tohoku University, Japan, Vol. 19,1967-1968, pp. 
+221-239. 
+8 Whitaker, S., "Forced Convection Heat Transfer Correlation for Flow 
+in Pipes, Past Flat Plates, Single Cylinders, Single Spheres, and for Flow in 
+Packed Beds and Tube Bundles," AIChE Journal, Vol. 18, 1972, pp. 361-
+371. 
+9 Fand, R. M., and Keswani, K. K., "A Continuous Correlation Equation 
+for Heat Transfer From Cylinders to Air in Crossflow for Reynolds Numbers 
+From 10~2 to 2 X 105," International Journal of Heat and Mass Transfer, Vol. 
+15,1972, pp. 559-562. 
+10 Collis, D. C, and Williams, M. J., "Two-dimensional Convection From 
+Heated Wires at Low Reynolds Numbers," Journal of Fluid Mechanics, Vol. 
+6, Part 3,1959, pp. 357-384. 
+11 King, L. V., "On the Convection of Heat From Small Cylinders in a 
+Stream of Fluid," Philosophical Transactions of the Royal Society (London), 
+Series A, Vol. 214,1914, pp. 373-432. 
+12 Gnielinski, V., "Berechnung mittlerer Warme- und Stoffiibergangs-
+koeffizienten an laminar und turbulent iiberstromten Einzelkorpern mit Hilfe 
+einer einheitlichen Gleichung," Forschung im Ingenieurwesen, Vol. 41,1975, 
+pp. 145-153. 
+13 Zhukauskas, A., "Heat Transfer From Tubes in Crossflow," Advances 
+in Heat Transfer, Vol. 8, Academic Press, New York, 1972, pp. 93-160. 
+14 Morgan, V. T., "The Overall Convective Heat Transfer From Smooth 
+Circular Cylinders," Advances in Heat Transfer, Vol. 11, Academic Press, New 
+York, 1975, pp. 199-264. 
+15 Achenbach, "Total and Local Heat Transfer From a Smooth Circular 
+Cylinder in Cross-flow at High Reynolds Number," International Journal of 
+Heat and Mass Transfer, Vol. 18,1975, pp. 1387-1396. 
+16 Zdanavichyus, G. B., Chesna, B. A., Zhyugzhda, 1.1., and Zhukauskas, 
+A. A., "Local Heat Transfer in an Air Stream Flowing Laterally to a Circular 
+Cylinder at High Re Numbers," Intern'l. Chem. Engng., Vol. 16, 1976, pp. 
+121-127. 
+17 Katinas, V. I., Shvegzhda, S. A., Zhyugzhda, 1.1., and Zhukauskas, A. 
+A., "Streamline Flow and Heat Transfer at the Frontal Section of a Circular 
+Cylinder in Turbulent Streams of a Viscous Liquid," Intern'l. Chem. Engng., 
+Vol. 16, 1976, pp. 469-475. 
+18 Churchill, S. W., "A Comprehensive Correlating Equation for Forced 
+Convection From Flat Plates," AIChE Journal, Vol. 21,1976, pp. 264-268. 
+19 Churchill, S. W., and Chu, H. H.-S., "Correlating Equations for Laminar 
+and Turbulent Free Convection From a Horizontal Cylinder," International 
+Journal of Heat and Mass Transfer, Vol. 18,1975, pp. 1049-1053. 
+20 Squire, H. B., in "Modern Developments in Fluid Dynamics, S. Gold­
+stein, ed., Clarendon Press, Oxford, England, 1938, Vol. II, p. 631. 
+21 Eckert, E. R. G., "Die Berechnung des Warmeubergangs in der Lami-
+naren Grenzschicht umstromter Korper," VDI Forschungsheft, No. 416, 
+1942. 
+22 Levy, S., "Heat Transfer to Constant-Property Laminar Boundary-
+Layer Flows With Power-Function Free-Stream Velocity and Wall-Temper­
+ature Variation," J. of the Aero. Scis., Vol. 19,1952, pp. 341-348. 
+23 Churchill, S. W., and Usagi, R., "A General Expression for the Correla­
+tion of Rates of Transfer and Other Phenomena," AIChE Journal, Vol. 18,1972, 
+pp. 1121-1128. 
+24 Churchill, S. W., and Ozoe, H., "Correlations for Laminar Forced Con­
+vection With Uniform Heating in Flow over a Plate and in Developing and Fully 
+Developed Flow in a Tube," JOURNAL OF HEAT TRANSFER TRANS. 
+ASME, Series C, Vol. 95,1973, pp. 78-84. 
+25 Churchill, S. W., and Ozoe, H., "Correlation for Laminar Forced Con­
+vection in Flow over an Isothermal Tube," JOURNAL OF HEAT TRANS., 
+TRANS. ASME, Series C, Vol. 95,1973, pp. 416-419. 
+26 Churchill, S. W., and Churchill, R. U., "A Comprehensive Correlating 
+Equation for Heat and Component Transfer by Free Convection," AIChE 
+Journal, Vol. 21,1975, pp. 604-607. 
+27 Masliyah, J. H., and Epstein, N., "Heat and Mass Transfer From El­
+liptical Cylinders in Steady Symmetric Flow," Ind. and Engng. Chem. Funda., 
+Vol. 12, 1973, pp. 317-323. 
+28 Jain, P. C., and Goel, B. S., "A Numerical Study of Unsteady Laminar 
+Forced Convection From a Circular Cylinder," JOURNAL OF HEAT 
+TRANSFER, TRANS. ASME, Series C, Vol. 98,1976, pp. 303-307. 
+29 Nakai, S., and Okazaki, T., "Heat Transfer From a Horizontal Circular 
+Wire at Small Reynolds and Grashof Numbers—I Pure Convection," Inter­
+national Journal of Heat and Mass Transfer, Vol. 18,1975, pp. 387-396. 
+30 Dennis, S. C. R., Hudson, J. D., and Smith, N., "Steady Laminar Forced 
+Convection From a Circular Cylinder at Low Reynolds Numbers," Physics of 
+Fluids, Vol. 11,1968, pp. 933-940. 
+31 Hill, J. C, and Sleicher, C. A., Jr., "Convective Heat Transfer From Small 
+Cylinders to Mercury," International Journal of Heat and Mass Transfer, Vol. 
+12.1969, pp. 1595-1604. 
+32 Virk, P. S., "Heat Transfer From the Rear of a Cylinder in Transverse 
+Flow," JOURNAL OF HEAT TRANSFER , TRANS. ASME, Series C, Vol. 
+92.1970, pp. 206-207. 
+33 Clark, L. G., private communication (see reference [1]). 
+34 van der Hegge Zijnen, "Modified Correlation Formulae for the Heat 
+Transfers by Natural and by Forced Co/ivection From Horizontal Cylinders, 
+Applied Sci. Res., Series A, Vol. 6,1956, pp. 129-140. 
+35 Richardson, P. D., "On Hilpert's Measurements of Heat Transfer From 
+Cylinders Transverse to an Air Stream," JOURNAL OF HEAT TRANSFER, 
+TRANS. ASME, Series C, Vol. 85, 1963, pp. 283-284. 
+Journal of Heat Transfer MAY 1977, VOL 99 / 305 
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/ on 01/26/2016 Terms of Use: http://www.asme.org/about-asme/terms-of-use
+
+===== PAGE 7 =====
+36 Gebhart, B., and Pera, L., "Mixed Convection From Long Horizontal 
+Cylinders," Journal of Fluid Mechanics, Vol. 45,1970, pp. 49-64. 
+37 Krall, K. M., and Eckert, E. R. G., "Local Heat Transfer Around a Cyl­
+inder at Low Reynolds Number," JOURNAL OF HEAT TRANS., TRANS. 
+ASME, Series C, Vol. 95,1973, pp. 273-275. 
+38 Schmidt, E., and Wenner, K., "Warmeabgabe fiber den Umfang eines 
+angeblasenen geheizten Zylinders.," Forschung im Ingenieurwesen, Vol. 12, 
+1941, pp. 65-73. 
+39 Lewis, J. S., "Heat Transfer for Predictions From Mass Transfer Mea­
+surements Around a Single Cylinder in Cross Flow," International Journal 
+of Heat and Mass Transfer, Vol. 14,1971, pp. 325-329. 
+40 Ishiguro, R., Kumada, T., Sugujama, and Ikezaki, E., "Experimental 
+Study of Heat Transfer Around a Circular Cylinder in a Liquid-Sodium 
+Crossflow," lntern'l. Chem. Engng., Vol. 16,1976, pp. 249-252. 
+41 Grosh, R. J., and Cess, R. D., "Heat Transfer to Fluids With Low Prandtl 
+Numbers for Flow Across Plates and Cylinders of Various Cross Section," 
+TRANS. ASME, Vol. 80,1958, pp. 667-676. 
+42 Davis, A. H., "Convective Cooling of Wires in Streams of Viscous Liq­
+uids," Philosophical Magazine, Vol. 47,1924, pp. 1057-1092. 
+43 Beckers, H. L., ter Haar, L. W., Tjoan, L. T., Merk, H. J., Prins, J. A., 
+and Schenk, J., "Heat Transfer at Very Low Grashof and Reynolds Numbers," 
+Appl. Sci. Res., Series A, Vol. 6,1956, pp. 82-84. 
+44 Fand, R. M., and Keswani, K. K., "The Influence of Property Variation 
+on Forced Convection Heat Transfer to Liquids," International Journal of Heat 
+and Mass Transfer, Vol. 15,1972, pp. 1515-1536. 
+45 Fand, R. M., "Heat Transfer by Forced Convection From a Cylinder to 
+Water in Crossflow," International Journal of Heat and Mass Transfer, Vol. 
+8, 1965, pp. 995-1010. 
+46 Dobry, R., and Finn, R. K., "Mass Transfer to a Cylinder at Low Reyn­
+olds Numbers," Ind. and Engng. Chem., Vol. 48,1956, pp. 1540-1543. 
+47 Wylie, R. G., "The Transfer Coefficients of a Laminar Boundary Layer 
+With Variable Fluid Properties," The Chem. Engng. J., Vol. 6, 1973, pp 
+1-14. 
+48 Vaitekunas, P. P., Schlanshyyanskas, A. A., and Zhukauskas, A. A., 
+"Influence of the Variable Physical Properties of a Gas on Drag and Heat 
+Transfer at a Plate With Developed Turbulent Flow," lntern'l. Chem. Engng., 
+Vol. 16,1976, pp. 403-411. 
+49 Boulos, M. I., and Pei, D. C. T., "Dynamics of Heat Transfer From 
+Cylinders in a Turbulent Air Stream," International Journal of Heat and Mass 
+Transfer, Vol. 17,1974, pp. 767-783. 
+50 Vincenti, W. G., and Graham, D. J., "The Effect of Wall Interference 
+Upon the Aerodynamic Characteristics of an Airfoil Spanning a Closed-Throat 
+Circular Wind Tunnel," National Advisory Committee Aeronautics Technical 
+Report No. 849, Washington, D. C, 1946. 
+51 Lock, C. N., "The Interference of a Wind Tunnel oh a Symmetrical 
+Body," Aeronautical Research Council, Report, Memo No. 1275,1929, No. 1451, 
+1931. 
+52 Dyban, E. P., and Epik, E. Ya., "Heat Transfer in Laminar Boundary 
+Layer With Increased Turbulence of Outer Flow," Heat Transfer-Soviet Re­
+search, Vol. 6,1974, pp. 159-162. 
+53 Ohman, G. A., "A Note on Experimental Determination of Convective 
+Heat Transfer From Wires at Extremely Small Reynolds and Grashof Num­
+bers," Acta Acad. Abo, Series B, Vol. 30,1970, pp. 1-7. 
+54 Churchill, S. W., "A Comprehensive Correlating Equation for Laminar, 
+Assisting, Forced and Free Convection," AIChE Journal, Vol. 23, 1977, pp. 
+10-16. 
+306 / VOL 99, MAY 1977 Transactions of the ASME 
+Downloaded From: http://heattransfer.asmedigitalcollection.asme.org/ on 01/26/2016 Terms of Use: http://www.asme.org/about-asme/terms-of-use

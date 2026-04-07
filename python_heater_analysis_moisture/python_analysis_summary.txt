@@ -5,18 +5,18 @@ Active configuration:
 - Covered top + vent
 
 Recommended point used throughout:
-- Pitch: 12.0 mm
-- Voltage: 100.9 V
-- Total flow: 436.0 L/min
-- Total power: 760.8 W
-- Total current: 7.54 A
+- Pitch: 10.0 mm
+- Voltage: 109.3 V
+- Total flow: 430.3 L/min
+- Total power: 759.7 W
+- Total current: 6.95 A
 
 What "recommended" means:
 - Recommended = the single hard-constraint-safe operating point selected for a vessel configuration from the MATLAB sweep by the shared lexicographic criteria used throughout the study. Inside the hard-safe set, the rule is: maximize the colder-node bed temperature, then minimize power, then minimize spread. If no hard-safe point exists, the best-available point is retained only as a reference point.
 
 Why the same star appears on every constraint/performance plot:
 - The standalone Heat Transfer Study plots do not place stars on the contour panels. Recommended operating points are reported in the text summary.
-- In this case the starred point is 12.0 mm, 100.9 V, 436.0 L/min, so every panel shows the same x-y location while the z-value changes by metric.
+- In this case the starred point is 10.0 mm, 109.3 V, 430.3 L/min, so every panel shows the same x-y location while the z-value changes by metric.
 
 300-point display note:
 - Continuous Python plots were redrawn at 100 display points per axis where that makes sense.

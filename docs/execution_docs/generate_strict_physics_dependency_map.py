@@ -152,7 +152,7 @@ def build_map():
 
     # Shared closures
     box(ax, x_cols[0], 156, w, 22, "Air +\npsychrometrics", "rho, mu, k, c_p, Pr\nw, dew point\np_sat, rho_v,sat, h_fg", PALETTE["shared_a"], body_fs=7.4)
-    box(ax, x_cols[1], 156, w, 22, "Bin loss +\nthermal network", "h_ext, U_wall\nUA_tot, UA_binf, UA_tinf, UA_bt\nC_total, Bi, Q_req", PALETTE["shared_b"], body_fs=7.0)
+    box(ax, x_cols[1], 156, w, 22, "Bin loss +\nthermal network", "h_side,h_bottom,h_top\nU_ext, UA_tot, UA_binf, UA_tinf, UA_bt\nC_total, Bi, Q_req", PALETTE["shared_b"], body_fs=6.8)
     box(ax, x_cols[2], 156, w, 22, "Branch partition\nvariables", "Vdot_tube, mdot_tube\nA_hole, u_hole\nreleased mdot\nsegment dx", PALETTE["shared_c"], body_fs=7.2)
     box(ax, x_cols[3], 156, w, 22, "Transport + loss\nclosures", "Re, Nu_wire, Nu_tube, f\nU_heater, U_aer\nK_contr, K_exp, dP_dist\nh_mass from Lewis", PALETTE["shared_d"], body_fs=6.8)
     box(ax, x_cols[4], 156, w, 22, "Electrical derived\nvariables", "L_wire, R_tube\nI_tube, P_tube\nq_gen,i", PALETTE["shared_e"], body_fs=7.4)

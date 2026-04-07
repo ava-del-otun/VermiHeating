@@ -104,14 +104,18 @@ Here $f$ is the Churchill friction factor [R3] used consistently in both the
 pressure-drop and turbulent heat-transfer calculations.
 
 The overall heat-transfer coefficient from the heater-tube air to ambient is
-modeled as a series resistance network:
+modeled on the exposed outer-area basis. With the insulated exposed diameter
+\begin{equation}
+OD_{\text{ext}} = OD + 2t_{\text{ins}},
+\end{equation}
+this gives
 \begin{equation}
 U_{\text{heater}}
 =
 \left(
-\frac{1}{h_{\text{inside,heater}}}
-+\frac{OD-ID}{2k_{\text{wall}}}
-+\frac{t_{\text{ins}}}{k_{\text{ins}}}
+\frac{OD_{\text{ext}}}{ID\,h_{\text{inside,heater}}}
++\frac{OD_{\text{ext}}}{2k_{\text{wall}}}\ln\!\left(\frac{OD}{ID}\right)
++\frac{OD_{\text{ext}}}{2k_{\text{ins}}}\ln\!\left(\frac{OD_{\text{ext}}}{OD}\right)
 +\frac{1}{h_{\text{outside,heater}}}
 \right)^{-1}.
 \end{equation}
@@ -121,7 +125,9 @@ The corresponding heat loss from the heater section is
 q_{\text{loss,heater}}
 =
 U_{\text{heater}}\,P_{\text{out}}\,\Delta x\,
-\left(T_{\text{air}}-T_{\text{env}}\right).
+\left(T_{\text{air}}-T_{\text{env}}\right),
+\qquad
+P_{\text{out}}=\pi OD_{\text{ext}}.
 \end{equation}
 
 This loss is coupled to the heater air-energy balance through
@@ -156,8 +162,8 @@ wall is
 U_{\text{aer}}
 =
 \left(
-\frac{1}{h_{\text{inside,aer}}}
-+\frac{OD-ID}{2k_{\text{wall}}}
+\frac{OD}{ID\,h_{\text{inside,aer}}}
++\frac{OD}{2k_{\text{wall}}}\ln\!\left(\frac{OD}{ID}\right)
 +\frac{1}{h_{\text{outside,aer}}}
 \right)^{-1}.
 \end{equation}
@@ -1912,6 +1918,18 @@ The heater-to-aeration abrupt expansion is modeled by
 \end{equation}
 which is the standard Borda--Carnot sudden-expansion relation.
 
+In the standalone Python heating reference-point solve, the helical wire inside
+the heater tube also contributes a separate reduced-order obstruction term.
+Rather than folding that effect into an arbitrary extra minor-loss constant, the
+code now evaluates a projected-area drag surrogate based on the local velocity
+component normal to the helix. This is an intentional reduced-order mapping of
+the handbook sections on tubes with wire ribbing and spiral-ribbed air heaters:
+those references indicate that the ribbing contributes finite aerodynamic
+resistance in addition to the smooth-tube Darcy wall-friction term. The active
+JSON configuration now exposes this closure through
+\texttt{coilPressureModel}, \texttt{coilDragCoefficient}, and
+\texttt{coilLossMultiplier} under \texttt{model\_overrides.heaterTube}.
+
 For the common distribution hardware upstream of each branch, the current
 implementation distinguishes five contributions:
 \begin{enumerate}
@@ -2006,8 +2024,36 @@ Accordingly, the modeled distribution-network contribution becomes
 + \Delta P_{\mathrm{connector}}
 + \Delta P_{\mathrm{connector\rightarrow branch}}.
 \end{equation}
-The total pressure drop reported for a candidate point is the sum of these
-contributions.
+For a single electrical group, the total pressure drop reported for a candidate
+point is the sum of the shared distribution path, the branch-private
+distribution path, the heater-tube friction plus helical-obstruction terms, the
+heater-to-aeration expansion, and the aeration-branch pressure requirement.
+
+If multiple electrical series-count groups coexist in parallel, however, the
+branch flows are not physically constrained to remain equal once the heater-side
+power, air temperature, density, and helical-obstruction losses differ between
+groups. In that case the correct reduced-order network statement is not to sum
+all group drops in series, but to solve one common branch-side pressure
+difference together with total-flow continuity. The common upstream header path
+still contributes equally to every branch; the branch-private splitter,
+connector, heater, expansion, and aeration losses are then evaluated at the
+redistributed group-specific branch flows until those branch-path drops match.
+The reported winter total therefore becomes
+\[
+\Delta P_{\mathrm{tot,heat}} = \Delta P_{\mathrm{dist,shared}} + \Delta P_{\mathrm{branch,common}},
+\]
+with
+\[
+\Delta P_{\mathrm{branch},1}(\dot m_1)=\Delta P_{\mathrm{branch},2}(\dot m_2)=\cdots=\Delta P_{\mathrm{branch,common}},
+\qquad
+\sum_g N_g\dot m_g = \dot m_{\mathrm{tot}}.
+\]
+If \texttt{headerEnabled = false}, then the shared upstream contribution
+\(\Delta P_{\mathrm{dist,shared}}\) vanishes and the modeled distribution loss is
+entirely branch-private; that is the current active JSON default. Under the
+current default topology, where all heated branches belong to the same
+electrical group, this redistributed-flow statement collapses to the same
+single-group result as the simpler equal-branch-flow treatment.
 
 \subsubsection{Two-Node Bed Solve and Duty Calculation}
 
@@ -2552,10 +2598,6 @@ correlation families and source materials cited throughout this document:
       S320--S326. Table~3 supplies the particle-size distribution used in
       the current wetted-area estimate.
 \end{itemize}
-
-\documentclass{article}
-\usepackage{amsmath}
-\usepackage[margin=1in]{geometry}
 
 \subsection{Year-Round Energy, Cost, and Climate-Driven Operation}
 
@@ -3170,3 +3212,4 @@ cooling reference points.
 
 
 \end{document}
+

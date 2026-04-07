@@ -1,0 +1,35 @@
+============================================================
+VERMICOMPOSTER WINTER WALL-BLANKET HEATING MODEL
+============================================================
+Heating method                         : wall_blanket_conduction
+Wall blankets                          : 2 x 250.0 mm x 1740.0 mm
+Max blanket surface temperature        : 120.0 C
+Supply voltage basis                   : 110.0 V
+Required winter heating load           : 50.7 W
+Optimization method                    : NSGA-II
+Seasonal temperature-goal mode         : legacy extreme-node objective mode
+Hard limits                            : I_total <= 15.0 A, T_blanket <= 350.0 C, T_bottom >= 22.0 C, T_top >= 22.0 C
+
+NSGA-II reported feasible Pareto point:
+  Blanket duty                        : 0.351
+  Total electrical power              : 64.4 W
+  Heat delivered to bed               : 53.9 W
+  Bottom node temperature             : 25.54 C
+  Top node temperature                : 23.18 C
+  Duty needed at design load          : 0.941
+  Status                              : meets all hard constraints and the heating target
+
+Best-available wall-blanket reference:
+  Blanket duty                        : 0.351
+  Total electrical power              : 64.4 W
+  Heat delivered to bed               : 53.9 W
+  Bottom node temperature             : 25.54 C
+  Top node temperature                : 23.18 C
+  Duty needed at design load          : 0.941
+  Status                              : meets all hard constraints and the heating target
+
+Top optimization-ranked wall-blanket points:
+  duty    power(W)  Qbed(W)  Tbottom(C)  Ttop(C)  dutyNeed  state
+   0.351      64.4     53.9       25.54     23.18     0.941  feasible
+
+============================================================

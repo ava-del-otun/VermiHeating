@@ -1,0 +1,466 @@
+
+
+===== PAGE 1 =====
+21 
+Measurements of entrainment by axisymmetrical 
+turbulent jets 
+By F. P. RICOUt AND D. B. SPALDING 
+Mechanical Engineering Dopartinent, Imperial College of Science 
+and Technology, London, S.W. 7 
+(Received 23 Sovember 1960) 
+A new technique is described for measuring the axial mass flow rate in the 
+turbulent jet formed when a gas is injected into a reservoir of stagnant air at 
+uniform pressure. The jet is surrounded by a porous-walled cylindrical chamber, 
+and air is injected through the wall until the pressure in the chamber is uniform 
+and atmospheric, a condition which is taken to signify that the ‘entrainment 
+appetite’ of the jet is satisfied. 
+Measurements made with the apparatus have allowed the deduction of an 
+entrainment law relating mass flow rate, jet momentum, axial distance and air 
+density, regardless of the density of the injected gas, and including the effects 
+of buoyancy. When the injected gas burns in the jet the entrainment rate is up 
+to 30 yo lower than when it does not. 
+The problem 1. Introduction 
+Several accounts are available (e.g. Scklichting 1955; Pai 1954) of the turbulent 
+jet which results from the injection of a fluid through a nozzle into a large 
+reservoir in which a second fluid is at rest. In the present paper, attention is con- 
+centrated on one property of the jet: the mass flow rate across a section at right 
+angles to the jet axis. This quantity will be denoted by the symbol m; it may be 
+related to the fluid velocity u in the axial direction, the fluid density p, and the 
+radial distance y by 
+m = /om 2n~ydy, (1) 
+where the over bar denotes a time-mean. 
+The mass flow rate m is known to increase with distance x from the nozzle. 
+As a consequence, fluid from the surrounding reservoir is drawn radially inwards 
+towards the jet across its conical surface; this process is known as entrainment. 
+Entrainment is also important in many more practical situations; for example, 
+it controls the flow patterns in combustion chambers and furnaces; it causes 
+‘ fire-storms ’ around large conflagrations; and many mixing devices of the 
+chemical industry rely on entrainment for their effectiveness. If such processes 
+are to be understood and controlled, the quantitative laws which govern the 
+rate of entrainment, i.e. the quantity dmldx, must be discovered. 
+t Now at t,he Laboratoires de MBcanique des Fluidos, UniversitO do Grenoble. 
+
+===== PAGE 2 =====
+22 F. P. Ricou and D. B. Spalding 
+Dimensional analysis may be employed to show that, when the fluid density 
+is uniform, when the Reynolds number is high and when the distance x is much 
+larger than the diameter of the orifice, m is proportional to x. More precisely, 
+it may be demonstrated thst m 
+where M stands for the excess momentum flux of the jet, p1 is the density of the 
+surrounding hid,? and K, is a numerical constant. Consideration of Newton’s 
+Second bw of Motion shows that, since the static pressure of the flow is uniform, 
+M must have a value which is independent of x; it is most easily evaluatd at the 
+orifice, where the fluid haa the uniform velocity u,, from 
+(3) 
+Here do is the orifice diameter and po the density of the injected fluid. 
+The numeriwl magnitude of R, can only be determined, in the present state 
+of turbulence theory, by experimental means. Similarly, only experiment can 
+show how equation (2) must be modified when the jet density is rendered non- 
+uniform by a chemical reaction in the jet, or by the existence of a difference of 
+value between po and the density of the surrounding fluid, p,. 
+M = 4 = )dipoui. 
+Previoufl work 
+Numerous measurements have been made of the axial-velocity profiles, u(y), 
+in isothermal air jets (see, for example, the bibliography compiled by Krzy- 
+woblocki 1956). These data may be inserted in equation (l), from which the mms 
+flow rate m can then be evaluated by numerical quadrature; this has been done 
+by Grimmett (1948), Polomik (1948) and Voorheis & Howe (1939). 
+Many authors have avoided the numerical quadrature by assuming that the 
+u(y) profile has one of the forms which permit analytical integration; the velocity 
+and radius sdea appropriate to a given section are then determined from, say, 
+the measured velocity on the axis, and the radius at which the measured velocity 
+has half this value. The resulting values for m then depend to some extent on the 
+profile-shape amumed. 
+Values for K, obtained in this way for isothermal air jets range from about 
+0-22 up to 0.404, according to the investigator. The highest value, due to Schlicht- 
+ing (1965), is obtained by fitting to the experimental data of Reichardt (1942) 
+a particularly full-skirted ‘theoretical’ curve. 
+The reasons for the present uncertainty about the value of K, me of several 
+kinds. They include the following: 
+(i) It is diffioult to measure @ at large values of y where the velocities are 
+small and the flow may be intermittent; the presence of y aa a multiplier of u in 
+equation (1) augments the influence of inaccuracies in this region. 
+(ii) The above difficulty is avoided if an analytical form is chosen for the 
+velocity profile. This choice, on the other hand, entails uncertainty m to what is 
+t The eubecripta to p in equatiomi (2) and (3) are not needed in the present discussion, 
+which preeumes that p ie uniform throughout; they are nevertheless inserted for use later 
+in the paper. 
+
+===== PAGE 3 =====
+Entrainment by misymmetrical turbulent jets 23 
+the ‘best ’ profile. Small differences in profile height at large y can greatly affect 
+the value of m which is deduced. 
+(iii) Whichever of the above procedures is used, it is desirable that x should 
+be many tihes greater than do. Since the dynamic head at a Pitot tube in the jet 
+is propokional to (do/x)2, limitations on manometer sensitivity make it dificult 
+to work at axial distances much greater than five times the length of the potential 
+core. 
+Outline of the present contribution 
+The above remarks show that a new method of measuring m is required, even 
+for uniform-density flows. When jets with non-uniform density are to be studied, 
+the case for a new method is stronger still; for a recourse to equation (1) would 
+now necessitate measurement of a density profile as well as one of velocity, and 
+would raise questions as to the relation of pU to the measured jj and 9. 
+The present paper reports a new experimental method which is not open to 
+the objections mentioned above: m is measured more directly and simply; no 
+integration is required. This technique is described in 5 2 below. 
+The results of the study are presented in 5 3 and figures 4,5 and 7. Summarized 
+briefly, they are: that K, is equal to 0.282; that equation (2) holds for non- 
+uniform density without modification provided that buoyancy effects are 
+negligible; and that the presence of combustion reduces K,. The role of buoyancy 
+is not so easily summarized; it is discussed in $4. 
+2. Apparatus The principle of the method 
+In the ideal free jet which is under consideration, the surrounding reservoir is 
+large and, except in the vicinity of the jet axis, at uniform pressure; the entrained 
+fluid flows radially inward towards the jet axis. If, however, a turbulent jet is 
+partially enclosed by cylindrical walls, the radial inflow is impeded; the fluid 
+entrained by the enclosed part of the jet has to flow axially in the annular space 
+between the cylindrical wall and the conical ‘ boundary’ of jet; the corresponding 
+axial pressure gradients can be measured. 
+Now let us suppose that the cylindrical wall is made porous, and that a con- 
+trolled and measured amount of fluid can be mused to flow through it in a radially 
+inward direction. Then, if this flow is equal in quantity to that which would have 
+passed through the area occupied by the wall if the wall had been absent, the 
+axid pressure gradients referred to in the last paragraph will disappear. 
+This recognition underlies the experimental method which has been used: 
+the flow rate through the porous wall is varied until no axial pressure gradients 
+can be detectid; this flow rate is then measured and presumed to be equal to 
+tht which would be entrained if the jet were unenclosed. 
+Details of the apparatus 
+Figure 1 shows the porous-walled chambers which were used. The axis of the 
+jet is coincident with the axis of the cylindrical porous wall. The base of the 
+oylinder waa completely closed, apart from the orifice from which the jet origin- 
+
+===== PAGE 4 =====
+24 F. P. Ricou and D. B. #palding 
+aM, and the upper end of the resulting chamber waa partially closed; these 
+measures had the effect of augmenting the axial pressure gradients which pre- 
+vailed when the flow through the porous wall waa not 'right', while in no way 
+interfering with the radially inward flow to the jet when it waa entraining under 
+free-jet conditions. 
+The porous cylinders were built up of fine-grade filter cloth on a rigid frame- 
+work. A Roots-type blower was used to supply the entrainable air; this permitted 
+the use of an appreciable pressure drop (up to 5in. of water) across the porous 
+cylinder and helped to ensure uniformity of inflow. Calibrated orifice plates were 
+I 
+Porous wall 
+Orifice 
+I\ 
+I \I 
+- -el/ 
+19; in. diameter 
+plates 
+Extension to no. 2 chamber 
+2 chamber 
+FIQWBE 1. (a) Leading dimensions of three chambere. 
+(b) Dimensions of extension to no. 2 chamber. 
+Entrainment chamber 
+No. 1 2 3 
+Hin. 8.7 13 3 
+D in. 6.8 8.9 8.9 
+used to meamre the rate of supply of this air. The orifices used were of rounded 
+profle, designed according to B.S.1042. Their diameters (do) ranged from 
+0-0625in. to 1-25in. The corresponding range of dimensionless axial distances 
+(%/do) over which measurements could be made was from 418 to 2.4. 
+The axial pmsure difference which waa measured was that across the outlet 
+aperture; since the pressure variations within the chamber were small, this 
+difference can be thought of aa that between the pressure in the chrtmber and 
+the pressure of the atmosphere. The micromanometer used waa of the direct- 
+reading type developed by Spalding (1950). 
+
+===== PAGE 5 =====
+Entrainment by axisymmetrical turbulent jets 25 
+Preliminary tests: the choice of aperture size 
+The size of the aperture in the mask at the upper end of the 'entrainment 
+ahamber' had to be chosen with care. On the one hand, it was-desired that the 
+hole should be smell, since this led to an easily detected pressure difference, when 
+the flow through the porous wall was not properly matched to the free-jet require- 
+mente; however, if the hole were made too small, the mask would interfere 
+with the axial flow in the jet itself. 
+h 
+N aJ .la 
+a3 
+B 
+Q+ 0 
+A - 41" 
+t -up 
+0 - 26' 
+0 - 17" I 
+0.004.- 
+0002 - 
+I I 
+2 4 0 
+-ow - 
+-0004 - 
+-0a06 - 
+FIQIJRE 2. Variation of chamber pressure with flow rate through porous wall, for various 
+apertures. Nozzle, 0.6 in. diameter; x/d, = 25.6; uo = 112 ft./eec. (No. 2 chamber.) 
+Figure 2 shows the results of preliminary tests leading to the choice of aperture 
+size, the latter being expressed in terms of the angle 0 subtended by a diameter 
+of the aperture at the centre of the base of the chamber. The ordinate is the 
+excess pressure in the chamber; the abscissa is the ratio of the mass of air flowing 
+through the porous wall, m,, to the mass of gas (air) injected through the orifice, 
+m,; m,, and the orifice diameter, do, have the same values throughout; each curve 
+is drawn for a different value of aperture angle 0. 
+Inspection of figure 2 confirms that the smaller 0 is the more steeply the 
+exceas pressure varies with variations of m,; it also confirms that the aperture 
+size influences the value of ml/mo which gives zero excess pressure, if0 is too small. 
+The latter influence is slight if 0 is 30' or more; thus figure 2 shows that the value 
+
+===== PAGE 6 =====
+26 El I? Ricou and D. B. Spalding 
+of mJm0 corresponding to free-jet conditions for the situation in question can be 
+taken as 7.0. These tests led to the choice of 30° for the aperture angle in all the 
+tests reported below. 
+Preliminary tests: the effect of the ReynoldP number 
+Teats were carried out, using air as the injected fluid, to establish the value of 
+the Reynolds number above which equation (2) waa valid. Some of the data. 
+are recorded in figure 3 in the form of plots of ml/mo versm the Reynolds number. 
+The latter quantity is defined by 
+R = Pouodo/,uoY (4) 
+where ,uo is the viscosity of the injected gas. From now onwards, m, will be used 
+aa signifying that value of the air flow rate through the porous wall which causes 
+10 
+8 
+6 
+f = 
+4 
+L 
+2 
+0 
+-k 
+I I I I I I I I 
+1 2 3 4 5 6 I 8 
+Reynolds number x lo-' 
+FIGURE 3. Variation of entrainment rate with the Reynolds number. (a) No. 2 chamber. 
+Nozzle, 0.5 in. diameter; x/do = 25.6. (b) No. 1 chamber. Nozzle, 0.625 in. diameter; 
+xldo = 13.7. 
+axial pressure gradients to disappear; m, is therefore connected with m, the maas 
+flow rate in a fiee jet of length equal to the length of the entrainment chamber, by 
+m = m,+m,. (5) 
+The tests of figure 3 were carried out by varying the injection flow rate, and 
+so the Reynolds number, and then meesuring the corresponding w. Evidently, 
+the ratio mJmo was approximately constant for Reynolds numbers in excess 
+of 2-5 x 104. All test data appea,ring in the remainder of the paper can be taken 
+as pertaining to Reynolds numbers greater than this value, except for those 
+in which the injected fluid is hydrogen. 
+
+===== PAGE 7 =====
+Entrainment by axkymmetrical turbuknt jets 27 
+3. Experimental results 
+Air into air: hotherma1 
+Experiments were made with various combinations of chamber length x and 
+nozzle diameter do, when the injected gaa was air at the same temperature aa 
+the sir supplied through the porous wall. The results are represented by the points 
+in figure 4 clustered near the straight line marked (a); this line may be represented 
+by the formula 
+200 
+100 
+., 0 0 
+m 2 
+- = 0.32 -. 
+d0 
++- 
+yr- . 
+50 100 150 200 250 300 350 400 
+I 1 I I I I 
+XI4 
+FIQURE 4. Variation of entrainment rate with axial distance for isothermal jete. Experi- 
+mental results: (a) 0, air into air; (b) +, propane and carbon dioxide into air; 
+(c) 0, hydrogen into air; (A, entrainment chamber inverted). 
+Heavy gas into air: isothed 
+Corresponding measurements were made when the injeoted fluid waa carbon 
+dioxide or propane, two gmes with equal densities, the temperatures being equal 
+to that of the air supplied through the porous cylinder. The results are shown in 
+figure 4 &B a series of points clustered near the straight line marked (b): thie line 
+can be rep-nted by the formula 
+Although flammable, the propane waa not ignited in the experiments referred 
+to here. 
+Light gas into air: i80them~d 
+Figure 4 ah contains results obtained by similar experiments in which hydrogen 
+was the injected gaa; the hydrogen jet waa not ignited. The results are represented 
+by the pointe near the straight line (c), the formula for which is 
+
+===== PAGE 8 =====
+28 F. €? Rh and D. B. SpaJding 
+Since buoyancy wa~ thought to affect the hydrogen jets, some experiments were 
+carried out with the entrainment chamber inverted; it is seen that this inversion 
+had an effect. 
+The high viscosity of hydrogen, and other limitations, prevented the per- 
+formance of teats at Reynolds numbers in exceas of 17,500. 
+Fuels into gas: conbustion 
+Measurements were also made of the entrainment rate which prevailed when 
+the fuel gases in the jet (propane and hydrogen) were ignited; in some cmea 
+both air and fuel were injected through the orifice simultaneously. The results 
+of these tests, which showed a considerable effect of buoyancy, will be introduced 
+in figure 7 below. 
+4. Discussion of results 
+Jet8 of uniform density 
+The equations (6), (7) and (8) may be cast in the form of equation (2) by introduc- 
+tion of equation (3) for the excess momentum flux and of a corresponding equation 
+for the injected maas flux, m,, namely 
+m, = and; pouw (9 1 
+Equations (6), (7) and (8) then lead respectively to 
+m -- 0*32(4n)* = 0.283, 
+xM*ppf - 
+m -- - 0.26(17~)* ($$)* = 0.284, 
+XM*P# 
+z@= 
+m 1*2(&)4 (A)* = 0.279, 
+wherein (s) and (A) represent the density ratio po/pI for the respective caaes 
+of propane or carbon dioxide, and hydrogen. 
+Comparison of equations (lo), (1 1) and (12) led to the conclusion that equa- 
+tion (2) is valid, within the experimental error, for all the experimental results 
+cited so far, if K, is given the value 0.282. 
+The same conclusion can be expressed differently by noting tbt all the data 
+can be held to obey the relation 
+m 
+This is illustrated by figure 5, which contains the data of figure 4 replotted in 
+the manner indicated by equation (13). 
+The efsect of buoyancy: theory 
+When the density of the fluid in the jet differs from that of the surrounding air, 
+hydrostatic forces cause the excess momentum flux to increase with z (ttssuming 
+that the jet fluid is the lighter and that the flow direction is upward). Con- 
+sequently equation (2) no longer correctly expresses the variation of m with 2. 
+
+===== PAGE 9 =====
+Entrainment by misymmetrical turbulent jet% 29 
+Dimensional analysis indicates that, when x becomes very large, m is pro- 
+portional to xt (Batchelor 1964); for this to hold, however, the excess momentum 
+flux of the jet, M, must greatly exceed the value of Mo defined by equation (3). 
+How should m vary with x when M and Mo are of the -me order? 
+A tentative answer to this question may be obtained by supposing that the 
+local rate of entrainment is uniquely related to the local excess momentum flux 
+in accordance with the differential equation 
+\ e 
+t 
+FIQURE 5. Entrainment rate for ieothermal jete. Experimental results: (a) 0, air into air; 
+(a) + , propane and carbon dioxide into air; (c), 0, hydrogen into air; ( A, entrainment 
+chamber inverted). 
+An assumption of this character has been made by Morton, Taylor & Turner 
+(1950), and other authom, in connexion with the rise of turbulent plumes in the 
+atmosphere. 
+In an unpublished study, one of the present authors has investigated the 
+implications of equation (14), when combined with the assumptions: (i) that the 
+velocity and temperature profiles are Gaussian, (ii) that the ratio of the widths 
+of the temperature and velocity profiles is equal to 1.17 for all x, (iii) that chemical 
+reaction is confined to regions of the jet which are much closer to the orifice than 
+is the section 5. The results of this study are represented by the curve of figure 6; 
+the ordinate and abscissa quantities of this graph are self-explanatory apart 
+from the Froude number, P, which is defined by: 
+in the absence of chemical reaction, 
+
+===== PAGE 10 =====
+30 F. €! Ricou and D. B. Spa2ding 
+or, when chemical reaotion occurs, 
+10 
+* 
+rc, 
+h 
+1.0- 
+E - 
+c1 Tl 
+Here the symbols signify: 
+- 
+C 
+T 
+h 
+9 
+mfu 
+H 
+specific heat of gas at constant pressure, 
+absolute temperature of air, 
+enthlpy , 
+gravitational acceleration, 
+maw fraction of fuel in injected gas, 
+heat of combustion of fuel, 
+and subscripte 0 and 1 refer, aa before, to the injected fluid and to the sur- 
+rounding air reapectively. 
+/ 
+Asymptote for pure 
+F natural convection 
+I I 
+10 100 
+,/, / 
+0.1 1.0 
+k)’ F-t 
+FIGURE 6. Theoretical prediction of entrainment in buoyent jets. 
+The effect of buoyancy: experiment 
+Figure 7 presents the data of figure 4 (upward flow only) together with the result% 
+of measurements made with burning jete. Also drawn for comparison is the curve 
+of figure 6. The following features are evident. 
+(i) The data points lie close to the curve in the forced-convection rCgime; 
+this, of course, is to be expected from figure 5, for example. 
+(ii) The iduencs of increasing buoyancy predicted by the theoretical curve, 
+viz. an increased slope in the upper right corner, is exhibited by the experimental 
+data. It is chiefly the hydrogen diffusion-flame data which are in question here. 
+(iii) Some of the data points, particularly those for premixed hydrogen-air 
+jets, lie well below both the curve and its forced-convection aaymptote. 
+(iv) The scatter is considerable. 
+
+===== PAGE 11 =====
+Entrainment by aximjmmetrical turbulent jets 31 
+Cornprison with previoue work 
+It has already been stated that, in the absence of buoyancy, K, has been found by 
+previous authors to lie between 0.22 and 0.404; the value obtained from the 
+praeent work, viz. 0.282, can therefore be said to lie near the middle of the range 
+ofearlier values. The ease with which the mwurements were made, in the present 
+FIOIJRE 7. Entrainment by buoyant jete and flames. + , Unburnt propane jet; , un- 
+burnt hydrogen jet; 0, pre-mixed air-hydrogen flame; A, hydrogen diffueion flame; 
+0, propane Musion flame. 
+investigation, together with the straightforwardness of their interpretation, leads 
+w to believe that the present value of K, is the most reliable established so far. 
+The finding that equation (2) holds, in the absence of buoyancy effects, for jets 
+of non-uniform density was expected; it accords with the surmise of Squire & 
+Trouncer (1944), and with the suggeetion of Thring & Newby (1953), that the 
+oharacteriatic length of a turbulent jet is not do but do(p,,/pl)*. 
+Other authors who have presented experimental dab for the natural convec- 
+tion &@me include Yih (1961), and Cleeves & Boelter (1947); the data of these 
+outhore are represented on fig... 7 by broken straight lines which have been 
+
+===== PAGE 12 =====
+32 F. €? Ricou and D. B. Spalding 
+plotted by ignoring experimental scatter and assuming Gaussian velocity and 
+temperature profiles. 
+The data of Yih agree fairly well with the present hydrogen diffusion-flame 
+data; both sets lie appreciably above the theoretical curve, indicating that the 
+entrainment rate is greater in a buoyant jet than a non-buoyant one of the same 
+excess momentum. The data of Cleeves & Boelter show the same tendency to an 
+even more marked degree; they are, however, probably the leaat reliable of the 
+data on figure 7, being appreciably influenced by potential-core effects. 
+5. Conclusions 
+(a) The new experimental technique for measuring the rate of entrainment by 
+a turbulent jet was found to be easy to use, and to be applicable to jets of non- 
+uniform density and to larger values of z/d, than had previously been in- 
+vestigated. 
+(b) The constant K, of equation (2) was found to have the value 0.282, irrespec- 
+tive of the density ratio. 
+(c) The curve of figure 6, based on the entrainment assumption expressed by 
+equation (14), represents approximately the influence of buoyancy on the entrain- 
+ment. However, it must be noted that: (i) there is a tendency for the curve to 
+predict too low an entrainment rate in the natural-convection rkgime; (ii) the 
+curve predicts too high an entrainment rate for some flames; (iii) the experi- 
+mental scatter of the results of the present and earlier work in the natural- 
+convection regime precludes the drawing of firm conclusions at present. 
+One of the authors (F. P. R.) acknowledges the financial support of the States 
+of Jersey Committee of Education, and of Thomils Hedley and Company, Ltd. 
+This research was supported by a contract between Imperial College and the 
+National Engineering Laboratory; the Director of the N.E.L. has given his 
+permission for publication. 
+REFERENCES 
+BATCHELOR, G. K. 1954 Quart. J. Roy. Met. Soc. 80, 339. 
+CLEEVES, V. & BOELTER, L. M. K. 1947 Chem. Engng Progr. 43, 123. 
+GRI~TT, H. L. 1948 M.S. Thesis, University of Illinois. 
+KRZYWOBLOCKI, M. Z. 1956 Jet Prop. 26, 760. 
+MORTON, B. R., TAYLOR, G. I. & TURNER, J. S. 1950 Proc. Roy. Soc. A, 234, 1. 
+Par, S. I. 1954 Flus DynumiCe of Jets. New York: Van Noetrand. 
+POLO~E, E. E. 1948 M.S. Thesis, University of Illinois. 
+REICEARDT, H. 1942 V.D.1.-Fw8chungsheft. p. 414. (2nd ed. 1951). 
+SCHLICHTIN~, H. 1955 Boundary Layer Theory. London: Pergamon Prees. 
+SPALDINQ, D. B. 1960 J. Sci. Inatrum. 27, 310. 
+SQUIRE, H. B. & TROUNCER, J. 1944 Round jets in a general stream. Aero. Res. Cwm. 
+Tech. Rep. R. &. M. no. 1974. 
+THRINQ, M. W. & NEWBY. M. P. 1963 Fourth Syqoeium on Co?nbu&h, p. 789. Balti- 
+more: Williams and Wilkins. 
+VOORHEIS, T. S. & HOW, E. D. 1939 Proc. Pac. Coaet Gas Ass. 30, 198. 
+YIH, C. S. 1951 Proc. First U.S. Nat. Congt.. Awl. Me&. p. 941. 

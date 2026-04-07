@@ -1,0 +1,56 @@
+============================================================
+VERMICOMPOSTER WINTER WALL-BLANKET HEATING MODEL
+============================================================
+Heating method                         : wall_blanket_conduction
+Wall blankets                          : 2 x 250.0 mm x 1740.0 mm
+Max blanket surface temperature        : 120.0 C
+Supply voltage basis                   : 110.0 V
+Required winter heating load           : 386.0 W
+Optimization method                    : NSGA-II
+Seasonal temperature-goal mode         : legacy extreme-node objective mode
+Hard limits                            : I_total <= 15.0 A, T_blanket <= 350.0 C, T_bottom >= 22.0 C, T_top >= 22.0 C
+Microbial q_bio model                 : enabled=False, scenario=base, operating day=30.0, VS fraction=0.180
+
+NSGA-II reported feasible Pareto point:
+  Blanket duty                        : 0.880
+  Total electrical power              : 453.3 W
+  Heat delivered to bed               : 426.7 W
+  Lumped bed temperature              : 25.91 C
+  Legacy bottom/top aliases           : 25.91 / 25.91 C
+  Duty needed at design load          : 0.904
+  Status                              : meets all hard constraints and the heating target
+
+Best-available wall-blanket reference:
+  Blanket duty                        : 0.832
+  Total electrical power              : 417.9 W
+  Heat delivered to bed               : 392.8 W
+  Lumped bed temperature              : 22.66 C
+  Legacy bottom/top aliases           : 22.66 / 22.66 C
+  Duty needed at design load          : 0.982
+  Status                              : meets all hard constraints and the heating target
+
+Top optimization-ranked wall-blanket points:
+  duty    power(W)  Qbed(W)  Tbottom(C)  Ttop(C)  dutyNeed  state
+   0.880     453.3    426.7       25.91     25.91     0.904  feasible
+   0.868     444.4    418.3       25.10     25.10     0.923  feasible
+   0.856     435.6    409.8       24.29     24.29     0.942  feasible
+   0.844     426.7    401.3       23.47     23.47     0.962  feasible
+   0.832     417.9    392.8       22.66     22.66     0.982  feasible
+
+Lengthwise side-view heat-map diagnostics:
+  Heat-map reference duty             : 0.832
+  Heat-map point selection            : optimized feasible+safe point closest to setpoint
+  With bio (bottom/top)              : 26.24 / 26.24 C
+  Without bio (bottom/top)           : 22.66 / 22.66 C
+  Bioheat contribution at map duty    : 37.34 W
+
+Generated files:
+  - wall_blanket_heating_curves.png
+  - heating_pareto_front.png
+  - heating_sideview_lengthwise_heatmap.png
+  - heating_sideview_lengthwise_heatmap_with_bio.png
+  - heating_sideview_lengthwise_heatmap_without_bio.png
+  - heating_sideview_lengthwise_heatmap_bio_delta.png
+  - heating_sideview_field_wall_blanket.npz
+
+============================================================

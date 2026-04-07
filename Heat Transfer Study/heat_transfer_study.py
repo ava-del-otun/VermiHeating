@@ -1311,23 +1311,30 @@ def compute_radial_profile(payload: dict, config: dict) -> dict:
     if not np.isfinite(rec_air_C):
         return {}
 
-    ref_mode = str(radial_cfg.get("bed_reference", "bottom_node")).strip().lower()
     T_bottom = float(rec.get("TbottomFullPower_C", np.nan))
     T_top = float(rec.get("TtopFullPower_C", np.nan))
-    if ref_mode == "mean_nodes" and np.isfinite(T_bottom) and np.isfinite(T_top):
-        bed_ref_C = 0.5 * (T_bottom + T_top)
-    elif ref_mode == "colder_node" and np.isfinite(T_bottom) and np.isfinite(T_top):
-        bed_ref_C = min(T_bottom, T_top)
-    elif np.isfinite(T_bottom):
-        bed_ref_C = T_bottom
-    elif np.isfinite(T_top):
-        bed_ref_C = T_top
-    else:
-        bed_ref_C = float(summary_inputs.get("bedSetpoint_C", 20.0))
+    if not (np.isfinite(T_bottom) and np.isfinite(T_top)):
+        return {}
+    fill_height_m = float(bin_inputs.get("height_m", 0.61)) * float(bin_inputs.get("fillFraction", 0.80))
+    if not (np.isfinite(fill_height_m) and fill_height_m > 0.0):
+        return {}
 
-    evaporation_inputs = model_overrides.get("evaporation", {})
-    surface_set_C = float(evaporation_inputs.get("surfaceTemp_C", summary_inputs.get("bedSetpoint_C", bed_ref_C)))
-    sink_C = min(max(surface_set_C, bed_ref_C), rec_air_C)
+    aer_id_m = max(1e-9, float(aer_inputs.get("ID_mm", 40.0)) / 1000.0)
+    aer_od_m = max(aer_id_m, float(aer_inputs.get("OD_mm", 44.0)) / 1000.0)
+    tube_radius_m = max(0.5 * aer_od_m, 0.0)
+    representative_center_height_m = aer_inputs.get("representativeTubeCenterHeight_m", None)
+    if representative_center_height_m is None:
+        representative_center_height_m = default_representative_tube_center_height_m(fill_height_m, aer_od_m)
+    representative_center_height_m = float(representative_center_height_m)
+    if not np.isfinite(representative_center_height_m):
+        return {}
+    y_tube_m = min(
+        max(representative_center_height_m, tube_radius_m),
+        max(fill_height_m - tube_radius_m, tube_radius_m),
+    )
+    eta_tube = y_tube_m / max(fill_height_m, 1e-12)
+    bed_ref_C = T_bottom + eta_tube * (T_top - T_bottom)
+    sink_C = min(bed_ref_C, rec_air_C)
     wetted = derived_wetted_area_details(summary_inputs, model_overrides)
     fill_volume_m3 = float(wetted.get("fill_volume_m3", np.nan))
     wetted_area_m2 = float(wetted.get("area_m2", np.nan))
@@ -1350,12 +1357,21 @@ def compute_radial_profile(payload: dict, config: dict) -> dict:
     if mdot_release_per_length_kg_s_m <= 0:
         return {}
 
-    aer_od_m = float(aer_inputs.get("OD_mm", 44.0)) / 1000.0
     r0_m = 0.5 * aer_od_m
     max_distance_m = float(radial_cfg.get("max_distance_m", 0.20))
     point_count = max(25, int(radial_cfg.get("point_count", 300)))
     threshold_C = float(radial_cfg.get("temperature_threshold_C", 27.0))
-    spread_rate_m_per_m = max(0.0, float(radial_cfg.get("spread_rate_m_per_m", 0.15)))
+    spread_model = str(radial_cfg.get("spread_rate_model", "legacy_constant")).strip().lower()
+    entrainment_coefficient = np.nan
+    entrainment_to_spread_factor = np.nan
+    if spread_model in {"entrainment_constant", "ricou_spalding_option1", "option1"}:
+        entrainment_coefficient = max(0.0, float(radial_cfg.get("entrainment_coefficient", 0.055)))
+        entrainment_to_spread_factor = max(0.0, float(radial_cfg.get("entrainment_to_spread_factor", 2.0)))
+        spread_rate_m_per_m = entrainment_to_spread_factor * entrainment_coefficient
+        spread_model = "entrainment_constant"
+    else:
+        spread_rate_m_per_m = max(0.0, float(radial_cfg.get("spread_rate_m_per_m", 0.15)))
+        spread_model = "legacy_constant"
 
     initial_mode = str(radial_cfg.get("initial_plume_radius_mode", "hole_radius")).strip().lower()
     initial_override = radial_cfg.get("initial_plume_radius_m")
@@ -1383,7 +1399,9 @@ def compute_radial_profile(payload: dict, config: dict) -> dict:
     evaporation_inputs = model_overrides.get("evaporation", {})
     relative_humidity = float(evaporation_inputs.get("relativeHumidity", 0.8))
     lewis_factor = float(evaporation_inputs.get("lewisFactor", 1.0))
-    evaporation_multiplier = float(calibration.get("evaporationHMultiplier", 1.0))
+    evaporation_sherwood_multiplier = float(
+        calibration.get("evaporationSherwoodMultiplier", calibration.get("evaporationHMultiplier", 1.0))
+    )
     rho_v_inlet = relative_humidity * water_vapor_density_at_saturation_kg_m3(greenhouse_air_C + 273.15)
     rho_v_bulk = min(rho_v_inlet, water_vapor_density_at_saturation_kg_m3(rec_air_C + 273.15))
     bulk_vapor_density_kg_m3[0] = rho_v_bulk
@@ -1408,12 +1426,12 @@ def compute_radial_profile(payload: dict, config: dict) -> dict:
             continue
 
         props = air_props(T_local_C, pressure_Pa)
-        local_surface_C = min(max(surface_set_C, bed_ref_C), T_local_C)
+        local_surface_C = min(bed_ref_C, T_local_C)
         local_surface_K = local_surface_C + 273.15
         rho_v_surface = water_vapor_density_at_saturation_kg_m3(local_surface_K)
         driving_kg_m3 = max(rho_v_surface - rho_v_bulk, 0.0)
 
-        h_mass_m_s = evaporation_multiplier * h_sensible / max(
+        h_mass_m_s = evaporation_sherwood_multiplier * h_sensible / max(
             props["rho_kg_m3"] * props["cp_J_kgK"] * lewis_factor ** (2.0 / 3.0),
             1e-12,
         )
@@ -1508,6 +1526,9 @@ def compute_radial_profile(payload: dict, config: dict) -> dict:
         "threshold_state": threshold_state,
         "sink_C": sink_C,
         "bed_ref_C": bed_ref_C,
+        "tube_center_height_m": y_tube_m,
+        "fill_height_m": fill_height_m,
+        "tube_height_fraction": eta_tube,
         "area_density_m2_m3": area_density_m2_m3,
         "h_sensible_W_m2K": h_sensible,
         "h_latent_W_m2K": h_latent,
@@ -1528,6 +1549,9 @@ def compute_radial_profile(payload: dict, config: dict) -> dict:
         "mdot_release_per_length_kg_s_m": mdot_release_per_length_kg_s_m,
         "plume_radius_m": plume_radius_m,
         "initial_plume_radius_m": plume_radius0_m,
+        "spread_model": spread_model,
+        "entrainment_coefficient": entrainment_coefficient,
+        "entrainment_to_spread_factor": entrainment_to_spread_factor,
         "spread_rate_m_per_m": spread_rate_m_per_m,
         "max_plume_radius_m": max_plume_radius_m,
         "sink_strength": sink_strength,
@@ -1688,20 +1712,42 @@ def compute_tube_layout_and_habitat(payload: dict, config: dict) -> dict:
         "left_depth_m": 0.0,
         "right_depth_m": 0.0,
         "bottom_depth_m": 0.0,
+        "top_depth_m": 0.0,
         "left_contactTemp_C": np.nan,
         "right_contactTemp_C": np.nan,
         "bottom_contactTemp_C": np.nan,
+        "top_contactTemp_C": np.nan,
         "left_wallTemp_C": np.nan,
         "right_wallTemp_C": np.nan,
         "bottom_wallTemp_C": np.nan,
+        "top_wallTemp_C": np.nan,
     }
     wall_inputs = effective_bin_wall_inputs(summary_inputs, model_overrides)
-    h_ext = float(summary_inputs.get("externalNaturalConvection_h_W_m2K", np.nan))
-    if wall_return["enabled"] and radial and {"sheetThickness_mm", "sheetK_W_mK", "insulationThickness_mm", "insulationK_W_mK"} <= wall_inputs.keys() and np.isfinite(h_ext):
-        R_out_m2K_W = (
+    h_ext_side = float(
+        summary_inputs.get(
+            "sideAmbientH_W_m2K",
+            summary_inputs.get(
+                "externalH_W_m2K",
+                summary_inputs.get("externalNaturalConvection_h_W_m2K", np.nan),
+            ),
+        )
+    )
+    h_ext_bottom = float(summary_inputs.get("bottomAmbientH_W_m2K", h_ext_side))
+    top_mode = str(summary_inputs.get("topMode", "")).strip().lower()
+    h_ext_top_open = float(summary_inputs.get("topAmbientH_W_m2K", h_ext_side))
+    h_ext_top_cover = float(summary_inputs.get("coveredTopAmbientH_W_m2K", h_ext_top_open))
+    h_ext_top = h_ext_top_open if top_mode == "open top" else h_ext_top_cover
+    if (
+        wall_return["enabled"]
+        and radial
+        and {"sheetThickness_mm", "sheetK_W_mK", "insulationThickness_mm", "insulationK_W_mK"} <= wall_inputs.keys()
+        and np.isfinite(h_ext_side)
+        and np.isfinite(h_ext_bottom)
+        and np.isfinite(h_ext_top)
+    ):
+        r_cond_m2K_W = (
             float(wall_inputs["sheetThickness_mm"]) / 1000.0 / max(float(wall_inputs["sheetK_W_mK"]), 1e-12)
             + float(wall_inputs["insulationThickness_mm"]) / 1000.0 / max(float(wall_inputs["insulationK_W_mK"]), 1e-12)
-            + 1.0 / max(h_ext, 1e-12)
         )
         h_in = max(float(radial.get("h_sensible_W_m2K", 0.0)), 1e-12)
         T_inf = float(summary_inputs.get("greenhouseAir_C", -15.0))
@@ -1717,40 +1763,43 @@ def compute_tube_layout_and_habitat(payload: dict, config: dict) -> dict:
                 return depth_limit_m
             return float(np.clip(depth_limit_m * (wall_temp_C - T_safe) / max(wall_temp_C - T_bed, 1e-12), 0.0, depth_limit_m))
 
-        def wall_contact_temperature(distances_to_wall_m: np.ndarray) -> float:
-            if distances_to_wall_m.size == 0:
-                return float("nan")
-            samples = [
-                interpolate_profile_value(profile_x, profile_T, max(float(distance), 0.0))
-                for distance in distances_to_wall_m
-            ]
-            finite = [value for value in samples if np.isfinite(value)]
-            return float(np.mean(finite)) if finite else float("nan")
+        def wall_contact_temperature(distance_to_wall_m: float) -> float:
+            sample = interpolate_profile_value(profile_x, profile_T, max(float(distance_to_wall_m), 0.0))
+            return float(sample) if np.isfinite(sample) else float("nan")
 
-        left_mask = np.isclose(x_centers, np.min(x_centers))
-        right_mask = np.isclose(x_centers, np.max(x_centers))
-        bottom_mask = np.isclose(y_centers, np.min(y_centers))
+        # Wall offsets are taken directly from the realized tube centers, so no
+        # separate edge-index set is needed for wall localization in this path.
+        left_center_offset = float(np.clip(np.min(x_centers), tube_radius_m, width_m))
+        right_center_offset = float(np.clip(width_m - np.max(x_centers), tube_radius_m, width_m))
+        bottom_center_offset = float(np.clip(np.min(y_centers), tube_radius_m, fill_height_m))
+        top_center_offset = float(np.clip(fill_height_m - np.max(y_centers), tube_radius_m, fill_height_m))
 
-        left_gap = np.maximum(x_centers[left_mask] - tube_radius_m, 0.0)
-        right_gap = np.maximum(width_m - x_centers[right_mask] - tube_radius_m, 0.0)
-        bottom_gap = np.maximum(y_centers[bottom_mask] - tube_radius_m, 0.0)
+        left_gap = max(left_center_offset - tube_radius_m, 0.0)
+        right_gap = max(right_center_offset - tube_radius_m, 0.0)
+        bottom_gap = max(bottom_center_offset - tube_radius_m, 0.0)
+        top_gap = max(top_center_offset - tube_radius_m, 0.0)
 
         wall_return["left_contactTemp_C"] = wall_contact_temperature(left_gap)
         wall_return["right_contactTemp_C"] = wall_contact_temperature(right_gap)
         wall_return["bottom_contactTemp_C"] = wall_contact_temperature(bottom_gap)
+        wall_return["top_contactTemp_C"] = wall_contact_temperature(top_gap)
 
-        for side in ("left", "right", "bottom"):
+        wall_external_h = {"left": h_ext_side, "right": h_ext_side, "bottom": h_ext_bottom, "top": h_ext_top}
+        for side in ("left", "right", "bottom", "top"):
             contact_temp = wall_return[f"{side}_contactTemp_C"]
             if np.isfinite(contact_temp):
-                qpp = (contact_temp - T_inf) / max(1.0 / h_in + R_out_m2K_W, 1e-12)
+                r_out_m2K_W = r_cond_m2K_W + 1.0 / max(wall_external_h[side], 1e-12)
+                qpp = (contact_temp - T_inf) / max(1.0 / h_in + r_out_m2K_W, 1e-12)
                 wall_return[f"{side}_wallTemp_C"] = contact_temp - qpp / h_in
 
-        left_depth_limit = float(np.min(x_centers[left_mask])) if np.any(left_mask) else 0.0
-        right_depth_limit = float(width_m - np.max(x_centers[right_mask])) if np.any(right_mask) else 0.0
-        bottom_depth_limit = float(np.min(y_centers[bottom_mask])) if np.any(bottom_mask) else 0.0
+        left_depth_limit = left_center_offset
+        right_depth_limit = right_center_offset
+        bottom_depth_limit = bottom_center_offset
+        top_depth_limit = top_center_offset
         wall_return["left_depth_m"] = wall_band_depth(float(wall_return["left_wallTemp_C"]), left_depth_limit)
         wall_return["right_depth_m"] = wall_band_depth(float(wall_return["right_wallTemp_C"]), right_depth_limit)
         wall_return["bottom_depth_m"] = wall_band_depth(float(wall_return["bottom_wallTemp_C"]), bottom_depth_limit)
+        wall_return["top_depth_m"] = wall_band_depth(float(wall_return["top_wallTemp_C"]), top_depth_limit)
 
         if wall_return["left_depth_m"] > 0:
             wall_masks.append(xx <= wall_return["left_depth_m"])
@@ -1758,6 +1807,8 @@ def compute_tube_layout_and_habitat(payload: dict, config: dict) -> dict:
             wall_masks.append(xx >= width_m - wall_return["right_depth_m"])
         if wall_return["bottom_depth_m"] > 0:
             wall_masks.append(yy <= wall_return["bottom_depth_m"])
+        if wall_return["top_depth_m"] > 0:
+            wall_masks.append(yy >= fill_height_m - wall_return["top_depth_m"])
 
     wall_union = np.logical_or.reduce(wall_masks) if wall_masks else np.zeros_like(xx, dtype=bool)
     unsafe_union = np.logical_or(exclusion_union, wall_union)
@@ -1873,6 +1924,18 @@ def plot_habitat_exclusion_cross_section(payload: dict, config: dict, output_dir
                 (0, 0),
                 1000.0 * layout["width_m"],
                 1000.0 * float(wall_return["bottom_depth_m"]),
+                facecolor="#fdba74",
+                edgecolor="#ea580c",
+                alpha=0.28,
+                linewidth=1.0,
+            )
+        )
+    if float(wall_return.get("top_depth_m", 0.0)) > 0:
+        ax.add_patch(
+            plt.Rectangle(
+                (0, 1000.0 * (layout["fill_height_m"] - float(wall_return["top_depth_m"]))),
+                1000.0 * layout["width_m"],
+                1000.0 * float(wall_return["top_depth_m"]),
                 facecolor="#fdba74",
                 edgecolor="#ea580c",
                 alpha=0.28,
@@ -2866,12 +2929,10 @@ def summer_evaporation_loss_segment(
     hole_velocity_m_s: float,
     seg_area_m2: float,
     pressure_Pa: float,
-    inlet_relative_humidity: float,
+    bulk_vapor_density_kg_m3: float,
     surface_temp_C: float,
-    lewis_factor: float,
-    evaporation_multiplier: float,
+    sherwood_multiplier: float,
     hole_diameter_m: float,
-    inlet_air_ref_C: float,
 ) -> tuple[float, float]:
     lower_T_C = min(tair_C, tbed_C)
     upper_T_C = max(tair_C, tbed_C)
@@ -2879,13 +2940,13 @@ def summer_evaporation_loss_segment(
     surfaceT_K = surfaceT_C + 273.15
     props = air_props(tair_C, pressure_Pa)
     rho_v_surface = water_vapor_density_at_saturation_kg_m3(surfaceT_K)
-    rho_v_inlet = inlet_relative_humidity * water_vapor_density_at_saturation_kg_m3(inlet_air_ref_C + 273.15)
-    delta_rho_v = max(rho_v_surface - rho_v_inlet, 0.0)
+    delta_rho_v = max(rho_v_surface - max(bulk_vapor_density_kg_m3, 0.0), 0.0)
 
+    sc_hole = 0.60
     re_hole = props["rho_kg_m3"] * max(hole_velocity_m_s, 0.0) * max(hole_diameter_m, 1e-12) / max(props["mu_Pa_s"], 1e-12)
-    nu_hole = churchill_bernstein_nu(re_hole, props["Pr"])
-    h_evap = evaporation_multiplier * nu_hole * props["k_W_mK"] / max(hole_diameter_m, 1e-12)
-    h_mass = h_evap / max(props["rho_kg_m3"] * props["cp_J_kgK"] * lewis_factor ** (2.0 / 3.0), 1e-12)
+    sh_hole = sherwood_multiplier * froessling_sherwood_number(re_hole, sc_hole)
+    diffusivity_m2_s = props["mu_Pa_s"] / max(props["rho_kg_m3"] * sc_hole, 1e-12)
+    h_mass = sh_hole * diffusivity_m2_s / max(hole_diameter_m, 1e-12)
 
     vol_release_m3_s = dm_release_kg_s / max(props["rho_kg_m3"], 1e-12)
     hfg = latent_heat_vaporization_water_J_kg(surfaceT_K)
@@ -3334,8 +3395,9 @@ def simulate_summer_cooling_point(
     discharge_coefficient = max(float(perforation_inputs.get("dischargeCoefficient", 0.60)), 0.0)
     ambient_relative_humidity = float(cooling_cfg.get("inletRelativeHumidity", evaporation_inputs.get("relativeHumidity", 0.80)))
     surface_temp_C = float(cooling_cfg.get("surfaceTemp_C", evaporation_inputs.get("surfaceTemp_C", design_bed_C)))
-    lewis_factor = float(evaporation_inputs.get("lewisFactor", 1.0))
-    evaporation_multiplier = float(calibration.get("evaporationHMultiplier", 1.0))
+    evaporation_sherwood_multiplier = float(
+        calibration.get("evaporationSherwoodMultiplier", calibration.get("evaporationHMultiplier", 1.0))
+    )
     bottom_fraction = float(bin_inputs.get("heatToBottomFraction", 0.60))
 
     requested_flow_m3_s = max(float(flow_Lpm) / 60000.0, 0.0)
@@ -3364,6 +3426,7 @@ def simulate_summer_cooling_point(
         spot = spot_cooler_supply_state(cooling_cfg, total_flow_m3_s, ambient_air_C, pressure_Pa)
         supply_air_C = float(spot["actualSupplyAir_C"])
         supply_relative_humidity = float(spot.get("supplyRelativeHumidity", ambient_relative_humidity))
+        supply_humidity_ratio = humidity_ratio_from_rh(supply_air_C, supply_relative_humidity, pressure_Pa)
         supply_props = air_props(supply_air_C, pressure_Pa)
         distribution_dp = branch_distribution_losses(
             total_flow_m3_s,
@@ -3406,11 +3469,12 @@ def simulate_summer_cooling_point(
                     re_tube = props["rho_kg_m3"] * u_bulk * aer_id_m / max(props["mu_Pa_s"], 1e-12)
                     nu_tube = internal_tube_nu(re_tube, props["Pr"], aer_id_m, aer_len_m)
                     h_inside = nu_tube * props["k_W_mK"] / aer_id_m
-                    u_tube = 1.0 / max(
-                        1.0 / max(h_inside, 1e-12)
-                        + (aer_od_m - aer_id_m) / (2.0 * max(wall_k, 1e-12))
-                        + 1.0 / max(bed_h, 1e-12),
-                        1e-12,
+                    u_tube = cylindrical_tube_overall_u_on_outer_basis(
+                        aer_id_m,
+                        aer_od_m,
+                        h_inside,
+                        wall_k,
+                        bed_h,
                     )
                     dm_kg_s, local_bed_gauge_pressure_pa = solve_segment_release_with_bed_backpressure(
                         local_gauge_pressure_pa,
@@ -3438,6 +3502,10 @@ def simulate_summer_cooling_point(
                     local_hole_velocity = vol_release_seg_m3_s / max(segment_hole_area_m2, 1e-12)
                     peak_flow_per_hole_lpm = max(peak_flow_per_hole_lpm, local_flow_per_hole_lpm)
                     peak_hole_velocity_m_s = max(peak_hole_velocity_m_s, local_hole_velocity)
+                    rho_v_bulk_release = min(
+                        vapor_density_from_humidity_ratio_kg_m3(t_release_C, supply_humidity_ratio, local_pressure_pa),
+                        water_vapor_density_at_saturation_kg_m3(t_release_C + 273.15),
+                    )
                     q_avail = dm_kg_s * release_props["cp_J_kgK"] * abs(t_release_C - bed_ref_C)
                     m_evap, q_evap = summer_evaporation_loss_segment(
                         dm_kg_s,
@@ -3447,12 +3515,10 @@ def simulate_summer_cooling_point(
                         local_hole_velocity,
                         seg_area_m2,
                         local_pressure_pa,
-                        supply_relative_humidity,
+                        rho_v_bulk_release,
                         surface_temp_C,
-                        lewis_factor,
-                        evaporation_multiplier,
+                        evaporation_sherwood_multiplier,
                         hole_diameter_m,
-                        supply_air_C,
                     )
                     q_to_bed += q_wall + q_jet - q_evap
                     latent_evap += q_evap
@@ -3969,6 +4035,7 @@ def build_summer_cooling_payload(config: dict) -> dict:
             "tau_h": lumped_loss["tau_h"],
             "Bi_lumped": lumped_loss["Bi_lumped"],
             "lumpedStrictlyValid": lumped_loss["lumpedStrictlyValid"],
+            "externalU_W_m2K": lumped_loss.get("externalU_W_m2K", np.nan),
             "externalH_W_m2K": lumped_loss["externalH_W_m2K"],
         },
         "bin_model": bin_model,
@@ -4232,6 +4299,16 @@ def build_heating_wire_geometry(point: dict, heater_inputs: dict, wire_inputs: d
     wire_cross_section_m2 = np.pi * wire_diameter_m**2 / 4.0 if np.isfinite(wire_diameter_m) else float("nan")
     wire_surface_area_m2 = np.pi * wire_diameter_m * wire_length_m if np.isfinite(wire_length_m) else float("nan")
     wire_surface_area_per_axial_length_m = wire_surface_area_m2 / max(coil_span_m, 1e-12)
+    helix_angle_factor = (
+        (np.pi * coil_mean_d_m) / max(float(np.hypot(np.pi * coil_mean_d_m, pitch_m)), 1e-12)
+        if is_valid
+        else float("nan")
+    )
+    projected_area_per_axial_length_m = (
+        np.pi * coil_mean_d_m * wire_diameter_m / max(pitch_m, 1e-12)
+        if is_valid
+        else float("nan")
+    )
 
     return {
         "isValid": bool(is_valid),
@@ -4243,6 +4320,8 @@ def build_heating_wire_geometry(point: dict, heater_inputs: dict, wire_inputs: d
         "crossSection_m2": float(wire_cross_section_m2) if np.isfinite(wire_cross_section_m2) else float("nan"),
         "surfaceArea_m2": float(wire_surface_area_m2) if np.isfinite(wire_surface_area_m2) else float("nan"),
         "surfaceAreaPerAxialLength_m": float(wire_surface_area_per_axial_length_m) if np.isfinite(wire_surface_area_per_axial_length_m) else float("nan"),
+        "projectedAreaPerAxialLength_m": float(projected_area_per_axial_length_m) if np.isfinite(projected_area_per_axial_length_m) else float("nan"),
+        "helixAngleFactor": float(helix_angle_factor) if np.isfinite(helix_angle_factor) else float("nan"),
         "turnLength_m": float(turn_length_m) if np.isfinite(turn_length_m) else float("nan"),
         "coilMeanD_m": float(coil_mean_d_m) if np.isfinite(coil_mean_d_m) else float("nan"),
         "diameter_m": float(wire_diameter_m) if np.isfinite(wire_diameter_m) else float("nan"),
@@ -4371,6 +4450,18 @@ def relative_humidity_from_humidity_ratio(T_C: float, humidity_ratio: float, pre
     return min(max(p_v / max(p_sat, 1e-12), 0.0), 1.0)
 
 
+def vapor_density_from_humidity_ratio_kg_m3(T_C: float, humidity_ratio: float, pressure_Pa: float) -> float:
+    w = max(humidity_ratio, 0.0)
+    p_v = pressure_Pa * w / max(0.62198 + w, 1e-12)
+    return p_v / max(float(iapws95.R_95) * (T_C + 273.15), 1e-12)
+
+
+def froessling_sherwood_number(Re: float, Sc: float) -> float:
+    Re = max(Re, 0.0)
+    Sc = max(Sc, 1e-12)
+    return 2.0 + 0.552 * Re**0.5 * Sc ** (1.0 / 3.0)
+
+
 def dew_point_from_rh(T_C: float, relative_humidity: float, pressure_Pa: float) -> float:
     rh = min(max(relative_humidity, 0.0), 1.0)
     p_target = rh * saturation_pressure_water_Pa(T_C + 273.15)
@@ -4398,7 +4489,13 @@ def natural_convection_vertical_plate_h(Tsurf_C: float, Tinf_C: float, L_m: floa
     return Nu * props["k_W_mK"] / max(L_m, 1e-9)
 
 
-def natural_convection_horizontal_plate_h(Tsurf_C: float, Tinf_C: float, L_m: float, pressure_Pa: float) -> float:
+def natural_convection_horizontal_plate_h(
+    Tsurf_C: float,
+    Tinf_C: float,
+    L_m: float,
+    pressure_Pa: float,
+    surface_faces_upward: bool = True,
+) -> float:
     Tfilm_K = 0.5 * (Tsurf_C + Tinf_C) + 273.15
     props = air_props(0.5 * (Tsurf_C + Tinf_C), pressure_Pa)
     beta_1_K = 1.0 / max(Tfilm_K, 1e-12)
@@ -4406,19 +4503,65 @@ def natural_convection_horizontal_plate_h(Tsurf_C: float, Tinf_C: float, L_m: fl
     alpha_m2_s = props["k_W_mK"] / max(props["rho_kg_m3"] * props["cp_J_kgK"], 1e-12)
     deltaT_K = max(abs(Tsurf_C - Tinf_C), 1e-6)
     Ra = 9.81 * beta_1_K * deltaT_K * max(L_m, 1e-9) ** 3 / max(nu_m2_s * alpha_m2_s, 1e-12)
-    if Tsurf_C >= Tinf_C:
+    heated_surface = Tsurf_C >= Tinf_C
+    unstable_orientation = heated_surface if surface_faces_upward else not heated_surface
+    if unstable_orientation:
         Nu = 0.54 * Ra ** 0.25 if Ra <= 1.0e7 else 0.15 * Ra ** (1.0 / 3.0)
     else:
         Nu = 0.27 * Ra ** 0.25
     return Nu * props["k_W_mK"] / max(L_m, 1e-9)
 
 
-def overall_wall_u(wall_inputs: dict, h_outside_W_m2K: float) -> float:
+def natural_convection_horizontal_plate_bottom_h(Tsurf_C: float, Tinf_C: float, L_m: float, pressure_Pa: float) -> float:
+    return natural_convection_horizontal_plate_h(
+        Tsurf_C,
+        Tinf_C,
+        L_m,
+        pressure_Pa,
+        surface_faces_upward=False,
+    )
+
+
+def wall_resistance_without_outside(wall_inputs: dict) -> float:
     rin = 1.0 / max(float(wall_inputs.get("internalH_W_m2K", 6.0)), 1e-12)
     rsheet = float(wall_inputs.get("sheetThickness_mm", 1.5)) / 1000.0 / max(float(wall_inputs.get("sheetK_W_mK", 50.0)), 1e-12)
     rins = float(wall_inputs.get("insulationThickness_mm", 50.8)) / 1000.0 / max(float(wall_inputs.get("insulationK_W_mK", 0.040)), 1e-12)
+    return rin + rsheet + rins
+
+
+def overall_wall_u(wall_inputs: dict, h_outside_W_m2K: float) -> float:
     rout = 1.0 / max(h_outside_W_m2K, 1e-12)
-    return 1.0 / max(rin + rsheet + rins + rout, 1e-12)
+    return 1.0 / max(wall_resistance_without_outside(wall_inputs) + rout, 1e-12)
+
+
+def solve_insulated_surface_u(
+    Tinside_C: float,
+    Tinf_C: float,
+    L_m: float,
+    pressure_Pa: float,
+    wall_inputs: dict,
+    outside_h_func,
+) -> dict:
+    r_fixed = wall_resistance_without_outside(wall_inputs)
+    Tsurf_C = 0.5 * (Tinside_C + Tinf_C)
+    h_outside_W_m2K = max(float(outside_h_func(Tsurf_C, Tinf_C, L_m, pressure_Pa)), 1e-12)
+    for _ in range(25):
+        u_value = 1.0 / max(r_fixed + 1.0 / h_outside_W_m2K, 1e-12)
+        q_flux_W_m2 = u_value * (Tinside_C - Tinf_C)
+        Tsurf_new_C = Tinf_C + q_flux_W_m2 / h_outside_W_m2K
+        h_new_W_m2K = max(float(outside_h_func(Tsurf_new_C, Tinf_C, L_m, pressure_Pa)), 1e-12)
+        if abs(Tsurf_new_C - Tsurf_C) <= 1.0e-6 and abs(h_new_W_m2K - h_outside_W_m2K) <= 1.0e-6:
+            Tsurf_C = Tsurf_new_C
+            h_outside_W_m2K = h_new_W_m2K
+            break
+        Tsurf_C = Tsurf_new_C
+        h_outside_W_m2K = h_new_W_m2K
+    u_value = 1.0 / max(r_fixed + 1.0 / h_outside_W_m2K, 1e-12)
+    return {
+        "hOutside_W_m2K": h_outside_W_m2K,
+        "U_W_m2K": u_value,
+        "surfaceTemperature_C": Tsurf_C,
+    }
 
 
 def churchill_bernstein_nu(Re: float, Pr: float) -> float:
@@ -4451,16 +4594,85 @@ def internal_tube_nu(Re: float, Pr: float, D_m: float, L_m: float) -> float:
     return max(nu, 3.66)
 
 
-def heater_tube_overall_u(heater_inputs: dict, h_inside_wall_W_m2K: float) -> float:
-    rin = 1.0 / max(h_inside_wall_W_m2K, 1e-12)
-    rwall = (
-        (float(heater_inputs.get("OD_mm", 19.0)) - float(heater_inputs.get("ID_mm", 15.0))) / 1000.0
-    ) / max(2.0 * float(heater_inputs.get("wallK_W_mK", 16.0)), 1e-12)
-    rins = (float(heater_inputs.get("insulationThickness_mm", 10.0)) / 1000.0) / max(
-        float(heater_inputs.get("insulationK_W_mK", 0.040)), 1e-12
-    )
-    rout = 1.0 / max(float(heater_inputs.get("externalH_W_m2K", 10.0)), 1e-12)
+def cylindrical_tube_overall_u_on_outer_basis(
+    inner_d_m: float,
+    wall_outer_d_m: float,
+    h_inside_W_m2K: float,
+    wall_k_W_mK: float,
+    h_outside_W_m2K: float,
+    exposed_outer_d_m: float | None = None,
+    insulation_k_W_mK: float | None = None,
+) -> float:
+    inner_d_m = max(float(inner_d_m), 1e-12)
+    wall_outer_d_m = max(float(wall_outer_d_m), inner_d_m)
+    if exposed_outer_d_m is None:
+        exposed_outer_d_m = wall_outer_d_m
+    exposed_outer_d_m = max(float(exposed_outer_d_m), wall_outer_d_m)
+    h_inside_W_m2K = max(float(h_inside_W_m2K), 1e-12)
+    wall_k_W_mK = max(float(wall_k_W_mK), 1e-12)
+    h_outside_W_m2K = max(float(h_outside_W_m2K), 1e-12)
+
+    rin = exposed_outer_d_m / max(inner_d_m * h_inside_W_m2K, 1e-12)
+    rwall = exposed_outer_d_m * np.log(max(wall_outer_d_m / inner_d_m, 1.0)) / max(2.0 * wall_k_W_mK, 1e-12)
+    rins = 0.0
+    if exposed_outer_d_m > wall_outer_d_m:
+        insulation_k_W_mK = max(float(insulation_k_W_mK if insulation_k_W_mK is not None else 0.0), 1e-12)
+        rins = exposed_outer_d_m * np.log(max(exposed_outer_d_m / wall_outer_d_m, 1.0)) / max(2.0 * insulation_k_W_mK, 1e-12)
+    rout = 1.0 / h_outside_W_m2K
     return 1.0 / max(rin + rwall + rins + rout, 1e-12)
+
+
+def heater_tube_overall_u(heater_inputs: dict, h_inside_wall_W_m2K: float) -> float:
+    id_m = max(float(heater_inputs.get("ID_mm", 15.0)) / 1000.0, 1e-12)
+    od_m = max(float(heater_inputs.get("OD_mm", 19.0)) / 1000.0, id_m)
+    insulation_thickness_m = max(float(heater_inputs.get("insulationThickness_mm", 10.0)) / 1000.0, 0.0)
+    exposed_outer_d_m = od_m + 2.0 * insulation_thickness_m
+    return cylindrical_tube_overall_u_on_outer_basis(
+        id_m,
+        od_m,
+        h_inside_wall_W_m2K,
+        float(heater_inputs.get("wallK_W_mK", 16.0)),
+        float(heater_inputs.get("externalH_W_m2K", 10.0)),
+        exposed_outer_d_m=exposed_outer_d_m,
+        insulation_k_W_mK=float(heater_inputs.get("insulationK_W_mK", 0.040)),
+    )
+
+
+def heater_coil_obstruction_segment_dp_pa(
+    props: dict,
+    u_bulk_m_s: float,
+    heater_inputs: dict,
+    wire: dict,
+    dx_m: float,
+    tube_flow_area_m2: float,
+) -> float:
+    model = str(heater_inputs.get("coilPressureModel", "projected_area_drag")).strip().lower()
+    if model in {"", "none", "off", "disabled"}:
+        return 0.0
+    projected_area_per_axial_length_m = float(wire.get("projectedAreaPerAxialLength_m", np.nan))
+    helix_angle_factor = float(wire.get("helixAngleFactor", np.nan))
+    if (
+        not np.isfinite(projected_area_per_axial_length_m)
+        or projected_area_per_axial_length_m <= 0.0
+        or not np.isfinite(helix_angle_factor)
+        or helix_angle_factor <= 0.0
+    ):
+        return 0.0
+    if model != "projected_area_drag":
+        return 0.0
+    drag_coefficient = max(float(heater_inputs.get("coilDragCoefficient", 1.0)), 0.0)
+    loss_multiplier = max(float(heater_inputs.get("coilLossMultiplier", 1.0)), 0.0)
+    frontal_area_density_1_m = projected_area_per_axial_length_m / max(tube_flow_area_m2, 1e-12)
+    u_normal_m_s = abs(u_bulk_m_s) * helix_angle_factor
+    return float(
+        loss_multiplier
+        * 0.5
+        * float(props["rho_kg_m3"])
+        * u_normal_m_s**2
+        * drag_coefficient
+        * frontal_area_density_1_m
+        * dx_m
+    )
 
 
 def solve_heater_tube_python(
@@ -4480,7 +4692,8 @@ def solve_heater_tube_python(
     id_m = max(float(heater_inputs.get("ID_mm", 15.0)) / 1000.0, 1e-12)
     od_m = max(float(heater_inputs.get("OD_mm", 19.0)) / 1000.0, id_m)
     atube_m2 = np.pi * id_m**2 / 4.0
-    pout_m = np.pi * od_m
+    heater_insulation_thickness_m = max(float(heater_inputs.get("insulationThickness_mm", 10.0)) / 1000.0, 0.0)
+    pout_exposed_m = np.pi * (od_m + 2.0 * heater_insulation_thickness_m)
     tair_K = float(air_in_K)
 
     props_in = air_props(air_in_K - 273.15, pressure_Pa)
@@ -4491,16 +4704,17 @@ def solve_heater_tube_python(
     air_profile_C = np.zeros(n_segments + 1, dtype=float)
     air_profile_C[0] = air_in_K - 273.15
     hwire_profile = np.zeros(n_segments, dtype=float)
-    dp_friction_pa = 0.0
+    dp_tube_friction_pa = 0.0
+    dp_coil_obstruction_pa = 0.0
 
-    coil_mean_d_m = float(wire.get("coilMeanD_m", np.nan))
     wire_diameter_m = float(wire.get("diameter_m", np.nan))
-    pitch_m = float(wire.get("pitch_m", np.nan))
+    helix_angle_factor = float(wire.get("helixAngleFactor", np.nan))
+    if not np.isfinite(helix_angle_factor) or helix_angle_factor <= 0.0:
+        helix_angle_factor = 0.0
 
     for idx in range(n_segments):
         props = air_props(tair_K - 273.15, pressure_Pa)
         u_bulk_m_s = mdot_kg_s / max(props["rho_kg_m3"] * atube_m2, 1e-12)
-        helix_angle_factor = (np.pi * coil_mean_d_m) / max(np.hypot(np.pi * coil_mean_d_m, pitch_m), 1e-12)
         u_normal_m_s = max(1e-6, u_bulk_m_s * helix_angle_factor)
         re_wire = props["rho_kg_m3"] * u_normal_m_s * wire_diameter_m / max(props["mu_Pa_s"], 1e-12)
         nu_wire = churchill_bernstein_nu(re_wire, props["Pr"])
@@ -4511,7 +4725,7 @@ def solve_heater_tube_python(
         h_inside_wall = float(calibration.get("hWallMultiplier", 1.0)) * nu_tube * props["k_W_mK"] / id_m
         u_loss = heater_tube_overall_u(heater_inputs, h_inside_wall)
 
-        q_loss_W = u_loss * pout_m * dx_m * max((tair_K - 273.15) - ambient_C, 0.0)
+        q_loss_W = u_loss * pout_exposed_m * dx_m * max((tair_K - 273.15) - ambient_C, 0.0)
         q_gen_W = power_W * dx_m / max(length_m, 1e-12)
         q_to_air_W = q_gen_W - q_loss_W
         tair_K = tair_K + q_to_air_W / max(mdot_kg_s * props["cp_J_kgK"], 1e-12)
@@ -4522,9 +4736,17 @@ def solve_heater_tube_python(
         hwire_profile[idx] = h_wire
 
         f = churchill_friction_factor(re_tube)
-        dp_friction_pa += (
+        dp_tube_friction_pa += (
             f * dx_m / id_m + float(heater_inputs.get("extraMinorK", 1.0)) / n_segments
         ) * 0.5 * props["rho_kg_m3"] * u_bulk_m_s**2
+        dp_coil_obstruction_pa += heater_coil_obstruction_segment_dp_pa(
+            props,
+            u_bulk_m_s,
+            heater_inputs,
+            wire,
+            dx_m,
+            atube_m2,
+        )
 
     return {
         "airInletTemp_C": float(air_in_K - 273.15),
@@ -4534,7 +4756,9 @@ def solve_heater_tube_python(
         "wireMaxTemp_C": float(np.max(wire_profile_C)),
         "wireMeanTemp_C": float(np.mean(wire_profile_C)),
         "hWireMean_W_m2K": float(np.mean(hwire_profile)),
-        "deltaP_Pa": float(dp_friction_pa),
+        "tubeFrictionDeltaP_Pa": float(dp_tube_friction_pa),
+        "coilObstructionDeltaP_Pa": float(dp_coil_obstruction_pa),
+        "deltaP_Pa": float(dp_tube_friction_pa + dp_coil_obstruction_pa),
     }
 
 
@@ -4587,9 +4811,11 @@ def solve_heating_aeration_tube_python(
         bed_pressure_model,
     )
     inlet_relative_humidity = float(evap_inputs.get("relativeHumidity", 0.80))
+    inlet_humidity_ratio = humidity_ratio_from_rh(tair_in_C, inlet_relative_humidity, pressure_pa)
     surface_temp_C = float(evap_inputs.get("surfaceTemp_C", tbed_C))
-    lewis_factor = float(evap_inputs.get("lewisFactor", 1.0))
-    evaporation_multiplier = float(calibration.get("evaporationHMultiplier", 1.0))
+    evaporation_sherwood_multiplier = float(
+        calibration.get("evaporationSherwoodMultiplier", calibration.get("evaporationHMultiplier", 1.0))
+    )
 
     def march_branch(inlet_gauge_pressure_pa: float) -> dict:
         remaining_mdot_kg_s = mdot_in_kg_s
@@ -4616,11 +4842,12 @@ def solve_heating_aeration_tube_python(
             nu_tube = internal_tube_nu(re_tube, props["Pr"], id_m, length_m)
             h_inside = float(calibration.get("hWallMultiplier", 1.0)) * nu_tube * props["k_W_mK"] / id_m
             h_outside = float(calibration.get("bedHTMultiplier", 1.0)) * float(aer_inputs.get("bedH_W_m2K", 8.0))
-            u_tube = 1.0 / max(
-                1.0 / max(h_inside, 1e-12)
-                + (od_m - id_m) / max(2.0 * wall_k, 1e-12)
-                + 1.0 / max(h_outside, 1e-12),
-                1e-12,
+            u_tube = cylindrical_tube_overall_u_on_outer_basis(
+                id_m,
+                od_m,
+                h_inside,
+                wall_k,
+                h_outside,
             )
 
             dm_kg_s, local_bed_gauge_pressure_pa = solve_segment_release_with_bed_backpressure(
@@ -4642,11 +4869,16 @@ def solve_heating_aeration_tube_python(
             tair_after_wall_C = tbed_C + (tair_C - tbed_C) * wall_factor
             q_wall_W = mdot_mean_kg_s * props["cp_J_kgK"] * (tair_C - tair_after_wall_C)
             t_release_C = 0.5 * (tair_C + tair_after_wall_C)
-            vol_release_m3_s = dm_kg_s / max(props["rho_kg_m3"], 1e-12)
+            release_props = air_props(t_release_C, local_pressure_pa)
+            vol_release_m3_s = dm_kg_s / max(release_props["rho_kg_m3"], 1e-12)
             local_flow_per_hole_lpm = vol_release_m3_s * 60000.0 / max(holes_per_segment, 1e-12)
             local_hole_velocity_m_s = vol_release_m3_s / max(segment_hole_area_m2, 1e-12)
             peak_flow_per_hole_lpm = max(peak_flow_per_hole_lpm, local_flow_per_hole_lpm)
             peak_hole_velocity_m_s = max(peak_hole_velocity_m_s, local_hole_velocity_m_s)
+            rho_v_bulk_release = min(
+                vapor_density_from_humidity_ratio_kg_m3(t_release_C, inlet_humidity_ratio, local_pressure_pa),
+                water_vapor_density_at_saturation_kg_m3(t_release_C + 273.15),
+            )
             q_jet_W = dm_kg_s * props["cp_J_kgK"] * (t_release_C - tbed_C)
             q_avail_W = max(q_jet_W, 0.0)
             m_evap_kg_s, q_evap_W = summer_evaporation_loss_segment(
@@ -4657,12 +4889,10 @@ def solve_heating_aeration_tube_python(
                 local_hole_velocity_m_s,
                 seg_area_m2,
                 local_pressure_pa,
-                inlet_relative_humidity,
+                rho_v_bulk_release,
                 surface_temp_C,
-                lewis_factor,
-                evaporation_multiplier,
+                evaporation_sherwood_multiplier,
                 hole_diameter_m,
-                float(env_inputs.get("greenhouseAir_C", tbed_C)),
             )
             q_to_bed_W += q_wall_W + q_jet_W - q_evap_W
             latent_evap_W += q_evap_W
@@ -4722,7 +4952,7 @@ def simulate_heating_reference_point(config: dict, point: dict, ambient_air_C: f
     topology_label = str(point.get("electricalTopologyLabel") or electrical_topology_label(string_counts))
     n_tubes = sum(string_counts)
     total_flow_lpm = float(point.get("totalFlow_Lpm", 0.0))
-    branch_flow_lpm = total_flow_lpm / n_tubes
+    total_flow_m3_s = total_flow_lpm / 60000.0
     voltage_V = float(point.get("voltage_V", 0.0))
     air_in_K = ambient_air_C + 273.15
     wire = build_heating_wire_geometry(point, heater_inputs, wire_inputs)
@@ -4741,72 +4971,270 @@ def simulate_heating_reference_point(config: dict, point: dict, ambient_air_C: f
             "stringTubeCounts": string_counts,
         }
 
-    avg_wire_C = ambient_air_C + 20.0
-    tube_resistance_ohm = float("nan")
-    group_states: list[dict] = []
-    unique_series_counts = sorted(set(string_counts))
-
-    for _ in range(8):
-        wire_area_m2 = max(float(wire.get("crossSection_m2", np.nan)), 1e-12)
-        rho_ohm_m = float(wire_inputs.get("rho20_Ohm_m", 1.09e-6)) * (
-            1.0 + float(wire_inputs.get("tempCoeff_1_K", 1.7e-4)) * (avg_wire_C - 20.0)
-        )
-        tube_resistance_ohm = rho_ohm_m * float(wire.get("length_m", np.nan)) / wire_area_m2
-        group_states = []
-        weighted_wire_mean_C = 0.0
-        total_tube_weight = 0
-        for series_count in unique_series_counts:
-            n_strings_group = sum(1 for count in string_counts if count == series_count)
-            n_tubes_group = n_strings_group * series_count
-            tube_current_A = voltage_V / max(series_count * tube_resistance_ohm, 1e-12)
-            tube_power_W = tube_current_A**2 * tube_resistance_ohm
-            heater_state = solve_heater_tube_python(
-                heater_inputs,
-                wire_inputs,
-                calibration,
-                pressure_pa,
-                wire,
-                tube_power_W,
-                branch_flow_lpm,
-                air_in_K,
-                ambient_air_C,
-            )
-            group_states.append(
-                {
-                    "series_count": series_count,
-                    "n_strings": n_strings_group,
-                    "n_tubes": n_tubes_group,
-                    "tube_current_A": tube_current_A,
-                    "tube_power_W": tube_power_W,
-                    "heater_state": heater_state,
-                }
-            )
-            weighted_wire_mean_C += n_tubes_group * float(np.mean(heater_state["wireProfile_C"]))
-            total_tube_weight += n_tubes_group
-        new_avg_wire_C = weighted_wire_mean_C / max(total_tube_weight, 1)
-        if abs(new_avg_wire_C - avg_wire_C) < 0.05:
-            avg_wire_C = new_avg_wire_C
-            break
-        avg_wire_C = 0.65 * avg_wire_C + 0.35 * new_avg_wire_C
-
     props_at_inlet = air_props(ambient_air_C, pressure_pa)
-    vol_flow_branch_m3_s = branch_flow_lpm / 60000.0
-    mdot_branch_kg_s = vol_flow_branch_m3_s * props_at_inlet["rho_kg_m3"]
-    distribution = branch_distribution_losses(
-        total_flow_lpm / 60000.0,
-        branch_flow_lpm / 60000.0,
-        ambient_air_C,
-        pressure_pa,
-        n_tubes,
-        aer_inputs,
-        max(float(heater_inputs.get("ID_mm", 15.0)) / 1000.0, 1e-12),
-    )
+    rho_at_inlet = float(props_at_inlet["rho_kg_m3"])
+    mdot_total_kg_s = total_flow_m3_s * rho_at_inlet
+    heater_id_m = max(float(heater_inputs.get("ID_mm", 15.0)) / 1000.0, 1e-12)
+    aer_id_m = max(float(aer_inputs.get("ID_mm", 40.0)) / 1000.0, 1e-12)
+    unique_series_counts = sorted(set(string_counts))
+    group_definitions: list[dict] = []
+    for series_count in unique_series_counts:
+        n_strings_group = sum(1 for count in string_counts if count == series_count)
+        n_tubes_group = n_strings_group * series_count
+        group_definitions.append(
+            {
+                "series_count": int(series_count),
+                "n_strings": int(n_strings_group),
+                "n_tubes": int(n_tubes_group),
+                "state_cache": {},
+            }
+        )
+
+    distribution_common = branch_distribution_common_losses(total_flow_m3_s, ambient_air_C, pressure_pa, aer_inputs)
+    min_branch_mdot_for_state_kg_s = max(1.0e-6, 1.0e-3 * mdot_total_kg_s / max(n_tubes, 1))
+
+    def empty_distribution_private_state() -> dict[str, float]:
+        return {
+            "splitter_body_Pa": 0.0,
+            "connector_friction_Pa": 0.0,
+            "connector_to_branch_Pa": 0.0,
+            "splitter_body_loss_coefficient": 0.0,
+            "splitter_body_loss_multiplier": float(aeration_loss_multiplier(aer_inputs, "splitterBodyLossMultiplier", "splitterBodyK")),
+            "splitter_branch_tee_loss_coefficient": 0.0,
+            "splitter_valve_loss_coefficient": 0.0,
+            "total_Pa": 0.0,
+            "connector_velocity_m_s": 0.0,
+            "connector_reynolds": 0.0,
+        }
+
+    def empty_branch_aeration_state() -> dict:
+        return {
+            "QtoBed_W": 0.0,
+            "airOutlet_C": float(ambient_air_C),
+            "airProfile_C": np.array([ambient_air_C], dtype=float),
+            "flowPerHole_Lpm": 0.0,
+            "holeVelocity_m_s": 0.0,
+            "waterLoss_kg_day": 0.0,
+            "latentEvap_W": 0.0,
+            "remaining_mdot_kg_s": 0.0,
+            "tubeFrictionDrop_Pa": 0.0,
+            "bedBoundaryGauge_Pa": 0.0,
+            "pressureProfileGauge_Pa": np.array([0.0], dtype=float),
+            "bedPressureProfileGauge_Pa": np.array([], dtype=float),
+            "maxBedGaugePressure_Pa": 0.0,
+            "deltaP_Pa": 0.0,
+            "aerationInletGaugePressure_Pa": 0.0,
+            "pressureSolveBracketFound": True,
+            "pressureSolveConverged": True,
+            "pressureSolveMassBalanceTolerance_kg_s": 0.0,
+            "pressureSolveResidual_kg_s": 0.0,
+        }
+
+    def evaluate_group_branch_state(group_def: dict, branch_mdot_kg_s: float) -> dict:
+        branch_mdot_kg_s = max(float(branch_mdot_kg_s), 0.0)
+        cache_key = round(branch_mdot_kg_s, 12)
+        cache = group_def["state_cache"]
+        if cache_key in cache:
+            return cache[cache_key]
+
+        branch_mdot_for_state_kg_s = 0.0 if branch_mdot_kg_s <= 0.0 else max(branch_mdot_kg_s, min_branch_mdot_for_state_kg_s)
+        branch_flow_lpm = branch_mdot_for_state_kg_s / max(rho_at_inlet, 1e-12) * 60000.0
+        avg_wire_C = ambient_air_C + 20.0
+        tube_resistance_ohm = float("nan")
+        tube_current_A = 0.0
+        tube_power_W = 0.0
+        heater_state: dict = {
+            "deltaP_Pa": 0.0,
+            "tubeFrictionDeltaP_Pa": 0.0,
+            "coilObstructionDeltaP_Pa": 0.0,
+            "airOutletTemp_C": float(ambient_air_C),
+            "wireProfile_C": np.array([ambient_air_C], dtype=float),
+            "wireMaxTemp_C": float("nan"),
+            "hWireMean_W_m2K": float("nan"),
+        }
+
+        if branch_mdot_for_state_kg_s > 0.0:
+            for _ in range(8):
+                wire_area_m2 = max(float(wire.get("crossSection_m2", np.nan)), 1e-12)
+                rho_ohm_m = float(wire_inputs.get("rho20_Ohm_m", 1.09e-6)) * (
+                    1.0 + float(wire_inputs.get("tempCoeff_1_K", 1.7e-4)) * (avg_wire_C - 20.0)
+                )
+                tube_resistance_ohm = rho_ohm_m * float(wire.get("length_m", np.nan)) / wire_area_m2
+                tube_current_A = voltage_V / max(group_def["series_count"] * tube_resistance_ohm, 1e-12)
+                tube_power_W = tube_current_A**2 * tube_resistance_ohm
+                heater_state = solve_heater_tube_python(
+                    heater_inputs,
+                    wire_inputs,
+                    calibration,
+                    pressure_pa,
+                    wire,
+                    tube_power_W,
+                    branch_flow_lpm,
+                    air_in_K,
+                    ambient_air_C,
+                )
+                new_avg_wire_C = float(np.mean(heater_state["wireProfile_C"]))
+                if abs(new_avg_wire_C - avg_wire_C) < 0.05:
+                    avg_wire_C = new_avg_wire_C
+                    break
+                avg_wire_C = 0.65 * avg_wire_C + 0.35 * new_avg_wire_C
+
+        distribution_private = (
+            branch_distribution_branch_private_losses(
+                branch_flow_lpm / 60000.0,
+                ambient_air_C,
+                pressure_pa,
+                aer_inputs,
+                heater_id_m,
+            )
+            if branch_mdot_for_state_kg_s > 0.0
+            else empty_distribution_private_state()
+        )
+        branch_aeration = (
+            solve_heating_aeration_tube_python(
+                summary_inputs,
+                model_overrides,
+                env_inputs,
+                aer_inputs,
+                calibration,
+                float(heater_state["airOutletTemp_C"]),
+                bed_temp_C,
+                branch_mdot_for_state_kg_s,
+            )
+            if branch_mdot_for_state_kg_s > 0.0
+            else empty_branch_aeration_state()
+        )
+        dp_expansion_pa = (
+            sudden_expansion_loss_Pa(
+                branch_mdot_for_state_kg_s,
+                float(heater_state["airOutletTemp_C"]),
+                pressure_pa,
+                heater_id_m,
+                aer_id_m,
+            )
+            if branch_mdot_for_state_kg_s > 0.0
+            else 0.0
+        )
+        private_path_dp_pa = (
+            float(distribution_private["total_Pa"])
+            + float(heater_state["deltaP_Pa"])
+            + float(dp_expansion_pa)
+            + float(branch_aeration["deltaP_Pa"])
+        )
+        state = {
+            "groupLabel": f"{int(group_def['n_strings'])}x{int(group_def['series_count'])}S",
+            "series_count": int(group_def["series_count"]),
+            "n_strings": int(group_def["n_strings"]),
+            "n_tubes": int(group_def["n_tubes"]),
+            "branchMdot_kg_s": float(branch_mdot_kg_s),
+            "branchMdotEvaluated_kg_s": float(branch_mdot_for_state_kg_s),
+            "branchFlowActual_Lpm": float(branch_mdot_kg_s / max(rho_at_inlet, 1e-12) * 60000.0),
+            "branchFlowEvaluated_Lpm": float(branch_flow_lpm),
+            "branchResistance_Ohm": float(tube_resistance_ohm),
+            "tubeCurrent_A": float(tube_current_A),
+            "tubePower_W": float(tube_power_W),
+            "heaterAirOutlet_C": float(heater_state.get("airOutletTemp_C", ambient_air_C)),
+            "wireMax_C": float(heater_state.get("wireMaxTemp_C", np.nan)),
+            "wireMean_C": float(np.mean(heater_state["wireProfile_C"])) if np.size(heater_state.get("wireProfile_C", np.array([], dtype=float))) else float("nan"),
+            "hWire_W_m2K": float(heater_state.get("hWireMean_W_m2K", np.nan)),
+            "heaterDeltaP_Pa": float(heater_state.get("deltaP_Pa", 0.0)),
+            "heaterTubeFrictionDeltaP_Pa": float(heater_state.get("tubeFrictionDeltaP_Pa", 0.0)),
+            "heaterCoilObstructionDeltaP_Pa": float(heater_state.get("coilObstructionDeltaP_Pa", 0.0)),
+            "heaterToAerationExpansionDeltaP_Pa": float(dp_expansion_pa),
+            "aerationDeltaP_Pa": float(branch_aeration.get("deltaP_Pa", 0.0)),
+            "distributionPrivateDeltaP_Pa": float(distribution_private["total_Pa"]),
+            "distributionSplitterBody_Pa": float(distribution_private["splitter_body_Pa"]),
+            "distributionConnectorFriction_Pa": float(distribution_private["connector_friction_Pa"]),
+            "distributionConnectorToBranch_Pa": float(distribution_private["connector_to_branch_Pa"]),
+            "privatePathDeltaP_Pa": float(private_path_dp_pa),
+            "QtoBed_W": float(branch_aeration.get("QtoBed_W", 0.0)),
+            "waterLoss_kg_day": float(branch_aeration.get("waterLoss_kg_day", 0.0)),
+            "latentEvap_W": float(branch_aeration.get("latentEvap_W", 0.0)),
+            "holeVelocity_m_s": float(branch_aeration.get("holeVelocity_m_s", 0.0)),
+            "flowPerHole_Lpm": float(branch_aeration.get("flowPerHole_Lpm", 0.0)),
+            "pressureSolveConverged": bool(branch_aeration.get("pressureSolveConverged", True)),
+            "pressureSolveBracketFound": bool(branch_aeration.get("pressureSolveBracketFound", True)),
+            "pressureSolveResidual_kg_s": float(branch_aeration.get("pressureSolveResidual_kg_s", np.nan)),
+            "pressureSolveMassBalanceTolerance_kg_s": float(branch_aeration.get("pressureSolveMassBalanceTolerance_kg_s", np.nan)),
+        }
+        cache[cache_key] = state
+        return state
+
+    def solve_group_branch_mdot_for_target_dp(group_def: dict, target_dp_pa: float) -> float:
+        if target_dp_pa <= 0.0 or mdot_total_kg_s <= 0.0:
+            return 0.0
+        hi_mdot = mdot_total_kg_s / max(int(group_def["n_tubes"]), 1)
+        if hi_mdot <= 0.0:
+            return 0.0
+        hi_state = evaluate_group_branch_state(group_def, hi_mdot)
+        if float(hi_state["privatePathDeltaP_Pa"]) <= target_dp_pa:
+            return hi_mdot
+        lo = 0.0
+        hi = hi_mdot
+        for _ in range(36):
+            mid = 0.5 * (lo + hi)
+            if 0.0 < mid < min_branch_mdot_for_state_kg_s:
+                mid = min_branch_mdot_for_state_kg_s
+            mid_state = evaluate_group_branch_state(group_def, mid)
+            if float(mid_state["privatePathDeltaP_Pa"]) <= target_dp_pa:
+                lo = mid
+            else:
+                hi = mid
+            if hi - lo <= max(1.0e-9, 1.0e-6 * max(hi_mdot, 1.0)):
+                break
+        return lo
+
+    branch_mdots_by_group: dict[int, float] = {}
+    if mdot_total_kg_s <= 0.0 or len(group_definitions) == 1:
+        for group_def in group_definitions:
+            branch_mdots_by_group[int(group_def["series_count"])] = mdot_total_kg_s / max(int(group_def["n_tubes"]), 1)
+        common_private_path_dp_pa = (
+            float(
+                evaluate_group_branch_state(
+                    group_definitions[0],
+                    branch_mdots_by_group.get(int(group_definitions[0]["series_count"]), 0.0),
+                )["privatePathDeltaP_Pa"]
+            )
+            if group_definitions and mdot_total_kg_s > 0.0
+            else 0.0
+        )
+    else:
+        hi_dp_pa = max(
+            float(
+                evaluate_group_branch_state(
+                    group_def,
+                    mdot_total_kg_s / max(int(group_def["n_tubes"]), 1),
+                )["privatePathDeltaP_Pa"]
+            )
+            for group_def in group_definitions
+        )
+        lo_dp_pa = 0.0
+        for _ in range(56):
+            mid_dp_pa = 0.5 * (lo_dp_pa + hi_dp_pa)
+            mdot_trial_kg_s = 0.0
+            for group_def in group_definitions:
+                mdot_trial_kg_s += int(group_def["n_tubes"]) * solve_group_branch_mdot_for_target_dp(group_def, mid_dp_pa)
+            if mdot_trial_kg_s >= mdot_total_kg_s:
+                hi_dp_pa = mid_dp_pa
+            else:
+                lo_dp_pa = mid_dp_pa
+            if hi_dp_pa - lo_dp_pa <= max(1.0e-6, 1.0e-6 * max(hi_dp_pa, 1.0)):
+                break
+        common_private_path_dp_pa = hi_dp_pa
+        for group_def in group_definitions:
+            branch_mdots_by_group[int(group_def["series_count"])] = solve_group_branch_mdot_for_target_dp(group_def, common_private_path_dp_pa)
+
+    group_states: list[dict] = []
+    for group_def in group_definitions:
+        final_state = evaluate_group_branch_state(group_def, branch_mdots_by_group.get(int(group_def["series_count"]), 0.0)).copy()
+        group_states.append(final_state)
+
+    controlling_group = max(group_states, key=lambda item: float(item["privatePathDeltaP_Pa"])) if group_states else None
     total_current_A = 0.0
     total_power_W = 0.0
     q_to_bed_W = 0.0
     water_loss_kg_day = 0.0
     latent_evap_W = 0.0
-    max_branch_delta_p = -np.inf
     max_air_outlet_C = -np.inf
     max_wire_C = -np.inf
     max_hole_velocity_m_s = -np.inf
@@ -4814,71 +5242,108 @@ def simulate_heating_reference_point(config: dict, point: dict, ambient_air_C: f
     weighted_hwire = 0.0
     weighted_wire_mean = 0.0
     weighted_branch_q = 0.0
+    weighted_branch_flow = 0.0
+    weighted_branch_resistance = 0.0
     tube_current_min_A = float("inf")
     tube_current_max_A = -float("inf")
     tube_current_weighted_A = 0.0
     tube_power_min_W = float("inf")
     tube_power_max_W = -float("inf")
     tube_power_weighted_W = 0.0
+    branch_flow_min_Lpm = float("inf")
+    branch_flow_max_Lpm = -float("inf")
+    branch_path_dp_min_Pa = float("inf")
+    branch_path_dp_max_Pa = -float("inf")
+    pressure_solve_converged = True
+    pressure_solve_bracket_found = True
+
     for group_state in group_states:
-        heater_state = group_state["heater_state"]
-        branch_aeration = solve_heating_aeration_tube_python(
-            summary_inputs,
-            model_overrides,
-            env_inputs,
-            aer_inputs,
-            calibration,
-            float(heater_state["airOutletTemp_C"]),
-            bed_temp_C,
-            mdot_branch_kg_s,
-        )
-        dp_expansion_pa = sudden_expansion_loss_Pa(
-            mdot_branch_kg_s,
-            float(heater_state["airOutletTemp_C"]),
-            pressure_pa,
-            max(float(heater_inputs.get("ID_mm", 15.0)) / 1000.0, 1e-12),
-            max(float(aer_inputs.get("ID_mm", 40.0)) / 1000.0, 1e-12),
-        )
-        branch_delta_p = float(heater_state["deltaP_Pa"]) + dp_expansion_pa + float(branch_aeration["deltaP_Pa"])
         n_tubes_group = int(group_state["n_tubes"])
         n_strings_group = int(group_state["n_strings"])
-        tube_current_A = float(group_state["tube_current_A"])
-        tube_power_W = float(group_state["tube_power_W"])
+        branch_flow_actual_lpm = float(group_state["branchFlowActual_Lpm"])
+        tube_current_A = float(group_state["tubeCurrent_A"])
+        tube_power_W = float(group_state["tubePower_W"])
+        branch_path_dp_pa = float(group_state["privatePathDeltaP_Pa"])
 
         total_current_A += n_strings_group * tube_current_A
         total_power_W += n_tubes_group * tube_power_W
-        q_to_bed_W += n_tubes_group * float(branch_aeration["QtoBed_W"])
-        water_loss_kg_day += n_tubes_group * float(branch_aeration["waterLoss_kg_day"])
-        latent_evap_W += n_tubes_group * float(branch_aeration["latentEvap_W"])
-        max_branch_delta_p = max(max_branch_delta_p, branch_delta_p)
-        max_air_outlet_C = max(max_air_outlet_C, float(heater_state["airOutletTemp_C"]))
-        max_wire_C = max(max_wire_C, float(heater_state["wireMaxTemp_C"]))
-        max_hole_velocity_m_s = max(max_hole_velocity_m_s, float(branch_aeration["holeVelocity_m_s"]))
-        max_flow_per_hole_lpm = max(max_flow_per_hole_lpm, float(branch_aeration["flowPerHole_Lpm"]))
-        weighted_hwire += n_tubes_group * float(heater_state["hWireMean_W_m2K"])
-        weighted_wire_mean += n_tubes_group * float(np.mean(heater_state["wireProfile_C"]))
-        weighted_branch_q += n_tubes_group * float(branch_aeration["QtoBed_W"])
+        q_to_bed_W += n_tubes_group * float(group_state["QtoBed_W"])
+        water_loss_kg_day += n_tubes_group * float(group_state["waterLoss_kg_day"])
+        latent_evap_W += n_tubes_group * float(group_state["latentEvap_W"])
+        max_air_outlet_C = max(max_air_outlet_C, float(group_state["heaterAirOutlet_C"]))
+        max_wire_C = max(max_wire_C, float(group_state["wireMax_C"]))
+        max_hole_velocity_m_s = max(max_hole_velocity_m_s, float(group_state["holeVelocity_m_s"]))
+        max_flow_per_hole_lpm = max(max_flow_per_hole_lpm, float(group_state["flowPerHole_Lpm"]))
+        weighted_hwire += n_tubes_group * float(group_state["hWire_W_m2K"])
+        weighted_wire_mean += n_tubes_group * float(group_state["wireMean_C"])
+        weighted_branch_q += n_tubes_group * float(group_state["QtoBed_W"])
+        weighted_branch_flow += n_tubes_group * branch_flow_actual_lpm
+        weighted_branch_resistance += n_tubes_group * float(group_state["branchResistance_Ohm"])
         tube_current_min_A = min(tube_current_min_A, tube_current_A)
         tube_current_max_A = max(tube_current_max_A, tube_current_A)
         tube_current_weighted_A += n_tubes_group * tube_current_A
         tube_power_min_W = min(tube_power_min_W, tube_power_W)
         tube_power_max_W = max(tube_power_max_W, tube_power_W)
         tube_power_weighted_W += n_tubes_group * tube_power_W
+        branch_flow_min_Lpm = min(branch_flow_min_Lpm, branch_flow_actual_lpm)
+        branch_flow_max_Lpm = max(branch_flow_max_Lpm, branch_flow_actual_lpm)
+        branch_path_dp_min_Pa = min(branch_path_dp_min_Pa, branch_path_dp_pa)
+        branch_path_dp_max_Pa = max(branch_path_dp_max_Pa, branch_path_dp_pa)
+        pressure_solve_converged = pressure_solve_converged and bool(group_state.get("pressureSolveConverged", True))
+        pressure_solve_bracket_found = pressure_solve_bracket_found and bool(group_state.get("pressureSolveBracketFound", True))
 
     mean_tube_current_A = tube_current_weighted_A / max(n_tubes, 1)
     mean_tube_power_W = tube_power_weighted_W / max(n_tubes, 1)
     mean_hwire = weighted_hwire / max(n_tubes, 1)
     mean_wire_temp_C = weighted_wire_mean / max(n_tubes, 1)
     mean_branch_q_W = weighted_branch_q / max(n_tubes, 1)
+    mean_branch_flow_Lpm = weighted_branch_flow / max(n_tubes, 1)
+    mean_branch_resistance_ohm = weighted_branch_resistance / max(n_tubes, 1)
     equivalent_resistance_ohm = voltage_V / max(total_current_A, 1e-12)
+    pressure_balance_residual_pa = (
+        branch_path_dp_max_Pa - branch_path_dp_min_Pa
+        if len(group_states) > 1 and np.isfinite(branch_path_dp_min_Pa) and np.isfinite(branch_path_dp_max_Pa)
+        else 0.0
+    )
+    group_pressure_states = [
+        {
+            "groupLabel": str(group_state["groupLabel"]),
+            "seriesCount": int(group_state["series_count"]),
+            "stringCount": int(group_state["n_strings"]),
+            "tubeCount": int(group_state["n_tubes"]),
+            "branchFlow_Lpm": float(group_state["branchFlowActual_Lpm"]),
+            "branchCurrent_A": float(group_state["tubeCurrent_A"]),
+            "branchPower_W": float(group_state["tubePower_W"]),
+            "branchResistance_Ohm": float(group_state["branchResistance_Ohm"]),
+            "airOutlet_C": float(group_state["heaterAirOutlet_C"]),
+            "wireMax_C": float(group_state["wireMax_C"]),
+            "QtoBed_W": float(group_state["QtoBed_W"]),
+            "waterLoss_kg_day": float(group_state["waterLoss_kg_day"]),
+            "holeVelocity_m_s": float(group_state["holeVelocity_m_s"]),
+            "privatePathDeltaP_Pa": float(group_state["privatePathDeltaP_Pa"]),
+            "distributionPrivateDeltaP_Pa": float(group_state["distributionPrivateDeltaP_Pa"]),
+            "heaterDeltaP_Pa": float(group_state["heaterDeltaP_Pa"]),
+            "heaterTubeFrictionDeltaP_Pa": float(group_state["heaterTubeFrictionDeltaP_Pa"]),
+            "heaterCoilObstructionDeltaP_Pa": float(group_state["heaterCoilObstructionDeltaP_Pa"]),
+            "heaterToAerationExpansionDeltaP_Pa": float(group_state["heaterToAerationExpansionDeltaP_Pa"]),
+            "aerationDeltaP_Pa": float(group_state["aerationDeltaP_Pa"]),
+        }
+        for group_state in group_states
+    ]
 
     return {
         "nParallelTubes": int(n_tubes),
         "parallelStringCount": int(len(string_counts)),
         "stringTubeCounts": [int(count) for count in string_counts],
         "electricalTopologyLabel": topology_label,
-        "branchFlow_Lpm": float(branch_flow_lpm),
-        "branchResistance_Ohm": float(tube_resistance_ohm),
+        "hydraulicRedistributionSolved": bool(len(group_definitions) > 1 and mdot_total_kg_s > 0.0),
+        "pressureControlGroupLabel": str(controlling_group["groupLabel"]) if controlling_group else "",
+        "pressureBalanceResidual_Pa": float(pressure_balance_residual_pa),
+        "branchFlow_Lpm": float(mean_branch_flow_Lpm),
+        "branchFlowMin_Lpm": float(branch_flow_min_Lpm),
+        "branchFlowMean_Lpm": float(mean_branch_flow_Lpm),
+        "branchFlowMax_Lpm": float(branch_flow_max_Lpm),
+        "branchResistance_Ohm": float(mean_branch_resistance_ohm),
         "branchCurrent_A": float(mean_tube_current_A),
         "branchPower_W": float(mean_tube_power_W),
         "supplyEquivalentResistance_Ohm": float(equivalent_resistance_ohm),
@@ -4893,13 +5358,19 @@ def simulate_heating_reference_point(config: dict, point: dict, ambient_air_C: f
         "totalCurrent_A": float(total_current_A),
         "branchQtoBed_W": float(mean_branch_q_W),
         "QtoBed_W": float(q_to_bed_W),
-        "deltaP_Pa": float(max_branch_delta_p + distribution["total_Pa"]),
-        "distributionDeltaP_Pa": float(distribution["total_Pa"]),
-        "distributionHeader_Pa": float(distribution["header_Pa"]),
-        "distributionHeaderToSplitter_Pa": float(distribution["header_to_splitter_Pa"]),
-        "distributionSplitterBody_Pa": float(distribution["splitter_body_Pa"]),
-        "distributionConnectorFriction_Pa": float(distribution["connector_friction_Pa"]),
-        "distributionConnectorToBranch_Pa": float(distribution["connector_to_branch_Pa"]),
+        "deltaP_Pa": float(distribution_common["total_Pa"] + (float(controlling_group["privatePathDeltaP_Pa"]) if controlling_group else 0.0)),
+        "distributionCommonDeltaP_Pa": float(distribution_common["total_Pa"]),
+        "distributionDeltaP_Pa": float(distribution_common["total_Pa"] + (float(controlling_group["distributionPrivateDeltaP_Pa"]) if controlling_group else 0.0)),
+        "distributionHeader_Pa": float(distribution_common["header_Pa"]),
+        "distributionHeaderToSplitter_Pa": float(distribution_common["header_to_splitter_Pa"]),
+        "distributionSplitterBody_Pa": float(controlling_group["distributionSplitterBody_Pa"]) if controlling_group else 0.0,
+        "distributionConnectorFriction_Pa": float(controlling_group["distributionConnectorFriction_Pa"]) if controlling_group else 0.0,
+        "distributionConnectorToBranch_Pa": float(controlling_group["distributionConnectorToBranch_Pa"]) if controlling_group else 0.0,
+        "heaterTubeDeltaP_Pa": float(controlling_group["heaterDeltaP_Pa"]) if controlling_group else 0.0,
+        "heaterTubeFrictionDeltaP_Pa": float(controlling_group["heaterTubeFrictionDeltaP_Pa"]) if controlling_group else 0.0,
+        "heaterCoilObstructionDeltaP_Pa": float(controlling_group["heaterCoilObstructionDeltaP_Pa"]) if controlling_group else 0.0,
+        "heaterToAerationExpansionDeltaP_Pa": float(controlling_group["heaterToAerationExpansionDeltaP_Pa"]) if controlling_group else 0.0,
+        "aerationDeltaP_Pa": float(controlling_group["aerationDeltaP_Pa"]) if controlling_group else 0.0,
         "airOutlet_C": float(max_air_outlet_C),
         "wireMax_C": float(max_wire_C),
         "wireMean_C": float(mean_wire_temp_C),
@@ -4907,8 +5378,10 @@ def simulate_heating_reference_point(config: dict, point: dict, ambient_air_C: f
         "waterLoss_kg_day": float(water_loss_kg_day),
         "latentEvap_W": float(latent_evap_W),
         "holeVelocity_m_s": float(max_hole_velocity_m_s),
+        "pressureSolveBracketFound": bool(pressure_solve_bracket_found),
+        "pressureSolveConverged": bool(pressure_solve_converged),
+        "groupPressureStates": group_pressure_states,
     }
-
 
 IDELCHIK_CONICAL_ANGLE_DEG = np.array([0.0, 10.0, 20.0, 30.0, 40.0, 60.0, 100.0, 140.0, 180.0], dtype=float)
 IDELCHIK_CONICAL_EPSILON = np.array([0.025, 0.050, 0.075, 0.10, 0.15, 0.25, 0.60, 1.0], dtype=float)
@@ -4997,14 +5470,11 @@ def aeration_loss_multiplier(aer_inputs: dict, primary_key: str, legacy_key: str
     return max(0.0, float(aer_inputs.get(primary_key, aer_inputs.get(legacy_key, 1.0))))
 
 
-def branch_distribution_losses(
+def branch_distribution_common_losses(
     total_flow_m3_s: float,
-    branch_flow_m3_s: float,
     T_C: float,
     pressure_Pa: float,
-    n_tubes: int,
     aer_inputs: dict,
-    downstream_branch_id_m: float,
 ) -> dict[str, float]:
     props = air_props(T_C, pressure_Pa)
     rho = props["rho_kg_m3"]
@@ -5012,18 +5482,55 @@ def branch_distribution_losses(
     header_enabled = bool(aer_inputs.get("headerEnabled", True))
     header_loss_multiplier = aeration_loss_multiplier(aer_inputs, "headerLossMultiplier", "headerMinorK")
     header_id_m = max(1e-12, float(aer_inputs.get("headerID_mm", 50.0)) / 1000.0)
-    splitter_outlet_count = max(1, int(round(float(aer_inputs.get("splitterOutletCount", 4)))))
     splitter_inlet_id_m = max(1e-12, float(aer_inputs.get("splitterInletID_mm", aer_inputs.get("branchConnectorID_mm", 19.0))) / 1000.0)
+    contraction_angle_deg = float(aer_inputs.get("contractionConeAngle_deg", 60.0))
+    total_mdot_kg_s = rho * max(total_flow_m3_s, 0.0)
+
+    if header_enabled:
+        header_area_m2 = np.pi * header_id_m**2 / 4.0
+        header_velocity_m_s = total_flow_m3_s / max(header_area_m2, 1e-12)
+        header_re = rho * header_velocity_m_s * header_id_m / max(mu, 1e-12)
+        header_loss_coeff = header_loss_multiplier * hooper_2k_entrance_loss_coefficient(header_re, K1=160.0, Kinf=0.50)
+        dp_header = header_loss_coeff * 0.5 * rho * header_velocity_m_s**2
+        dp_header_to_splitter = idelchik_conical_contraction_loss_Pa(
+            total_mdot_kg_s,
+            T_C,
+            pressure_Pa,
+            header_id_m,
+            splitter_inlet_id_m,
+            contraction_angle_deg,
+        )
+    else:
+        dp_header = 0.0
+        dp_header_to_splitter = 0.0
+        header_loss_coeff = 0.0
+
+    return {
+        "header_Pa": float(dp_header),
+        "header_to_splitter_Pa": float(dp_header_to_splitter),
+        "header_loss_coefficient": float(header_loss_coeff),
+        "header_loss_multiplier": float(header_loss_multiplier),
+        "total_Pa": float(dp_header + dp_header_to_splitter),
+        "header_enabled": float(1.0 if header_enabled else 0.0),
+    }
+
+
+def branch_distribution_branch_private_losses(
+    branch_flow_m3_s: float,
+    T_C: float,
+    pressure_Pa: float,
+    aer_inputs: dict,
+    downstream_branch_id_m: float,
+) -> dict[str, float]:
+    props = air_props(T_C, pressure_Pa)
+    rho = props["rho_kg_m3"]
+    mu = props["mu_Pa_s"]
     branch_connector_id_m = max(1e-12, float(aer_inputs.get("branchConnectorID_mm", 19.0)) / 1000.0)
     branch_connector_length_m = max(0.0, float(aer_inputs.get("branchConnectorLength_m", 0.0)))
     splitter_body_loss_multiplier = aeration_loss_multiplier(aer_inputs, "splitterBodyLossMultiplier", "splitterBodyK")
     contraction_angle_deg = float(aer_inputs.get("contractionConeAngle_deg", 60.0))
-    active_splitter_branches = max(1, min(splitter_outlet_count, int(n_tubes)))
 
-    branch_mdot_kg_s = rho * branch_flow_m3_s
-    splitter_inlet_flow_m3_s = active_splitter_branches * branch_flow_m3_s
-    splitter_inlet_mdot_kg_s = rho * splitter_inlet_flow_m3_s
-
+    branch_mdot_kg_s = rho * max(branch_flow_m3_s, 0.0)
     connector_area_m2 = np.pi * branch_connector_id_m**2 / 4.0
     connector_velocity_m_s = branch_mdot_kg_s / max(rho * connector_area_m2, 1e-12)
     connector_re = rho * connector_velocity_m_s * branch_connector_id_m / max(mu, 1e-12)
@@ -5036,25 +5543,6 @@ def branch_distribution_losses(
         * rho
         * connector_velocity_m_s**2
     )
-
-    if header_enabled:
-        header_area_m2 = np.pi * header_id_m**2 / 4.0
-        header_velocity_m_s = total_flow_m3_s / max(header_area_m2, 1e-12)
-        header_re = rho * header_velocity_m_s * header_id_m / max(mu, 1e-12)
-        header_loss_coeff = header_loss_multiplier * hooper_2k_entrance_loss_coefficient(header_re, K1=160.0, Kinf=0.50)
-        dp_header = header_loss_coeff * 0.5 * rho * header_velocity_m_s**2
-        dp_header_to_splitter = idelchik_conical_contraction_loss_Pa(
-            splitter_inlet_mdot_kg_s,
-            T_C,
-            pressure_Pa,
-            header_id_m,
-            splitter_inlet_id_m,
-            contraction_angle_deg,
-        )
-    else:
-        dp_header = 0.0
-        dp_header_to_splitter = 0.0
-        header_loss_coeff = 0.0
 
     splitter_branch_tee_loss_coeff = hooper_2k_fitting_loss_coefficient(
         connector_re,
@@ -5092,22 +5580,55 @@ def branch_distribution_losses(
         )
 
     return {
-        "header_Pa": float(dp_header),
-        "header_to_splitter_Pa": float(dp_header_to_splitter),
         "splitter_body_Pa": float(dp_splitter_body),
         "connector_friction_Pa": float(dp_connector_friction),
         "connector_to_branch_Pa": float(dp_connector_to_branch),
-        "header_loss_coefficient": float(header_loss_coeff),
-        "header_loss_multiplier": float(header_loss_multiplier),
         "splitter_body_loss_coefficient": float(splitter_body_loss_coeff),
         "splitter_body_loss_multiplier": float(splitter_body_loss_multiplier),
         "splitter_branch_tee_loss_coefficient": float(splitter_branch_tee_loss_coeff),
         "splitter_valve_loss_coefficient": float(splitter_valve_loss_coeff),
-        "total_Pa": float(dp_header + dp_header_to_splitter + dp_splitter_body + dp_connector_friction + dp_connector_to_branch),
+        "total_Pa": float(dp_splitter_body + dp_connector_friction + dp_connector_to_branch),
         "connector_velocity_m_s": float(connector_velocity_m_s),
         "connector_reynolds": float(connector_re),
+    }
+
+
+def branch_distribution_losses(
+    total_flow_m3_s: float,
+    branch_flow_m3_s: float,
+    T_C: float,
+    pressure_Pa: float,
+    n_tubes: int,
+    aer_inputs: dict,
+    downstream_branch_id_m: float,
+) -> dict[str, float]:
+    splitter_outlet_count = max(1, int(round(float(aer_inputs.get("splitterOutletCount", 4)))))
+    active_splitter_branches = max(1, min(splitter_outlet_count, int(n_tubes)))
+    common_losses = branch_distribution_common_losses(total_flow_m3_s, T_C, pressure_Pa, aer_inputs)
+    private_losses = branch_distribution_branch_private_losses(
+        branch_flow_m3_s,
+        T_C,
+        pressure_Pa,
+        aer_inputs,
+        downstream_branch_id_m,
+    )
+    return {
+        "header_Pa": float(common_losses["header_Pa"]),
+        "header_to_splitter_Pa": float(common_losses["header_to_splitter_Pa"]),
+        "splitter_body_Pa": float(private_losses["splitter_body_Pa"]),
+        "connector_friction_Pa": float(private_losses["connector_friction_Pa"]),
+        "connector_to_branch_Pa": float(private_losses["connector_to_branch_Pa"]),
+        "header_loss_coefficient": float(common_losses["header_loss_coefficient"]),
+        "header_loss_multiplier": float(common_losses["header_loss_multiplier"]),
+        "splitter_body_loss_coefficient": float(private_losses["splitter_body_loss_coefficient"]),
+        "splitter_body_loss_multiplier": float(private_losses["splitter_body_loss_multiplier"]),
+        "splitter_branch_tee_loss_coefficient": float(private_losses["splitter_branch_tee_loss_coefficient"]),
+        "splitter_valve_loss_coefficient": float(private_losses["splitter_valve_loss_coefficient"]),
+        "total_Pa": float(common_losses["total_Pa"] + private_losses["total_Pa"]),
+        "connector_velocity_m_s": float(private_losses["connector_velocity_m_s"]),
+        "connector_reynolds": float(private_losses["connector_reynolds"]),
         "splitter_active_branches": float(active_splitter_branches),
-        "header_enabled": float(1.0 if header_enabled else 0.0),
+        "header_enabled": float(common_losses["header_enabled"]),
     }
 
 
@@ -5126,26 +5647,62 @@ def build_bin_model_from_inputs(bin_inputs: dict, wall_inputs: dict, env_inputs:
     vent_area_m2 = min(top_area_m2, vent_count * vent_hole_area_m2)
     covered_top_area_m2 = max(top_area_m2 - vent_area_m2, 0.0)
 
-    h_ext = natural_convection_vertical_plate_h(
+    ambient_C = float(env_inputs.get("greenhouseAir_C", -15.0))
+    pressure_Pa = float(env_inputs.get("pressure_Pa", 101325.0))
+    side_char_length_m = float(env_inputs.get("referencePlateLength_m", H))
+    horizontal_perimeter_m = max(2.0 * (L + W), 1e-12)
+    horizontal_char_length_m = top_area_m2 / horizontal_perimeter_m
+
+    side_transfer = solve_insulated_surface_u(
         design_bed_C,
-        float(env_inputs.get("greenhouseAir_C", -15.0)),
-        float(env_inputs.get("referencePlateLength_m", H)),
-        float(env_inputs.get("pressure_Pa", 101325.0)),
+        ambient_C,
+        side_char_length_m,
+        pressure_Pa,
+        wall_inputs,
+        natural_convection_vertical_plate_h,
     )
-    u_wall = overall_wall_u(wall_inputs, h_ext)
-    abottom_node_m2 = bottom_area_m2 + 0.5 * side_area_m2
-    top_wall_area_m2 = 0.5 * side_area_m2
+    h_side = float(side_transfer["hOutside_W_m2K"])
+    u_side = float(side_transfer["U_W_m2K"])
+
+    bottom_mode = str(bin_inputs.get("bottomBoundaryMode", "elevated_air_gap")).strip().lower()
+    if bottom_mode in ("elevated_air_gap", "elevated", "air_gap", "raised"):
+        bottom_transfer = solve_insulated_surface_u(
+            design_bed_C,
+            ambient_C,
+            horizontal_char_length_m,
+            pressure_Pa,
+            wall_inputs,
+            natural_convection_horizontal_plate_bottom_h,
+        )
+        bottom_mode_label = "elevated air gap"
+    else:
+        bottom_transfer = dict(side_transfer)
+        bottom_mode_label = "lumped with side walls"
+    h_bottom = float(bottom_transfer["hOutside_W_m2K"])
+    u_bottom = float(bottom_transfer["U_W_m2K"])
+
+    covered_top_transfer = solve_insulated_surface_u(
+        design_bed_C,
+        ambient_C,
+        horizontal_char_length_m,
+        pressure_Pa,
+        wall_inputs,
+        natural_convection_horizontal_plate_h,
+    )
+    h_top_cover = float(covered_top_transfer["hOutside_W_m2K"])
+    u_top_cover = float(covered_top_transfer["U_W_m2K"])
+    side_bottom_node_m2 = 0.5 * side_area_m2
+    side_top_node_m2 = 0.5 * side_area_m2
 
     if bool(bin_inputs.get("openTop", True)):
-        top_char_length_m = top_area_m2 / max(2.0 * (L + W), 1e-12)
         h_top = natural_convection_horizontal_plate_h(
             design_bed_C,
-            float(env_inputs.get("greenhouseAir_C", -15.0)),
-            top_char_length_m,
-            float(env_inputs.get("pressure_Pa", 101325.0)),
+            ambient_C,
+            horizontal_char_length_m,
+            pressure_Pa,
         )
-        ua_top = u_wall * top_wall_area_m2 + h_top * top_area_m2
-        ua_total = u_wall * (side_area_m2 + bottom_area_m2) + h_top * top_area_m2
+        ua_top = u_side * side_top_node_m2 + h_top * top_area_m2
+        ua_total = u_side * side_area_m2 + u_bottom * bottom_area_m2 + h_top * top_area_m2
         open_top_area_m2 = top_area_m2
         top_mode = "open top"
     elif vent_area_m2 > 0.0:
@@ -5153,18 +5710,18 @@ def build_bin_model_from_inputs(bin_inputs: dict, wall_inputs: dict, env_inputs:
         vent_char_length_m = vent_area_m2 / vent_perimeter_m
         h_top = natural_convection_horizontal_plate_h(
             design_bed_C,
-            float(env_inputs.get("greenhouseAir_C", -15.0)),
+            ambient_C,
             vent_char_length_m,
-            float(env_inputs.get("pressure_Pa", 101325.0)),
+            pressure_Pa,
         )
-        ua_top = u_wall * (covered_top_area_m2 + top_wall_area_m2) + h_top * vent_area_m2
-        ua_total = u_wall * (side_area_m2 + bottom_area_m2 + covered_top_area_m2) + h_top * vent_area_m2
+        ua_top = u_side * side_top_node_m2 + u_top_cover * covered_top_area_m2 + h_top * vent_area_m2
+        ua_total = u_side * side_area_m2 + u_bottom * bottom_area_m2 + u_top_cover * covered_top_area_m2 + h_top * vent_area_m2
         open_top_area_m2 = vent_area_m2
         top_mode = "covered top with vent hole"
     else:
-        h_top = u_wall
-        ua_top = u_wall * (top_area_m2 + top_wall_area_m2)
-        ua_total = u_wall * total_area_m2
+        h_top = h_top_cover
+        ua_top = u_side * side_top_node_m2 + u_top_cover * top_area_m2
+        ua_total = u_side * side_area_m2 + u_bottom * bottom_area_m2 + u_top_cover * top_area_m2
         open_top_area_m2 = 0.0
         top_mode = "covered top"
 
@@ -5175,7 +5732,9 @@ def build_bin_model_from_inputs(bin_inputs: dict, wall_inputs: dict, env_inputs:
     interface_thickness_m = max(H / 2.0, 1e-9)
     ua_internal = float(bin_inputs.get("k_W_mK", 0.45)) * interface_area_m2 / interface_thickness_m
     lc_m = volume_m3 / max(total_area_m2, 1e-12)
-    bi_lumped = h_ext * lc_m / max(float(bin_inputs.get("k_W_mK", 0.45)), 1e-12)
+    h_ext_ref = max(h_side, h_bottom, h_top)
+    u_ext = ua_total / max(total_area_m2, 1e-12)
+    bi_lumped = h_ext_ref * lc_m / max(float(bin_inputs.get("k_W_mK", 0.45)), 1e-12)
 
     return {
         "totalArea_m2": total_area_m2,
@@ -5184,11 +5743,24 @@ def build_bin_model_from_inputs(bin_inputs: dict, wall_inputs: dict, env_inputs:
         "coveredTopArea_m2": covered_top_area_m2,
         "openTopArea_m2": open_top_area_m2,
         "ventHoleArea_m2": vent_area_m2,
-        "externalH_W_m2K": h_ext,
+        "bottomBoundaryMode": bottom_mode_label,
+        # Backward-compatible side-wall natural-convection h output.
+        "externalH_W_m2K": h_side,
+        # Geometry-inclusive exterior effective coefficient: U_ext = UA_total / A_total.
+        "externalU_W_m2K": u_ext,
+        "externalHRef_W_m2K": h_ext_ref,
+        "sideAmbientH_W_m2K": h_side,
+        "bottomAmbientH_W_m2K": h_bottom,
         "topAmbientH_W_m2K": h_top,
-        "Uwall_W_m2K": u_wall,
+        "coveredTopAmbientH_W_m2K": h_top_cover,
+        "sideOuterSurface_C": float(side_transfer["surfaceTemperature_C"]),
+        "bottomOuterSurface_C": float(bottom_transfer["surfaceTemperature_C"]),
+        "coveredTopOuterSurface_C": float(covered_top_transfer["surfaceTemperature_C"]),
+        "Uwall_W_m2K": u_side,
+        "Ubottom_W_m2K": u_bottom,
+        "UtopCovered_W_m2K": u_top_cover,
         "UAtotalAmbient_W_K": ua_total,
-        "UAbottomAmbient_W_K": u_wall * abottom_node_m2,
+        "UAbottomAmbient_W_K": u_bottom * bottom_area_m2 + u_side * side_bottom_node_m2,
         "UAtopAmbient_W_K": ua_top,
         "UAinternal_W_K": ua_internal,
         "Ctotal_J_K": c_total,
@@ -5213,7 +5785,14 @@ def lumped_loss_model_from_bin(bin_model: dict, ambient_C: float, design_bed_C: 
         "tau_h": tau_s / 3600.0,
         "Bi_lumped": float(bin_model["Bi_lumped"]),
         "lumpedStrictlyValid": bool(bin_model["lumpedStrictlyValid"]),
+        "externalU_W_m2K": float(bin_model.get("externalU_W_m2K", np.nan)),
         "externalH_W_m2K": float(bin_model["externalH_W_m2K"]),
+        "externalHRef_W_m2K": float(bin_model.get("externalHRef_W_m2K", bin_model["externalH_W_m2K"])),
+        "sideAmbientH_W_m2K": float(bin_model.get("sideAmbientH_W_m2K", bin_model["externalH_W_m2K"])),
+        "bottomAmbientH_W_m2K": float(bin_model.get("bottomAmbientH_W_m2K", bin_model["externalH_W_m2K"])),
+        "topAmbientH_W_m2K": float(bin_model.get("topAmbientH_W_m2K", bin_model["externalH_W_m2K"])),
+        "coveredTopAmbientH_W_m2K": float(bin_model.get("coveredTopAmbientH_W_m2K", bin_model.get("topAmbientH_W_m2K", bin_model["externalH_W_m2K"]))),
+        "bottomBoundaryMode": str(bin_model.get("bottomBoundaryMode", "unspecified")),
     }
 
 
@@ -6402,7 +6981,7 @@ def append_moisture_process(lines: list[str], payload: dict, config: dict) -> No
     lines.append("Perforation and moisture process:")
     lines.append("  Per-hole release and moisture loss are evaluated explicitly for the aeration tubes.")
     lines.append("  Source map                           : Frederickson et al. (2007) Table 3 particle-size data,")
-    lines.append("                                         Churchill-Bernstein hole convection, Lewis relation,")
+    lines.append("                                         Idel'chik orifice discharge, Frössling Sherwood transfer,")
     lines.append("                                         and IAPWS saturation/latent-heat relations")
     if {"holesPerTube", "holeDiameter_m"} <= perforation_inputs.keys():
         hole_area_m2 = np.pi * float(perforation_inputs["holeDiameter_m"]) ** 2 / 4.0
@@ -6423,7 +7002,8 @@ def append_moisture_process(lines: list[str], payload: dict, config: dict) -> No
     lines.append("  Diffusion limit                      : m_diffusion = h_m A (rho_v,sat(T_surface) - rho_v,bulk)")
     lines.append("                                         the diffusion, carrying-capacity, and heat-limited")
     lines.append("                                         evaporation rates are all evaluated in kg/s")
-    lines.append("  Heat-mass analogy                    : h_m = h / (rho c_p Le^(2/3)); h comes from the hole-scale convection correlation")
+    lines.append("  Hole-scale mass-transfer model       : Sh_h = M_Sh (2 + 0.552 Re_h^(1/2) Sc^(1/3)) with Sc = 0.60")
+    lines.append("                                         and h_m = Sh_h D_va / d_h, D_va = mu / (rho Sc)")
     lines.append("  Sensible-to-latent cap               : m_heat = q_available / h_fg")
     if evaporation_inputs:
         wetted_area_basis = str(evaporation_inputs.get("wettedAreaBasis", "manual")).strip().lower()
@@ -6431,8 +7011,7 @@ def append_moisture_process(lines: list[str], payload: dict, config: dict) -> No
             "  Moisture-state inputs                : "
             f"RH {100 * rh_value:.0f}%, "
             f"surface temp {surface_temp_value:.1f} C, "
-            f"wetted area {wetted_area:.3f} m^2, "
-            f"Lewis factor {float(evaporation_inputs.get('lewisFactor', np.nan)):.2f}"
+            f"wetted area {wetted_area:.3f} m^2"
         )
         if wetted_area_basis == "top_plan_area":
             wet_fraction = float(evaporation_inputs.get("wettedAreaFraction", 1.0))
@@ -6484,10 +7063,10 @@ def append_moisture_process(lines: list[str], payload: dict, config: dict) -> No
             lines.append("                                         assumes the Table 3 mass fractions represent equal-density")
             lines.append("                                         agglomerate classes, so the external particle area follows")
             lines.append("                                         the Sauter-mean relation for equivalent spheres")
-    if "evaporationHMultiplier" in calibration_inputs:
+    if "evaporationSherwoodMultiplier" in calibration_inputs or "evaporationHMultiplier" in calibration_inputs:
         lines.append(
-            "  Evaporation h multiplier             : "
-            f"{float(calibration_inputs['evaporationHMultiplier']):.2f}"
+            "  Evaporation Sherwood multiplier      : "
+            f"{float(calibration_inputs.get('evaporationSherwoodMultiplier', calibration_inputs.get('evaporationHMultiplier', np.nan))):.2f}"
         )
     if mode == COOLING_MODE:
         lines.append(
@@ -6528,6 +7107,15 @@ def append_radial_profile_process(lines: list[str], payload: dict, config: dict)
     lines.append("                                         limited stepwise by plume carrying capacity and by the")
     lines.append("                                         remaining sensible enthalpy above T_sink")
     lines.append("  Plume-radius law                     : b(x) = b0 + alpha x, with optional cap b_max")
+    if str(radial.get("spread_model", "legacy_constant")) == "entrainment_constant":
+        lines.append("  Plume spread closure                 : option 1 empirical entrainment model")
+        lines.append(
+            "                                         alpha = C_ent alpha_ent with "
+            f"C_ent={float(radial.get('entrainment_to_spread_factor', np.nan)):.3f}, "
+            f"alpha_ent={float(radial.get('entrainment_coefficient', np.nan)):.3f}"
+        )
+    else:
+        lines.append("  Plume spread closure                 : legacy fixed spread-rate override")
     lines.append(
         "  Tube outer radius                    : "
         f"{1000.0 * float(radial['tube_outer_radius_m']):.1f} mm"
@@ -6550,6 +7138,12 @@ def append_radial_profile_process(lines: list[str], payload: dict, config: dict)
     lines.append(f"  Selected outlet temperature          : {float(active_reference_point(payload).get('airOutlet_C', np.nan)):.1f} C")
     lines.append(f"  Sink temperature used                : {float(radial['sink_C']):.1f} C")
     lines.append(f"  Bed reference temperature            : {float(radial['bed_ref_C']):.1f} C")
+    lines.append(
+        "  Bed-reference interpolation          : "
+        f"y_tube={1000.0 * float(radial['tube_center_height_m']):.1f} mm, "
+        f"H_fill={1000.0 * float(radial['fill_height_m']):.1f} mm, "
+        f"eta={float(radial['tube_height_fraction']):.3f}"
+    )
     lines.append(f"  Wetted-area density                  : {float(radial['area_density_m2_m3']):.1f} m^2/m^3")
     lines.append(f"  Base sensible coefficient            : {float(radial['h_sensible_W_m2K']):.2f} W/m^2-K")
     lines.append(f"  Mean latent coefficient              : {float(radial['h_latent_W_m2K']):.2f} W/m^2-K")
@@ -6694,24 +7288,27 @@ def append_tube_layout_process(
     )
     lines.append("                                         safe-distance exclusion cylinders")
     wall_return = dict(layout.get("wall_return", {}))
-    if any(float(wall_return.get(f"{side}_depth_m", 0.0)) > 0 for side in ("left", "right", "bottom")):
+    if any(float(wall_return.get(f"{side}_depth_m", 0.0)) > 0 for side in ("left", "right", "bottom", "top")):
         lines.append(
             "  Wall-return unsafe depths            : "
             f"left {1000.0 * float(wall_return.get('left_depth_m', 0.0)):.1f} mm, "
             f"right {1000.0 * float(wall_return.get('right_depth_m', 0.0)):.1f} mm, "
-            f"bottom {1000.0 * float(wall_return.get('bottom_depth_m', 0.0)):.1f} mm"
+            f"bottom {1000.0 * float(wall_return.get('bottom_depth_m', 0.0)):.1f} mm, "
+            f"top {1000.0 * float(wall_return.get('top_depth_m', 0.0)):.1f} mm"
         )
         lines.append(
             "  Wall plume-contact temperatures      : "
             f"left {float(wall_return.get('left_contactTemp_C', np.nan)):.1f} C, "
             f"right {float(wall_return.get('right_contactTemp_C', np.nan)):.1f} C, "
-            f"bottom {float(wall_return.get('bottom_contactTemp_C', np.nan)):.1f} C"
+            f"bottom {float(wall_return.get('bottom_contactTemp_C', np.nan)):.1f} C, "
+            f"top {float(wall_return.get('top_contactTemp_C', np.nan)):.1f} C"
         )
         lines.append(
             "  Predicted inner-wall temperatures    : "
             f"left {float(wall_return.get('left_wallTemp_C', np.nan)):.1f} C, "
             f"right {float(wall_return.get('right_wallTemp_C', np.nan)):.1f} C, "
-            f"bottom {float(wall_return.get('bottom_wallTemp_C', np.nan)):.1f} C"
+            f"bottom {float(wall_return.get('bottom_wallTemp_C', np.nan)):.1f} C, "
+            f"top {float(wall_return.get('top_wallTemp_C', np.nan)):.1f} C"
         )
     lines.append(
         "  Overlap evaluation method            : overlap-aware union area on a "
@@ -6874,11 +7471,11 @@ def write_design_point_block(
         return
 
     n_tubes = int(aeration_inputs.get("nParallelTubes", 1))
-    branch_flow_lpm = float(rec["totalFlow_Lpm"]) / max(n_tubes, 1)
-    branch_current_a = float(rec["totalCurrent_A"]) / max(n_tubes, 1)
-    branch_power_w = float(rec["totalPower_W"]) / max(n_tubes, 1)
-    branch_resistance_ohm = float(rec["voltage_V"]) / max(branch_current_a, 1e-9)
-    supply_eq_resistance_ohm = float(rec["voltage_V"]) / max(float(rec["totalCurrent_A"]), 1e-9)
+    branch_flow_lpm = float(rec.get("branchFlowMean_Lpm", rec.get("branchFlow_Lpm", float(rec["totalFlow_Lpm"]) / max(n_tubes, 1))))
+    branch_current_a = float(rec.get("tubeCurrentMean_A", rec.get("branchCurrent_A", float(rec["totalCurrent_A"]) / max(n_tubes, 1))))
+    branch_power_w = float(rec.get("tubePowerMean_W", rec.get("branchPower_W", float(rec["totalPower_W"]) / max(n_tubes, 1))))
+    branch_resistance_ohm = float(rec.get("branchResistance_Ohm", float(rec["voltage_V"]) / max(branch_current_a, 1e-9)))
+    supply_eq_resistance_ohm = float(rec.get("supplyEquivalentResistance_Ohm", float(rec["voltage_V"]) / max(float(rec["totalCurrent_A"]), 1e-9)))
     wire_length_m = rec.get("wireLength_m")
     if wire_length_m is None or not np.isfinite(float(wire_length_m)):
         wire_length_m = compute_wire_length_m(float(rec["pitch_mm"]), heater_inputs, wire_inputs)
@@ -6891,6 +7488,13 @@ def write_design_point_block(
         f"{float(rec['totalPower_W']):.1f} W, {float(rec['totalCurrent_A']):.2f} A, {float(rec['totalFlow_Lpm']):.1f} L/min"
     )
     lines.append(f"  Branch flow                        : {branch_flow_lpm:.1f} L/min")
+    if np.isfinite(float(rec.get("branchFlowMin_Lpm", np.nan))) and np.isfinite(float(rec.get("branchFlowMax_Lpm", np.nan))):
+        branch_flow_span = abs(float(rec.get("branchFlowMax_Lpm", np.nan)) - float(rec.get("branchFlowMin_Lpm", np.nan)))
+        if branch_flow_span > 0.05:
+            lines.append(
+                "  Branch flow range                  : "
+                f"{float(rec['branchFlowMin_Lpm']):.1f} to {float(rec['branchFlowMax_Lpm']):.1f} L/min"
+            )
     if wire_length_m is not None:
         lines.append(f"  Branch wire length                 : {wire_length_m:.2f} m")
     if "coilSpan_m" in heater_inputs:
@@ -6914,6 +7518,13 @@ def write_design_point_block(
     lines.append(f"  Total heat to bed                  : {float(rec['QtoBed_W']):.1f} W")
     lines.append(f"  Duty needed at design loss         : {float(rec['dutyNeeded']):.2f}")
     lines.append(f"  Total pressure drop                : {float(rec['deltaP_Pa']):.1f} Pa")
+    if bool(rec.get("hydraulicRedistributionSolved", False)):
+        lines.append(
+            "  Hydraulic redistribution           : solved across mixed branch groups; "
+            f"pressure-balance residual {float(rec.get('pressureBalanceResidual_Pa', np.nan)):.2f} Pa"
+        )
+        if str(rec.get("pressureControlGroupLabel", "")).strip():
+            lines.append(f"  Pressure-controlling group         : {str(rec['pressureControlGroupLabel'])}")
     if np.isfinite(float(rec.get("distributionDeltaP_Pa", np.nan))):
         lines.append(f"  Distribution manifold dP          : {float(rec['distributionDeltaP_Pa']):.1f} Pa")
         lines.append(
@@ -6924,6 +7535,24 @@ def write_design_point_block(
             f"connector friction {float(rec.get('distributionConnectorFriction_Pa', 0.0)):.1f}, "
             f"connector->branch {float(rec.get('distributionConnectorToBranch_Pa', 0.0)):.1f} Pa"
         )
+    if np.isfinite(float(rec.get("heaterTubeDeltaP_Pa", np.nan))):
+        lines.append(
+            "  Branch dP components               : "
+            f"heater {float(rec.get('heaterTubeDeltaP_Pa', 0.0)):.1f}, "
+            f"of which tube friction {float(rec.get('heaterTubeFrictionDeltaP_Pa', 0.0)):.1f}, "
+            f"coil obstruction {float(rec.get('heaterCoilObstructionDeltaP_Pa', 0.0)):.1f}, "
+            f"heater->aeration expansion {float(rec.get('heaterToAerationExpansionDeltaP_Pa', 0.0)):.1f}, "
+            f"aeration {float(rec.get('aerationDeltaP_Pa', 0.0)):.1f} Pa"
+        )
+    if isinstance(rec.get("groupPressureStates"), list) and len(rec.get("groupPressureStates", [])) > 1:
+        lines.append("  Mixed group branch states          :")
+        for entry in rec.get("groupPressureStates", []):
+            lines.append(
+                "    "
+                f"{str(entry.get('groupLabel', ''))}: flow {float(entry.get('branchFlow_Lpm', np.nan)):.1f} L/min, "
+                f"path dP {float(entry.get('privatePathDeltaP_Pa', np.nan)):.1f} Pa, "
+                f"coil dP {float(entry.get('heaterCoilObstructionDeltaP_Pa', np.nan)):.1f} Pa"
+            )
     if "flowPerHole_Lpm" in rec:
         lines.append(f"  Peak local flow per hole           : {float(rec['flowPerHole_Lpm']):.2f} L/min")
     if "holeVelocity_m_s" in rec:
@@ -6997,6 +7626,13 @@ def write_cooling_design_point_block(lines: list[str], heading: str, rec: dict, 
     lines.append(f"  Substrate water loss               : {float(rec['waterLoss_kg_day']):.2f} kg/24 h")
     lines.append(f"  Latent evaporation load            : {float(rec['latentEvap_W']):.1f} W")
     lines.append(f"  Total pressure drop                : {float(rec['deltaP_Pa']):.1f} Pa")
+    if bool(rec.get("hydraulicRedistributionSolved", False)):
+        lines.append(
+            "  Hydraulic redistribution           : solved across mixed branch groups; "
+            f"pressure-balance residual {float(rec.get('pressureBalanceResidual_Pa', np.nan)):.2f} Pa"
+        )
+        if str(rec.get("pressureControlGroupLabel", "")).strip():
+            lines.append(f"  Pressure-controlling group         : {str(rec['pressureControlGroupLabel'])}")
     if np.isfinite(float(rec.get("distributionDeltaP_Pa", np.nan))):
         lines.append(f"  Distribution manifold dP          : {float(rec['distributionDeltaP_Pa']):.1f} Pa")
         lines.append(
@@ -7007,6 +7643,24 @@ def write_cooling_design_point_block(lines: list[str], heading: str, rec: dict, 
             f"connector friction {float(rec.get('distributionConnectorFriction_Pa', 0.0)):.1f}, "
             f"connector->branch {float(rec.get('distributionConnectorToBranch_Pa', 0.0)):.1f} Pa"
         )
+    if np.isfinite(float(rec.get("heaterTubeDeltaP_Pa", np.nan))):
+        lines.append(
+            "  Branch dP components               : "
+            f"heater {float(rec.get('heaterTubeDeltaP_Pa', 0.0)):.1f}, "
+            f"of which tube friction {float(rec.get('heaterTubeFrictionDeltaP_Pa', 0.0)):.1f}, "
+            f"coil obstruction {float(rec.get('heaterCoilObstructionDeltaP_Pa', 0.0)):.1f}, "
+            f"heater->aeration expansion {float(rec.get('heaterToAerationExpansionDeltaP_Pa', 0.0)):.1f}, "
+            f"aeration {float(rec.get('aerationDeltaP_Pa', 0.0)):.1f} Pa"
+        )
+    if isinstance(rec.get("groupPressureStates"), list) and len(rec.get("groupPressureStates", [])) > 1:
+        lines.append("  Mixed group branch states          :")
+        for entry in rec.get("groupPressureStates", []):
+            lines.append(
+                "    "
+                f"{str(entry.get('groupLabel', ''))}: flow {float(entry.get('branchFlow_Lpm', np.nan)):.1f} L/min, "
+                f"path dP {float(entry.get('privatePathDeltaP_Pa', np.nan)):.1f} Pa, "
+                f"coil dP {float(entry.get('heaterCoilObstructionDeltaP_Pa', np.nan)):.1f} Pa"
+            )
     if np.isfinite(float(rec.get("assistBlowerAvailablePressure_Pa", np.nan))):
         lines.append(
             f"  Assist-blower static-pressure margin: "
@@ -7214,7 +7868,16 @@ def write_cooling_summary(payload: dict, config: dict, output_dir: Path) -> None
     )
     append_line(lines, f"Lumped cooling requirement at {float(cooling_cfg['designBed_C']):.1f} C bed", f"{float(payload['requiredCooling_W']):.1f} W")
     append_line(lines, "Overall UA to ambient air", f"{float(lumped_loss.get('UA_W_K', np.nan)):.3f} W/K")
-    append_line(lines, "External natural-convection h estimate", f"{float(lumped_loss.get('externalH_W_m2K', np.nan)):.2f} W/m^2-K")
+    if "externalU_W_m2K" in lumped_loss:
+        append_line(lines, "Effective exterior U_ext", f"{float(lumped_loss['externalU_W_m2K']):.3f} W/m^2-K")
+    if "bottomBoundaryMode" in lumped_loss:
+        append_line(lines, "Bottom boundary treatment", str(lumped_loss["bottomBoundaryMode"]))
+    if "sideAmbientH_W_m2K" in lumped_loss:
+        append_line(lines, "Side-wall natural-convection h", f"{float(lumped_loss['sideAmbientH_W_m2K']):.2f} W/m^2-K")
+        append_line(lines, "Bottom natural-convection h", f"{float(lumped_loss['bottomAmbientH_W_m2K']):.2f} W/m^2-K")
+        append_line(lines, "Top natural-convection h", f"{float(lumped_loss['topAmbientH_W_m2K']):.2f} W/m^2-K")
+    else:
+        append_line(lines, "External natural-convection h estimate", f"{float(lumped_loss.get('externalH_W_m2K', np.nan)):.2f} W/m^2-K")
     append_line(lines, "Lumped time constant", f"{float(lumped_loss.get('tau_h', np.nan)):.1f} h")
     append_line(lines, "Lumped Biot number estimate", f"{float(lumped_loss.get('Bi_lumped', np.nan)):.2f}")
     append_line(lines, "Hard-safe cooling points found", f"{hard_safe_count} of {len(payload['design_points'])}")
@@ -7482,7 +8145,15 @@ def write_summary(payload: dict, config: dict, output_dir: Path) -> None:
         append_line(lines, "Overall UA to greenhouse air", f"{float(lumped_loss['UA_W_K']):.3f} W/K")
     elif "overallUA_W_K" in summary_inputs:
         append_line(lines, "Overall UA to greenhouse air", f"{float(summary_inputs['overallUA_W_K']):.3f} W/K")
-    if "externalH_W_m2K" in lumped_loss:
+    if "externalU_W_m2K" in lumped_loss:
+        append_line(lines, "Effective exterior U_ext", f"{float(lumped_loss['externalU_W_m2K']):.3f} W/m^2-K")
+    if "bottomBoundaryMode" in lumped_loss:
+        append_line(lines, "Bottom boundary treatment", str(lumped_loss["bottomBoundaryMode"]))
+    if "sideAmbientH_W_m2K" in lumped_loss:
+        append_line(lines, "Side-wall natural-convection h", f"{float(lumped_loss['sideAmbientH_W_m2K']):.2f} W/m^2-K")
+        append_line(lines, "Bottom natural-convection h", f"{float(lumped_loss['bottomAmbientH_W_m2K']):.2f} W/m^2-K")
+        append_line(lines, "Top natural-convection h", f"{float(lumped_loss['topAmbientH_W_m2K']):.2f} W/m^2-K")
+    elif "externalH_W_m2K" in lumped_loss:
         append_line(lines, "External natural-convection h estimate", f"{float(lumped_loss['externalH_W_m2K']):.2f} W/m^2-K")
     elif "externalNaturalConvection_h_W_m2K" in summary_inputs:
         append_line(lines, "External natural-convection h estimate", f"{float(summary_inputs['externalNaturalConvection_h_W_m2K']):.2f} W/m^2-K")
@@ -7836,3 +8507,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

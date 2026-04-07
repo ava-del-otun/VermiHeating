@@ -9,7 +9,7 @@ Design specifications:
   Vent specification                     : 1 vent hole(s), 25.0 mm diameter each, area per hole 0.000491 m^2, total vent area 0.000491 m^2
   Vessel wall stack                       : 1.5 mm steel (k = 50.0 W/m-K) + 150.0 mm insulation (k = 0.040 W/m-K)
   Heater tube                             : L 0.300 m, ID 15.0 mm, OD 19.0 mm, insulation 10.0 mm
-  Heater coil geometry                    : mean D 11.5 mm, pitch 10.0 mm, axial span 300.0 mm
+  Heater coil geometry                    : mean D 11.5 mm, pitch 12.0 mm, axial span 300.0 mm
   Aeration network                        : 8 tubes, each L 1.22 m, ID 50.0 mm, OD 53.0 mm
   Distribution manifold                  : no separate header; 8-way splitter(s), splitter inlet ID 19.0 mm, branch connector ID 19.0 mm, connector length 0.000 m
   Contraction model                      : Idel'chik conical converging bellmouth without end wall, 60 deg
@@ -33,7 +33,7 @@ Lumped-capacitance criterion               : Bi < 0.1 NOT satisfied
 Minimum total flow at 100% duty, 60.0 C cap: 61.7 L/min
 Minimum total flow at 90% duty, 60.0 C cap : 65.1 L/min
 Maximum allowed total current              : 15.0 A
-Feasible operating points found            : 273 of 50000
+Feasible operating points found            : 285 of 50000
 
 Export/config consistency warnings:
   - Configured voltage sweep (2.0 to 120.0, 80 points) differs from loaded export (2.0 to 120.0, 100 points); rerun analyze_vermicomposter_heater.py to update the physics dataset.
@@ -42,8 +42,8 @@ Export/config consistency warnings:
 
 Vessel configuration comparison:
   config                    UA(W/K)  Qreq(W)  Flow100  Flow20  Pref(W)  Qref(L/min)  Iref(A)  status
-  Covered top                1.448     53.6     61.5    64.9    482.5       322.8     5.57  feasible
-  Covered top + vent         1.454     53.8     61.7    65.1    406.8       260.6     5.12  feasible
+  Covered top                1.448     53.6     61.5    64.9    416.4       260.6     4.08  feasible
+  Covered top + vent         1.454     53.8     61.7    65.1    729.5       515.2     7.40  feasible
   Uncovered top             10.501    388.5    445.6   470.3   1046.2       600.0     8.81  best-available only
 
 Selection process:
@@ -107,7 +107,7 @@ Optimization process:
 Perforation and moisture process:
   Per-hole release and moisture loss are evaluated explicitly for the aeration tubes.
   Source map                           : Frederickson et al. (2007) Table 3 particle-size data,
-                                         Churchill-Bernstein hole convection, Lewis relation,
+                                         Idel'chik orifice discharge, Frössling Sherwood transfer,
                                          and IAPWS saturation/latent-heat relations
   Perforation geometry                 : 100 holes/tube, 5.0 mm diameter, area per hole 0.00001963 m^2
   Perforation discharge coefficient    : 0.60
@@ -117,9 +117,10 @@ Perforation and moisture process:
   Diffusion limit                      : m_diffusion = h_m A (rho_v,sat(T_surface) - rho_v,bulk)
                                          the diffusion, carrying-capacity, and heat-limited
                                          evaporation rates are all evaluated in kg/s
-  Heat-mass analogy                    : h_m = h / (rho c_p Le^(2/3)); h comes from the hole-scale convection correlation
+  Hole-scale mass-transfer model       : Sh_h = M_Sh (2 + 0.552 Re_h^(1/2) Sc^(1/3)) with Sc = 0.60
+                                         and h_m = Sh_h D_va / d_h, D_va = mu / (rho Sc)
   Sensible-to-latent cap               : m_heat = q_available / h_fg
-  Moisture-state inputs                : RH 80%, surface temp 20.0 C, wetted area 612.297 m^2, Lewis factor 1.00
+  Moisture-state inputs                : RH 80%, surface temp 20.0 C, wetted area 612.297 m^2
   Wetted-area basis                    : particle-surface estimate from Frederickson et al. (2007), Table 3
   Table 3 windrow fractions            : > 40 mm 9.8%, 20-40 mm 26.6%, 10-20 mm 26.6%, < 10 mm 37.0%
   Table 3 vermicompost fractions       : > 40 mm 7.9%, 20-40 mm 6.9%, 10-20 mm 19.8%, < 10 mm 65.3%
@@ -131,7 +132,7 @@ Perforation and moisture process:
                                          assumes the Table 3 mass fractions represent equal-density
                                          agglomerate classes, so the external particle area follows
                                          the Sauter-mean relation for equivalent spheres
-  Evaporation h multiplier             : 1.00
+  Evaporation Sherwood multiplier      : 1.00
   Water-loss constraint                : predicted sprinkler make-up must stay at or below 10.0 kg/24 h
   Velocity-limit interpretation        : there is no single fixed hole-velocity limit independent of
                                          voltage, temperature, humidity, and flow; the dashed red
@@ -159,17 +160,17 @@ Radial air-cooling profile:
   Initial plume radius                 : 2.5 mm
   Plume spreading rate                 : 0.150 m plume radius per m radial distance
   Maximum plume radius                 : none; plume radius grows linearly across the plotted range
-  Selected outlet temperature          : 51.1 C
+  Selected outlet temperature          : 45.3 C
   Sink temperature used                : 26.5 C
   Bed reference temperature            : 26.5 C
   Wetted-area density                  : 749.3 m^2/m^3
   Base sensible coefficient            : 8.00 W/m^2-K
-  Mean latent coefficient              : 26.98 W/m^2-K
-  Mean combined sink coefficient       : 34.98 W/m^2-K
-  Released mass flow per tube length   : 0.000608 kg/s-m
-  Initial / final plume RH             : 1.5% -> 41.6%
-  Initial / final vapor density        : 0.0013 -> 0.0104 kg/m^3
-  Integrated radial sensible / latent  : 3.12 W and 11.94 W
+  Mean latent coefficient              : 40.94 W/m^2-K
+  Mean combined sink coefficient       : 48.94 W/m^2-K
+  Released mass flow per tube length   : 0.001203 kg/s-m
+  Initial / final plume RH             : 1.9% -> 34.8%
+  Initial / final vapor density        : 0.0013 -> 0.0087 kg/m^3
+  Integrated radial sensible / latent  : 3.78 W and 19.00 W
   Safe distance result                 : no finite crossing in this simple model because
                                          the profile asymptote stays above 26.0 C
 
@@ -195,47 +196,47 @@ Tube layout and worm-habitat exclusion:
   Exclusion-overlap correction         : 0.0000 m^3 removed from the naive sum of 8
                                          safe-distance exclusion cylinders
   Wall-return unsafe depths            : left 122.0 mm, right 122.0 mm, bottom 54.9 mm
-  Wall plume-contact temperatures      : left 32.4 C, right 32.4 C, bottom 49.6 C
-  Predicted inner-wall temperatures    : left 31.1 C, right 31.1 C, bottom 47.8 C
+  Wall plume-contact temperatures      : left 35.4 C, right 35.4 C, bottom 44.6 C
+  Predicted inner-wall temperatures    : left 34.0 C, right 34.0 C, bottom 42.9 C
   Overlap evaluation method            : overlap-aware union area on a 700 x 700 midpoint grid
                                          clipped to the filled-bed rectangle, then extruded over the
                                          aeration-tube length to obtain volume; the final unsafe union
                                          includes both plume exclusion cylinders and 1D wall-return bands
 
 Helical geometry trade studies:
-  Wire diameter study                 : hard-safe optimum at 0.127 mm, colder node 27.5 C, Qbed 63.7 W
-  Coil mean diameter study            : best-available only at 14.690 mm, colder node 10.4 C, Qbed 38.1 W
-  Wire length study                   : best-available only at 2.800 m, colder node 11.4 C, Qbed 39.6 W
+  Wire diameter study                 : best-available only at 0.127 mm, colder node 18.8 C, Qbed 50.7 W
+  Coil mean diameter study            : best-available only at 14.690 mm, colder node 3.0 C, Qbed 27.0 W
+  Wire length study                   : best-available only at 2.800 m, colder node 5.8 C, Qbed 31.1 W
 
 NSGA-II reported feasible Pareto design point:
   Configuration                      : closed top with vents
-  Pitch                              : 10.0 mm
-  Supply voltage per branch          : 79.5 V
-  Total flow                         : 260.6 L/min
-  Selected operating trio            : 406.8 W, 5.12 A, 260.6 L/min
-  Branch flow                        : 32.6 L/min
-  Branch wire length                 : 1.12 m
+  Pitch                              : 12.0 mm
+  Supply voltage per branch          : 98.5 V
+  Total flow                         : 515.2 L/min
+  Selected operating trio            : 729.5 W, 7.40 A, 515.2 L/min
+  Branch flow                        : 64.4 L/min
+  Branch wire length                 : 0.95 m
   Branch coil axial length           : 0.30 m
   Wire gauge / diameter              : 31 AWG / 0.227 mm
-  Branch resistance                  : 124.20 ohm
-  Supply equivalent resistance       : 15.53 ohm
-  Branch current                     : 0.64 A
-  Total current                      : 5.12 A
-  Branch electrical power            : 50.9 W
-  Total electrical power             : 406.8 W
-  h_wire                             : 425.5 W/m^2-K
-  Branch air outlet temperature      : 51.1 C
-  Max wire temperature               : 193.7 C
-  Total heat to bed                  : 58.7 W
+  Branch resistance                  : 26.63 ohm
+  Supply equivalent resistance       : 13.31 ohm
+  Branch current                     : 1.85 A
+  Total current                      : 7.40 A
+  Branch electrical power            : 91.2 W
+  Total electrical power             : 729.5 W
+  h_wire                             : 579.0 W/m^2-K
+  Branch air outlet temperature      : 45.3 C
+  Max wire temperature               : 268.3 C
+  Total heat to bed                  : 58.6 W
   Duty needed at design loss         : 0.92
-  Total pressure drop                : 23.3 Pa
-  Distribution manifold dP          : 3.0 Pa
-  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 2.5, connector friction 0.0, connector->branch 0.5 Pa
-  Peak local flow per hole           : 0.44 L/min
-  Peak hole velocity                 : 0.37 m/s
-  Water loss / sprinkler make-up     : 4.07 kg/24 h
-  Latent evaporation load            : 115.2 W
-  Full-power bed estimate            : bottom 26.5 C, top 24.2 C
+  Total pressure drop                : 698.1 Pa
+  Distribution manifold dP          : 21.6 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 19.6, connector friction 0.0, connector->branch 2.0 Pa
+  Peak local flow per hole           : 0.82 L/min
+  Peak hole velocity                 : 0.69 m/s
+  Water loss / sprinkler make-up     : 7.64 kg/24 h
+  Latent evaporation load            : 216.6 W
+  Full-power bed estimate            : bottom 26.5 C, top 24.1 C
   Status                             : meets all hard constraints and the heating target
   Note                               : 90% duty is not achieved;
                                        more tubes help local temperature
@@ -244,32 +245,32 @@ NSGA-II reported feasible Pareto design point:
 
 Best-available active reference point:
   Configuration                      : closed top with vents
-  Pitch                              : 6.0 mm
-  Supply voltage per branch          : 78.3 V
-  Total flow                         : 136.2 L/min
-  Selected operating trio            : 245.3 W, 3.13 A, 136.2 L/min
-  Branch flow                        : 17.0 L/min
-  Branch wire length                 : 1.83 m
+  Pitch                              : 8.0 mm
+  Supply voltage per branch          : 71.1 V
+  Total flow                         : 147.5 L/min
+  Selected operating trio            : 266.0 W, 3.74 A, 147.5 L/min
+  Branch flow                        : 18.4 L/min
+  Branch wire length                 : 1.39 m
   Branch coil axial length           : 0.30 m
   Wire gauge / diameter              : 31 AWG / 0.227 mm
-  Branch resistance                  : 199.84 ohm
-  Supply equivalent resistance       : 24.98 ohm
-  Branch current                     : 0.39 A
-  Total current                      : 3.13 A
-  Branch electrical power            : 30.7 W
-  Total electrical power             : 245.3 W
-  h_wire                             : 321.9 W/m^2-K
-  Branch air outlet temperature      : 59.6 C
-  Max wire temperature               : 129.1 C
+  Branch resistance                  : 38.04 ohm
+  Supply equivalent resistance       : 19.02 ohm
+  Branch current                     : 0.94 A
+  Total current                      : 3.74 A
+  Branch electrical power            : 33.3 W
+  Total electrical power             : 266.0 W
+  h_wire                             : 332.0 W/m^2-K
+  Branch air outlet temperature      : 58.9 C
+  Max wire temperature               : 155.3 C
   Total heat to bed                  : 55.7 W
   Duty needed at design loss         : 0.97
-  Total pressure drop                : 6.2 Pa
-  Distribution manifold dP          : 0.8 Pa
-  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 0.7, connector friction 0.0, connector->branch 0.1 Pa
-  Peak local flow per hole           : 0.25 L/min
-  Peak hole velocity                 : 0.21 m/s
-  Water loss / sprinkler make-up     : 2.18 kg/24 h
-  Latent evaporation load            : 61.9 W
+  Total pressure drop                : 57.6 Pa
+  Distribution manifold dP          : 2.0 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 1.9, connector friction 0.0, connector->branch 0.2 Pa
+  Peak local flow per hole           : 0.26 L/min
+  Peak hole velocity                 : 0.22 m/s
+  Water loss / sprinkler make-up     : 2.44 kg/24 h
+  Latent evaporation load            : 69.1 W
   Full-power bed estimate            : bottom 24.4 C, top 22.2 C
   Status                             : meets all hard constraints and the heating target
   Note                               : 90% duty is not achieved;
@@ -279,33 +280,33 @@ Best-available active reference point:
 
 Covered-top-plus-vent NSGA-II reported design point:
   Configuration                      : closed top with vents
-  Pitch                              : 10.0 mm
-  Supply voltage per branch          : 79.5 V
-  Total flow                         : 260.6 L/min
-  Selected operating trio            : 406.8 W, 5.12 A, 260.6 L/min
-  Branch flow                        : 32.6 L/min
-  Branch wire length                 : 1.12 m
+  Pitch                              : 12.0 mm
+  Supply voltage per branch          : 98.5 V
+  Total flow                         : 515.2 L/min
+  Selected operating trio            : 729.5 W, 7.40 A, 515.2 L/min
+  Branch flow                        : 64.4 L/min
+  Branch wire length                 : 0.95 m
   Branch coil axial length           : 0.30 m
   Wire gauge / diameter              : 31 AWG / 0.227 mm
-  Branch resistance                  : 124.20 ohm
-  Supply equivalent resistance       : 15.53 ohm
-  Branch current                     : 0.64 A
-  Total current                      : 5.12 A
-  Branch electrical power            : 50.9 W
-  Total electrical power             : 406.8 W
-  h_wire                             : 425.5 W/m^2-K
-  Branch air outlet temperature      : 51.1 C
-  Max wire temperature               : 193.7 C
-  Total heat to bed                  : 58.7 W
+  Branch resistance                  : 26.63 ohm
+  Supply equivalent resistance       : 13.31 ohm
+  Branch current                     : 1.85 A
+  Total current                      : 7.40 A
+  Branch electrical power            : 91.2 W
+  Total electrical power             : 729.5 W
+  h_wire                             : 579.0 W/m^2-K
+  Branch air outlet temperature      : 45.3 C
+  Max wire temperature               : 268.3 C
+  Total heat to bed                  : 58.6 W
   Duty needed at design loss         : 0.92
-  Total pressure drop                : 23.3 Pa
-  Distribution manifold dP          : 3.0 Pa
-  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 2.5, connector friction 0.0, connector->branch 0.5 Pa
-  Peak local flow per hole           : 0.44 L/min
-  Peak hole velocity                 : 0.37 m/s
-  Water loss / sprinkler make-up     : 4.07 kg/24 h
-  Latent evaporation load            : 115.2 W
-  Full-power bed estimate            : bottom 26.5 C, top 24.2 C
+  Total pressure drop                : 698.1 Pa
+  Distribution manifold dP          : 21.6 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 19.6, connector friction 0.0, connector->branch 2.0 Pa
+  Peak local flow per hole           : 0.82 L/min
+  Peak hole velocity                 : 0.69 m/s
+  Water loss / sprinkler make-up     : 7.64 kg/24 h
+  Latent evaporation load            : 216.6 W
+  Full-power bed estimate            : bottom 26.5 C, top 24.1 C
   Status                             : meets all hard constraints and the heating target
   Note                               : 90% duty is not achieved;
                                        more tubes help local temperature
@@ -314,32 +315,32 @@ Covered-top-plus-vent NSGA-II reported design point:
 
 Covered-top-plus-vent best-available reference point:
   Configuration                      : closed top with vents
-  Pitch                              : 6.0 mm
-  Supply voltage per branch          : 78.3 V
-  Total flow                         : 136.2 L/min
-  Selected operating trio            : 245.3 W, 3.13 A, 136.2 L/min
-  Branch flow                        : 17.0 L/min
-  Branch wire length                 : 1.83 m
+  Pitch                              : 8.0 mm
+  Supply voltage per branch          : 71.1 V
+  Total flow                         : 147.5 L/min
+  Selected operating trio            : 266.0 W, 3.74 A, 147.5 L/min
+  Branch flow                        : 18.4 L/min
+  Branch wire length                 : 1.39 m
   Branch coil axial length           : 0.30 m
   Wire gauge / diameter              : 31 AWG / 0.227 mm
-  Branch resistance                  : 199.84 ohm
-  Supply equivalent resistance       : 24.98 ohm
-  Branch current                     : 0.39 A
-  Total current                      : 3.13 A
-  Branch electrical power            : 30.7 W
-  Total electrical power             : 245.3 W
-  h_wire                             : 321.9 W/m^2-K
-  Branch air outlet temperature      : 59.6 C
-  Max wire temperature               : 129.1 C
+  Branch resistance                  : 38.04 ohm
+  Supply equivalent resistance       : 19.02 ohm
+  Branch current                     : 0.94 A
+  Total current                      : 3.74 A
+  Branch electrical power            : 33.3 W
+  Total electrical power             : 266.0 W
+  h_wire                             : 332.0 W/m^2-K
+  Branch air outlet temperature      : 58.9 C
+  Max wire temperature               : 155.3 C
   Total heat to bed                  : 55.7 W
   Duty needed at design loss         : 0.97
-  Total pressure drop                : 6.2 Pa
-  Distribution manifold dP          : 0.8 Pa
-  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 0.7, connector friction 0.0, connector->branch 0.1 Pa
-  Peak local flow per hole           : 0.25 L/min
-  Peak hole velocity                 : 0.21 m/s
-  Water loss / sprinkler make-up     : 2.18 kg/24 h
-  Latent evaporation load            : 61.9 W
+  Total pressure drop                : 57.6 Pa
+  Distribution manifold dP          : 2.0 Pa
+  Distribution dP components         : header 0.0, header->splitter 0.0, splitter body 1.9, connector friction 0.0, connector->branch 0.2 Pa
+  Peak local flow per hole           : 0.26 L/min
+  Peak hole velocity                 : 0.22 m/s
+  Water loss / sprinkler make-up     : 2.44 kg/24 h
+  Latent evaporation load            : 69.1 W
   Full-power bed estimate            : bottom 24.4 C, top 22.2 C
   Status                             : meets all hard constraints and the heating target
   Note                               : 90% duty is not achieved;
@@ -349,49 +350,49 @@ Covered-top-plus-vent best-available reference point:
 
 Feasible Pareto candidates for active configuration:
   pitch  V   Qtot(L/min)  Ptot(W)  Vhole  evap(kg/d)  Tair(C)  Twire(C)  Qbed(W)  duty   dP(Pa)  stage
-   10.0 79       260.6     406.8    0.37       4.07      51.1      193.7      58.7  0.92     23.3  feasible
-   12.0 90       430.3     613.1    0.59       6.28      45.9      249.8      58.6  0.92     60.6  feasible
-   10.0 76       232.3     371.4    0.34       3.67      52.5      189.5      58.5  0.92     18.7  feasible
-   10.0 95       402.0     578.8    0.55       5.91      46.5      213.3      58.5  0.92     53.2  feasible
-   12.0 103       588.7     800.9    0.79       8.17      43.5      273.8      58.5  0.92    110.5  feasible
-   10.0 87       322.8     482.5    0.45       4.89      48.6      202.3      58.4  0.92     35.0  feasible
-   10.0 108       543.4     747.2    0.73       7.63      44.0      231.4      58.4  0.92     94.8  feasible
-   12.0 70       232.3     370.9    0.34       3.66      52.4      215.3      58.4  0.92     18.7  feasible
-   10.0 94       390.7     564.5    0.54       5.75      46.7      211.6      58.3  0.92     50.4  feasible
-   10.0 101       464.2     652.8    0.63       6.67      45.2      221.3      58.3  0.92     70.1  feasible
-   10.0 113       600.0     813.6    0.81       8.28      43.3      238.1      58.3  0.92    114.7  feasible
-    8.0 90       277.6     426.7    0.40       4.27      50.2      167.3      58.3  0.92     26.3  feasible
-   10.0 88       334.1     495.8    0.47       5.02      48.2      203.6      58.3  0.92     37.4  feasible
-   10.0 93       379.4     550.4    0.53       5.60      46.9      209.8      58.2  0.92     47.6  feasible
-   12.0 93       458.6     645.5    0.63       6.59      45.3      253.7      58.2  0.92     68.4  feasible
-   10.0 89       345.5     509.2    0.48       5.16      47.8      205.1      58.2  0.92     39.9  feasible
-   12.0 97       515.2     712.6    0.70       7.26      44.3      262.4      58.2  0.93     85.5  feasible
-   10.0 90       356.8     522.8    0.50       5.30      47.5      206.6      58.2  0.93     42.4  feasible
-   10.0 64       147.5     264.5    0.23       2.44      59.6      178.4      58.1  0.93      7.2  feasible
-   12.0 95       486.9     678.6    0.66       6.92      44.7      257.9      58.1  0.93     76.8  feasible
-   10.0 81       271.9     419.0    0.39       4.18      50.3      194.5      58.1  0.93     25.3  feasible
-   12.0 89       419.0     597.3    0.58       6.08      45.9      247.0      58.0  0.93     57.6  feasible
-   12.0 84       368.1     535.8    0.51       5.43      47.1      238.5      58.0  0.93     45.0  feasible
-   10.0 74       215.4     348.6    0.32       3.40      53.2      186.3      58.0  0.93     16.0  feasible
-   12.0 101       560.4     765.0    0.76       7.77      43.6      268.8      57.9  0.93    100.5  feasible
-   12.0 71       243.6     383.6    0.35       3.78      51.5      216.5      57.9  0.93     20.5  feasible
-    6.0 91       204.0     334.0    0.30       3.23      53.9      133.2      57.8  0.93     14.2  feasible
-   10.0 107       532.1     731.1    0.72       7.42      44.0      229.2      57.8  0.93     91.0  feasible
-   10.0 71       198.4     326.5    0.29       3.15      54.3      183.5      57.7  0.93     13.3  feasible
-   10.0 77       243.6     383.1    0.35       3.77      51.4      189.9      57.7  0.93     20.5  feasible
+   12.0 99       515.2     729.5    0.69       7.64      45.3      268.3      58.6  0.92    698.1  feasible
+    8.0 119       520.8     736.2    0.70       7.71      45.2      196.7      58.6  0.92    713.4  feasible
+   10.0 109       543.4     763.2    0.73       7.99      44.9      236.0      58.6  0.92    776.3  feasible
+   10.0 94       379.4     564.3    0.52       5.88      47.9      214.7      58.6  0.92    380.1  feasible
+    8.0 105       385.1     571.0    0.53       5.95      47.7      182.8      58.5  0.92    391.5  feasible
+    4.0 112       198.4     336.3    0.29       3.33      55.6      109.6      58.5  0.92    104.4  feasible
+   10.0 114       600.0     830.3    0.80       8.66      44.1      242.7      58.5  0.92    945.3  feasible
+   10.0 112       571.7     796.4    0.76       8.32      44.4      239.3      58.4  0.92    858.7  feasible
+    8.0 118       509.5     721.6    0.69       7.54      45.3      195.3      58.4  0.92    682.9  feasible
+    4.0 113       204.0     343.5    0.30       3.40      55.1      109.6      58.4  0.92    110.6  feasible
+   12.0 102       560.4     782.5    0.75       8.17      44.5      274.6      58.4  0.92    825.2  feasible
+    8.0 106       396.4     584.0    0.54       6.08      47.4      183.7      58.3  0.92    414.6  feasible
+    4.0 116       221.0     365.5    0.32       3.65      53.9      109.9      58.3  0.92    129.9  feasible
+    4.0 115       215.4     358.1    0.31       3.57      54.2      109.8      58.3  0.92    123.3  feasible
+    8.0 116       498.2     707.3    0.67       7.38      45.4      194.0      58.2  0.92    653.1  feasible
+   10.0 101       452.9     652.5    0.62       6.80      46.2      224.0      58.2  0.92    540.5  feasible
+    8.0 75       164.4     293.2    0.25       2.80      58.5      159.7      58.2  0.92     71.4  feasible
+    8.0 107       407.7     597.2    0.56       6.21      47.0      184.7      58.1  0.93    438.5  feasible
+   12.0 93       447.3     645.2    0.61       6.72      46.2      256.8      58.1  0.93    527.1  feasible
+   12.0 89       407.7     597.0    0.56       6.21      47.0      250.3      58.1  0.93    438.5  feasible
+    8.0 100       345.5     520.6    0.48       5.38      48.5      178.0      58.0  0.93    315.6  feasible
+    8.0 108       419.0     610.4    0.57       6.35      46.7      185.7      58.0  0.93    463.0  feasible
+    8.0 87       243.6     393.6    0.35       3.96      52.4      166.9      58.0  0.93    157.8  feasible
+    8.0 113       464.2     664.9    0.63       6.92      45.8      190.2      57.9  0.93    567.6  feasible
+   10.0 100       441.6     637.4    0.60       6.62      46.2      222.1      57.9  0.93    513.9  feasible
+   12.0 95       475.6     678.3    0.64       7.05      45.6      260.9      57.9  0.93    595.4  feasible
+   12.0 97       503.8     712.3    0.68       7.40      45.2      265.2      57.9  0.93    667.9  feasible
+   10.0 110       560.4     779.8    0.75       8.09      44.3      237.0      57.8  0.93    825.2  feasible
+   10.0 113       588.7     813.3    0.78       8.43      44.0      240.3      57.8  0.93    910.1  feasible
+   12.0 77       288.9     449.5    0.41       4.58      50.3      229.3      57.7  0.93    221.3  feasible
 
 Pareto candidates ordered by reported-design priority:
   pitch  V   Qtot(L/min)  Ptot(W)  Tb(C)  Tt(C)  dT(C)  Vhole  evap(kg/d)  Tair(C)  Twire(C)  duty  dP(Pa)  state
-   10.0  79       260.6    406.8   26.5   24.2    2.3  0.37       4.07     51.1     193.7  0.92    23.3  feasible
-   12.0  90       430.3    613.1   26.4   24.1    2.3  0.59       6.28     45.9     249.8  0.92    60.6  feasible
-   10.0  76       232.3    371.4   26.4   24.1    2.3  0.34       3.67     52.5     189.5  0.92    18.7  feasible
-   10.0  95       402.0    578.8   26.4   24.1    2.3  0.55       5.91     46.5     213.3  0.92    53.2  feasible
-   12.0 103       588.7    800.9   26.4   24.0    2.3  0.79       8.17     43.5     273.8  0.92   110.5  feasible
-   10.0  87       322.8    482.5   26.4   24.0    2.3  0.45       4.89     48.6     202.3  0.92    35.0  feasible
-   10.0 108       543.4    747.2   26.3   24.0    2.3  0.73       7.63     44.0     231.4  0.92    94.8  feasible
-   12.0  70       232.3    370.9   26.3   24.0    2.3  0.34       3.66     52.4     215.3  0.92    18.7  feasible
-   10.0  94       390.7    564.5   26.3   24.0    2.3  0.54       5.75     46.7     211.6  0.92    50.4  feasible
-   10.0 101       464.2    652.8   26.3   24.0    2.3  0.63       6.67     45.2     221.3  0.92    70.1  feasible
+   12.0  99       515.2    729.5   26.5   24.1    2.3  0.69       7.64     45.3     268.3  0.92   698.1  feasible
+    8.0 119       520.8    736.2   26.5   24.1    2.3  0.70       7.71     45.2     196.7  0.92   713.4  feasible
+   10.0 109       543.4    763.2   26.4   24.1    2.3  0.73       7.99     44.9     236.0  0.92   776.3  feasible
+   10.0  94       379.4    564.3   26.4   24.1    2.3  0.52       5.88     47.9     214.7  0.92   380.1  feasible
+    8.0 105       385.1    571.0   26.4   24.1    2.3  0.53       5.95     47.7     182.8  0.92   391.5  feasible
+    4.0 112       198.4    336.3   26.4   24.1    2.3  0.29       3.33     55.6     109.6  0.92   104.4  feasible
+   10.0 114       600.0    830.3   26.4   24.0    2.3  0.80       8.66     44.1     242.7  0.92   945.3  feasible
+   10.0 112       571.7    796.4   26.4   24.0    2.3  0.76       8.32     44.4     239.3  0.92   858.7  feasible
+    8.0 118       509.5    721.6   26.3   24.0    2.3  0.69       7.54     45.3     195.3  0.92   682.9  feasible
+    4.0 113       204.0    343.5   26.3   24.0    2.3  0.30       3.40     55.1     109.6  0.92   110.6  feasible
 
 Constraint logic:
   Hard-safe means all of the following are satisfied simultaneously:
