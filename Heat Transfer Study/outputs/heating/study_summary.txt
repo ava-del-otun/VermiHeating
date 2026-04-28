@@ -156,21 +156,23 @@ Radial air-cooling profile:
                                          limited stepwise by plume carrying capacity and by the
                                          remaining sensible enthalpy above T_sink
   Plume-radius law                     : b(x) = b0 + alpha x, with optional cap b_max
+  Plume spread closure                 : legacy fixed spread-rate override
   Tube outer radius                    : 26.5 mm
   Initial plume radius                 : 2.5 mm
-  Plume spreading rate                 : 0.150 m plume radius per m radial distance
+  Plume spreading rate                 : 0.110 m plume radius per m radial distance
   Maximum plume radius                 : none; plume radius grows linearly across the plotted range
   Selected outlet temperature          : 45.3 C
-  Sink temperature used                : 26.5 C
-  Bed reference temperature            : 26.5 C
+  Sink temperature used                : 26.2 C
+  Bed reference temperature            : 26.2 C
+  Bed-reference interpolation          : y_tube=54.9 mm, H_fill=549.0 mm, eta=0.100
   Wetted-area density                  : 749.3 m^2/m^3
   Base sensible coefficient            : 8.00 W/m^2-K
-  Mean latent coefficient              : 40.94 W/m^2-K
-  Mean combined sink coefficient       : 48.94 W/m^2-K
+  Mean latent coefficient              : 49.80 W/m^2-K
+  Mean combined sink coefficient       : 57.80 W/m^2-K
   Released mass flow per tube length   : 0.001203 kg/s-m
-  Initial / final plume RH             : 1.9% -> 34.8%
-  Initial / final vapor density        : 0.0013 -> 0.0087 kg/m^3
-  Integrated radial sensible / latent  : 3.78 W and 19.00 W
+  Initial / final plume RH             : 1.9% -> 35.5%
+  Initial / final vapor density        : 0.0013 -> 0.0088 kg/m^3
+  Integrated radial sensible / latent  : 3.91 W and 19.15 W
   Safe distance result                 : no finite crossing in this simple model because
                                          the profile asymptote stays above 26.0 C
 
@@ -188,16 +190,16 @@ Tube layout and worm-habitat exclusion:
   Safe-distance exclusion radius       : tube radius + safe offset = 26.5 + nan = nan mm
   Pipe solid volume                    : 0.0215 m^3 (2.63% of filled-bed volume)
   Pipe exclusion-cylinder union volume : 0.0000 m^3 (0.00% of filled-bed volume)
-  Added wall-return unsafe volume      : 0.2288 m^3 before overlap with the tube exclusion cylinders
-  Total worm-unsafe union volume       : 0.2288 m^3 (28.00% of filled-bed volume)
-  Worm-unsafe shell volume             : 0.2073 m^3 (25.37% of filled-bed volume)
-  Remaining habitable bed volume       : 0.5883 m^3 (72.00% of filled-bed volume)
+  Added wall-return unsafe volume      : 0.2942 m^3 before overlap with the tube exclusion cylinders
+  Total worm-unsafe union volume       : 0.2942 m^3 (36.00% of filled-bed volume)
+  Worm-unsafe shell volume             : 0.2726 m^3 (33.37% of filled-bed volume)
+  Remaining habitable bed volume       : 0.5230 m^3 (64.00% of filled-bed volume)
   Pipe-overlap correction              : 0.0000 m^3 removed from the naive sum of 8 pipe cylinders
   Exclusion-overlap correction         : 0.0000 m^3 removed from the naive sum of 8
                                          safe-distance exclusion cylinders
-  Wall-return unsafe depths            : left 122.0 mm, right 122.0 mm, bottom 54.9 mm
-  Wall plume-contact temperatures      : left 35.4 C, right 35.4 C, bottom 44.6 C
-  Predicted inner-wall temperatures    : left 34.0 C, right 34.0 C, bottom 42.9 C
+  Wall-return unsafe depths            : left 122.0 mm, right 122.0 mm, bottom 54.9 mm, top 54.9 mm
+  Wall plume-contact temperatures      : left 38.8 C, right 38.8 C, bottom 44.8 C, top 44.8 C
+  Predicted inner-wall temperatures    : left 37.3 C, right 37.3 C, bottom 43.1 C, top 43.1 C
   Overlap evaluation method            : overlap-aware union area on a 700 x 700 midpoint grid
                                          clipped to the filled-bed rectangle, then extruded over the
                                          aeration-tube length to obtain volume; the final unsafe union

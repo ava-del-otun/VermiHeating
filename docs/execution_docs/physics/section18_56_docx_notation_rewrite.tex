@@ -1,0 +1,488 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{enumitem}
+\setlist[itemize]{leftmargin=*}
+
+\title{Section 18.5--18.6 Rewrite Using Senior Design Report Notation}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section*{Scope}
+This document rewrites only Section 18.5 and Section 18.6 using the symbol conventions that appear in \texttt{Senior Design Project Report Draft 1 - Cited.docx}, especially the bed/branch heat relations and the two-node matrix notation.
+
+\subsection*{Notation Mapping Used in This Rewrite}
+\begin{longtable}{@{}p{0.44\textwidth}p{0.50\textwidth}@{}}
+\toprule
+Section 18 symbol (current physics docs) & Rewritten symbol (Senior Design draft style) \\
+\midrule
+\endfirsthead
+\toprule
+Section 18 symbol (current physics docs) & Rewritten symbol (Senior Design draft style) \\
+\midrule
+\endhead
+\(Q_{\mathrm{to\,bed},h}(d)\), \(Q_{\mathrm{to\,bed},c}(d)\) & \(Q_{\mathrm{bed,total}}^{(h)}(d)\), \(Q_{\mathrm{bed,total}}^{(c)}(d)\) \\
+\(Q_{\mathrm{wall}},Q_{\mathrm{jet}},Q_{\mathrm{evap}}\) (segment terms) & \(q_{\mathrm{wall},i},q_{\mathrm{jet},i},q_{\mathrm{evap},i}\) \\
+\(Q_{\mathrm{bed}}(d)\) (applied net load) & \(Q_{\mathrm{bed,total,applied}}(d)\) \\
+\(T_b(d),T_t(d)\) & \(T_{\mathrm{bed},b}(d),T_{\mathrm{bed},t}(d)\) \\
+\(UA_{b,\infty},UA_{t,\infty},UA_{bt}\) & \((UA)_{b,\infty},(UA)_{t,\infty},(UA)_{12}\) \\
+\(P_h(d)\) & \(P_{\mathrm{tot},h}(d)\) \\
+\(P_{\mathrm{spot\,cooler}}(d)+P_{\mathrm{assist\,blower}}(d)\) & \(P_{\mathrm{tot},c}(d)\) \\
+\bottomrule
+\end{longtable}
+
+\subsection*{18.5 Capacity Re-solve and Duty Application (Docx Notation)}
+\paragraph{Equation-number convention.}
+When a formula comes directly from the Senior Design draft notation, I keep that draft equation number in the tag. When the formula is Section 18-specific glue logic (duty, clipping, aggregation), I assign a local tag \(18.5\ast\) or \(18.6\ast\).
+
+\paragraph{Step 18.5-A: Required daily heating/cooling load.}
+Using the same daily ambient \(T_\infty(d)\), define required loads:
+\begin{equation}
+Q_{\mathrm{load},h}(d)=\max\!\left((UA)_{\mathrm{tot},*}\left(T_{h,\mathrm{set}}-T_\infty(d)\right),0\right),
+\tag{18.5A-1}
+\end{equation}
+\begin{equation}
+Q_{\mathrm{load},c}(d)=\max\!\left((UA)_{\mathrm{tot},*}\left(T_\infty(d)-T_{c,\mathrm{set}}\right),0\right).
+\tag{18.5A-2}
+\end{equation}
+Here \((UA)_{\mathrm{tot},*}\) is the same bin-loss conductance term used in the report's \(Q_{\mathrm{loss,bin}}\) relation.
+
+\paragraph{Step 18.5-B: Re-solved bed-transfer capacity at day ambient.}
+At each day \(d\), solve branch/segment transfer using the report's segment equations:
+\begin{equation}
+\dot m_{\mathrm{mean},i}(d)=\frac{\dot m_{\mathrm{rem},i}(d)+\dot m_{\mathrm{rem},i+1}(d)}{2},
+\tag{47}
+\end{equation}
+\begin{equation}
+\Theta_i(d)=\exp\!\left[-\frac{U_{\mathrm{aer}}\Pi_{\mathrm{out}}\Delta x_{\mathrm{aer}}}{\dot m_{\mathrm{mean},i}(d)C_P}\right],
+\tag{49}
+\end{equation}
+\begin{equation}
+T_{\mathrm{air,post\,wall},i}(d)=T_{\mathrm{bed,ref}}(d)+\left(T_{\mathrm{air},i}(d)-T_{\mathrm{bed,ref}}(d)\right)\Theta_i(d),
+\tag{50}
+\end{equation}
+\begin{equation}
+T_{\mathrm{rel},i}(d)=\frac{T_{\mathrm{air},i}(d)+T_{\mathrm{air,post\,wall},i}(d)}{2},
+\tag{52}
+\end{equation}
+\begin{equation}
+q_{\mathrm{wall},i}(d)=\dot m_{\mathrm{mean},i}(d)C_P\left(T_{\mathrm{air},i}(d)-T_{\mathrm{air,post\,wall},i}(d)\right),
+\tag{44}
+\end{equation}
+\begin{equation}
+q_{\mathrm{jet},i}(d)=\dot m_{\mathrm{rel},i}(d)C_P\left(T_{\mathrm{rel},i}(d)-T_{\mathrm{bed,ref}}(d)\right),
+\tag{43}
+\end{equation}
+\begin{equation}
+q_{\mathrm{bed},i}(d)=q_{\mathrm{wall},i}(d)+q_{\mathrm{jet},i}(d)-q_{\mathrm{evap},i}(d),
+\tag{42}
+\end{equation}
+\begin{equation}
+Q_{\mathrm{bed,branch}}(d)=\sum_{i=1}^{N_{\mathrm{aer}}} q_{\mathrm{bed},i}(d),
+\tag{45}
+\end{equation}
+\begin{equation}
+Q_{\mathrm{bed,total}}(d)=N_{\mathrm{tubes}}\,Q_{\mathrm{bed,branch}}(d).
+\tag{54}
+\end{equation}
+Use mode-specific re-solves:
+\begin{equation}
+Q_{\mathrm{bed,total}}^{(h)}(d),\qquad Q_{\mathrm{bed,total}}^{(c)}(d),
+\tag{18.5B-1}
+\end{equation}
+and convert to positive capacities:
+\begin{equation}
+Q_{h,\mathrm{cap}}(d)=\max\!\left(Q_{\mathrm{bed,total}}^{(h)}(d),0\right),\qquad
+Q_{c,\mathrm{cap}}(d)=\max\!\left(-Q_{\mathrm{bed,total}}^{(c)}(d),0\right).
+\tag{18.5B-2}
+\end{equation}
+
+\paragraph{Step 18.5-C: Re-solved electrical power at day ambient.}
+Heating coil power uses the report's electrical sum style:
+\begin{equation}
+P_{h,\mathrm{coil}}(d)=\sum_g n_{\mathrm{coil},g}\,P_{\mathrm{coil},g}(d),
+\tag{31}
+\end{equation}
+\noindent For blower \(x\in\{\mathrm{hb},\mathrm{ab}\}\) (\(\mathrm{hb}\): heating blower, \(\mathrm{ab}\): cooling assist blower), the same operating-flow and power model is used:
+\begin{equation}
+\Delta p_{\mathrm{avail},x}(\dot V)=\max\!\left(\Delta p_{\mathrm{shutoff},x}\left(1-\frac{\dot V}{\dot V_{\mathrm{free},x}}\right),0\right),
+\tag{18.5C-1a}
+\end{equation}
+\begin{equation}
+\dot V_{\mathrm{free},x}=
+\begin{cases}
+\dot V_{\mathrm{rated},x}\,\dfrac{\Delta p_{\mathrm{shutoff},x}}{\Delta p_{\mathrm{shutoff},x}-\Delta p_{\mathrm{rated},x}}, & \Delta p_{\mathrm{shutoff},x}>\Delta p_{\mathrm{rated},x},\\[8pt]
+\dot V_{\mathrm{rated},x}, & \text{otherwise},
+\end{cases}
+\tag{18.5C-1a2}
+\end{equation}
+Eq.~(18.5C-1a2) comes from a two-point linear fan-curve fit:
+\[
+(\dot V,\Delta p)=(0,\Delta p_{\mathrm{shutoff},x}),
+\qquad
+(\dot V,\Delta p)=(\dot V_{\mathrm{rated},x},\Delta p_{\mathrm{rated},x}).
+\]
+The slope is
+\[
+m_x=\frac{\Delta p_{\mathrm{rated},x}-\Delta p_{\mathrm{shutoff},x}}{\dot V_{\mathrm{rated},x}},
+\qquad
+\Delta p_x(\dot V)=\Delta p_{\mathrm{shutoff},x}+m_x\dot V.
+\]
+Setting \(\Delta p_x(\dot V_{\mathrm{free},x})=0\) gives Eq.~(18.5C-1a2). If \(\Delta p_{\mathrm{shutoff},x}\le\Delta p_{\mathrm{rated},x}\), this extrapolation is not physically reliable, so implementation falls back to \(\dot V_{\mathrm{free},x}=\dot V_{\mathrm{rated},x}\).
+Conceptually: \(\Delta p_{\mathrm{shutoff},x}\) and \(\Delta p_{\mathrm{rated},x}\) are two static-pressure-rise points (Pa), not absolute pressures. They are read from one blower curve at \(\dot V=0\) and \(\dot V=\dot V_{\mathrm{rated},x}\), and those two points define the linear pressure-flow relation used in Eqs.~(18.5C-1a) and (18.5C-1a2).
+Implementation sequence: when datasheet \(\dot V_{\mathrm{free},x}\) exists, the blower line is used directly from \((0,\Delta p_{\mathrm{shutoff},x})\) to \((\dot V_{\mathrm{free},x},0)\). When \(\dot V_{\mathrm{free},x}\) is missing, Eq.~(18.5C-1a2) infers it from \((\dot V_{\mathrm{rated},x},\Delta p_{\mathrm{rated},x})\) and \(\Delta p_{\mathrm{shutoff},x}\), then Eq.~(18.5C-1a) uses that inferred endpoint.
+when explicit free-air flow is not provided.
+\begin{equation}
+R_x(\dot V)=\Delta p_{\mathrm{sys},x}(\dot V)-\Delta p_{\mathrm{avail},x}(\dot V),
+\tag{18.5C-1b}
+\end{equation}
+\begin{equation}
+\Delta p_{\mathrm{dist},c}
+=
+\Delta p_{\mathrm{header}}
++\Delta p_{\mathrm{header\rightarrow splitter}}
++\Delta p_{\mathrm{splitter\,body}}
++\Delta p_{\mathrm{connector\,fric}}
++\Delta p_{\mathrm{connector\rightarrow branch}},
+\tag{56}
+\end{equation}
+\begin{equation}
+p_{\mathrm{in},c}=\Delta p_{\mathrm{aer,reported}},
+\tag{18.5C-1b0}
+\end{equation}
+\begin{equation}
+\Delta p_{\mathrm{sys},\mathrm{ab}}(\dot V)=\Delta p_{\mathrm{tot,cool}}(\dot V)=\Delta p_{\mathrm{dist},c}(\dot V)+p_{\mathrm{in},c}(\dot V),
+\tag{76}
+\end{equation}
+\begin{equation}
+\dot m_{\mathrm{rel},s}=C_dA_{h,s}\sqrt{2\rho_s\max(p_s-p_{\mathrm{bed},s},0)},
+\tag{15}
+\end{equation}
+\begin{equation}
+\frac{\Delta p_{\mathrm{Ergun},s}}{L_s}
+=
+\frac{150(1-\varepsilon)^2}{\varepsilon^3}\frac{\mu_su_s}{d_p^2}
++
+\frac{1.75(1-\varepsilon)}{\varepsilon^3}\frac{\rho_su_s^2}{d_p},
+\qquad
+u_s=\frac{\dot m_{\mathrm{rel},s}}{\rho_sA_{\mathrm{trib},s}},
+\tag{62}
+\end{equation}
+\begin{equation}
+p_{\mathrm{bed},s}=p_{\mathrm{out,bnd}}+\Delta p_{\mathrm{Ergun},s},
+\tag{60}
+\end{equation}
+\begin{equation}
+\Delta p_{\mathrm{path},g}
+=
+\Delta p_{\mathrm{dist,private},g}
++
+\Delta p_{\mathrm{heater,tube},g}
++
+\Delta p_{\mathrm{heater,coil},g}
++
+\Delta p_{\mathrm{heater\rightarrow aer},g}
++
+p_{\mathrm{in,aer},g},
+\tag{80}
+\end{equation}
+\begin{equation}
+\Delta p_{\mathrm{sys},\mathrm{hb}}(\dot V)=\Delta p_{\mathrm{tot,heat}}(\dot V)=\Delta p_{\mathrm{dist,common}}(\dot V)+\Delta p_{\mathrm{path,ctrl}}(\dot V),
+\tag{81}
+\end{equation}
+In the closed-end shooting step (described in the source text directly after Eq.~(10)), the inlet pressure is solved so terminal remaining flow meets the configured mass-balance tolerance. In the branch march implementation, \(\dot m_{\mathrm{rel},s}\) is bounded by the segment-remaining flow \(\dot m_{\mathrm{rem},s}\), and \(\Delta p_{\mathrm{path,ctrl}}\) is the largest active-group value of \(\Delta p_{\mathrm{path},g}\) used for the parallel-network pressure closure.
+\begin{equation}
+\mathcal{F}_x(d)=
+\left\{
+\dot V\in[0,\dot V_{\mathrm{req},x}(d)]
+\;:\;
+R_x(\dot V)\le 0
+\right\},
+\tag{18.5C-1c0}
+\end{equation}
+\begin{equation}
+\dot V_{\mathrm{feas},x}(d)=
+\begin{cases}
+\max \mathcal{F}_x(d), & \mathcal{F}_x(d)\neq\varnothing,\\[4pt]
+0, & \mathcal{F}_x(d)=\varnothing,
+\end{cases}
+\tag{18.5C-1c1}
+\end{equation}
+\begin{equation}
+\dot V_{\mathrm{ach},x}(d)=
+\begin{cases}
+\dot V_{\mathrm{req},x}(d), & \text{if blower \(x\) is disabled, fan data are unavailable, or }R_x(\dot V_{\mathrm{req},x}(d))\le 0,\\[4pt]
+\dot V_{\mathrm{feas},x}(d), & \text{otherwise},
+\end{cases}
+\tag{18.5C-1c}
+\end{equation}
+\begin{equation}
+\Delta p_{\mathrm{op},x}(d)=
+\begin{cases}
+0, & \Delta p_{\mathrm{sys},x}(\dot V_{\mathrm{ach},x}(d))\le 0,\\[4pt]
+\Delta p_{\mathrm{sys},x}(\dot V_{\mathrm{ach},x}(d)), &
+0<\Delta p_{\mathrm{sys},x}(\dot V_{\mathrm{ach},x}(d))
+<\Delta p_{\mathrm{avail},x}(\dot V_{\mathrm{ach},x}(d)),\\[4pt]
+\Delta p_{\mathrm{avail},x}(\dot V_{\mathrm{ach},x}(d)), &
+\Delta p_{\mathrm{sys},x}(\dot V_{\mathrm{ach},x}(d))
+\ge\Delta p_{\mathrm{avail},x}(\dot V_{\mathrm{ach},x}(d)).
+\end{cases}
+\tag{18.5C-1d}
+\end{equation}
+\begin{equation}
+P_{\mathrm{shaft},x}(d)=\dot V_{\mathrm{ach},x}(d)\,\Delta p_{\mathrm{op},x}(d),
+\tag{18.5C-1e}
+\end{equation}
+\begin{equation}
+P_{x,\mathrm{elec}}(d)=\min\!\left(P_{\mathrm{rated},x},\,P_{\mathrm{idle},x}+\frac{P_{\mathrm{shaft},x}(d)}{\eta_x}\right),
+\tag{18.5C-1f}
+\end{equation}
+\begin{equation}
+P_{x,\mathrm{elec}}(d)=\min\!\left(
+P_{\mathrm{rated},x},
+P_{\mathrm{idle},x}
+\!+\!
+\left(P_{\mathrm{rated},x}-P_{\mathrm{idle},x}\right)
+\min\!\left(\max\!\left(\frac{\dot V_{\mathrm{ach},x}(d)}{\dot V_{\mathrm{free},x}},0\right),1\right)
+\right),
+\tag{18.5C-1g}
+\end{equation}
+\noindent Eq.~(18.5C-1g) is the code fallback used only when \(\eta_x\) is unavailable.
+\begin{equation}
+P_{x,\mathrm{elec}}(d)=
+\begin{cases}
+0, & \begin{array}[t]{@{}l@{}}\text{if blower \(x\) is disabled}\\\text{or }\dot V_{\mathrm{ach},x}(d)\le 0\end{array},\\[4pt]
+\min\!\left(P_{\mathrm{rated},x},\,P_{\mathrm{idle},x}+\dfrac{P_{\mathrm{shaft},x}(d)}{\eta_x}\right), &
+\text{if }\eta_x\text{ is provided},\\[8pt]
+\min\!\left(
+P_{\mathrm{rated},x},
+P_{\mathrm{idle},x}
+\!+\!
+\left(P_{\mathrm{rated},x}-P_{\mathrm{idle},x}\right)
+\min\!\left(\max\!\left(\dfrac{\dot V_{\mathrm{ach},x}(d)}{\dot V_{\mathrm{free},x}},0\right),1\right)
+\right), &
+\text{otherwise}.
+\end{cases}
+\tag{18.5C-1h}
+\end{equation}
+This piecewise form is the exact implementation logic. \(P_{\mathrm{idle},x}\) is \emph{not} consumed when the blower is off or solved flow is zero, because the implemented return is \(0\) in that case.
+Conceptually, \(P_{\mathrm{idle},x}\) is the baseline non-hydraulic electrical draw when the blower is running at very low flow (motor/controller and parasitic losses before pressure-flow work). In configuration this is \texttt{idlePower\_W}; code enforces \(P_{\mathrm{idle},x}\ge 0\) and always caps final \(P_{x,\mathrm{elec}}(d)\) at \(P_{\mathrm{rated},x}\).
+For physically consistent calibration, select \(P_{\mathrm{idle},x}\) from a measured low-flow operating point and keep \(0\le P_{\mathrm{idle},x}\le P_{\mathrm{rated},x}\).
+Thus, total heating electrical power is
+\begin{equation}
+P_{\mathrm{tot},h}(d)=P_{h,\mathrm{coil}}(d)+P_{\mathrm{hb},\mathrm{elec}}(d).
+\tag{18.5C-2}
+\end{equation}
+\noindent Cooling electrical terms are:
+\begin{equation}
+\dot V_{\mathrm{rated}}=0.00047194745\,V_{\mathrm{rated,CFM}},\qquad
+\dot m_{\mathrm{rated}}(d)=\rho_{\mathrm{air}}(T_\infty(d),p_\infty)\,\dot V_{\mathrm{rated}}.
+\tag{18.5C-3a0}
+\end{equation}
+\begin{equation}
+\dot Q_{\mathrm{rated,sens}}(d)=\max\!\left(\dot Q_{\mathrm{rated,total}}-\dot Q_{\mathrm{rated,lat}}(d),\,0\right).
+\tag{18.5C-3a0a}
+\end{equation}
+\begin{equation}
+T_{\mathrm{target,derived}}(d)=
+T_\infty(d)-\frac{\dot Q_{\mathrm{rated,sens}}(d)}{\dot m_{\mathrm{rated}}(d)c_p(d)},
+\quad \dot m_{\mathrm{rated}}(d)c_p(d)>0.
+\tag{18.5C-3a0b}
+\end{equation}
+\begin{equation}
+T_{\mathrm{target}}(d)=
+\begin{cases}
+T_{\mathrm{target,derived}}(d), & \text{if }\chi_{\mathrm{derive}}=1\text{ and }T_{\mathrm{target,derived}}(d)\text{ is finite},\\[4pt]
+T_{\mathrm{target,cfg}}, & \text{if a configured target is provided},\\[4pt]
+T_\infty(d), & \text{otherwise}.
+\end{cases}
+\tag{18.5C-3a0c}
+\end{equation}
+\noindent Eq.~(18.5C-3a0c) matches code precedence: derived target overrides configured target only when \texttt{deriveTargetFromRatedSpecs} is enabled and derivation is finite.
+\begin{equation}
+\dot m(d)=\rho_{\mathrm{air}}(T_\infty(d),p_\infty)\,\dot V_{\mathrm{ach},\mathrm{ab}}(d),
+\qquad
+\dot m_{\mathrm{dry}}(d)=\frac{\dot m(d)}{1+w_{\mathrm{in}}(d)}.
+\tag{18.5C-3a0d}
+\end{equation}
+\noindent \(\dot V_{\mathrm{ach},\mathrm{ab}}(d)\) is the achieved assist-blower flow from the residual closure in Eqs.~(18.5C-1b)--(18.5C-1c3) over \([0,\dot V_{\mathrm{req},\mathrm{ab}}(d)]\).
+\begin{equation}
+\dot Q_{\mathrm{spot,req}}(d)=\dot m(d)c_p(d)\max\!\left(T_\infty(d)-T_{\mathrm{target}}(d),0\right),
+\tag{18.5C-3a}
+\end{equation}
+\begin{equation}
+\dot Q_{\mathrm{spot,act}}(d)=\min\!\left(\dot Q_{\mathrm{spot,req}}(d),\dot Q_{\mathrm{spot,max}}(d)\right),
+\tag{18.5C-3b}
+\end{equation}
+\begin{equation}
+\dot Q_{\mathrm{spot,max}}(d)=
+\begin{cases}
+Q_{\mathrm{spot,max,cfg}}, & \text{if }\texttt{maxCoolingCapacity\_W}\text{ is provided},\\[4pt]
+\max\!\left(\dot Q_{\mathrm{rated,total}}-\dot Q_{\mathrm{rated,lat}}(d),\,0\right), & \text{if rated-spec path is used},\\[4pt]
++\infty, & \text{otherwise},
+\end{cases}
+\tag{18.5C-3b1}
+\end{equation}
+\begin{equation}
+\begin{aligned}
+\dot Q_{\mathrm{rated,total}}&=0.29307107\,C_{\mathrm{rated,BTU/h}},\\
+\dot m_{\mathrm{cond,rated}}&=\frac{0.473176473\,D_{\mathrm{rated,pint/day}}}{86400},\\
+\dot Q_{\mathrm{rated,lat}}(d)&=\dot m_{\mathrm{cond,rated}}\,h_{fg}(T_\infty(d)).
+\end{aligned}
+\tag{18.5C-3b2}
+\end{equation}
+\begin{equation}
+P_{\mathrm{in}}(d)\equiv P_{\mathrm{spot\,cooler}}(d).
+\tag{18.5C-3c00}
+\end{equation}
+\begin{equation}
+\begin{aligned}
+\dot Q_{\mathrm{sensible}}(d)&=
+\dot m(d)c_p(d)\max\!\left(T_\infty(d)-T_{\mathrm{supply,actual}}(d),0\right)
+=\dot Q_{\mathrm{spot,act}}(d),\\
+\mathrm{COP}&=\frac{\dot Q_{\mathrm{cool}}}{P_{\mathrm{in}}(d)},\\
+\mathrm{COP}_{\mathrm{sensible}}&=\frac{\dot Q_{\mathrm{sensible}}(d)}{P_{\mathrm{in}}(d)},\\
+\mathrm{COP}&=\frac{\mathrm{EER}}{3.412}.
+\end{aligned}
+\tag{18.5C-3c0}
+\end{equation}
+\noindent In Eq.~(18.5C-3c), \(\mathrm{COP}\) is the configuration input and should be interpreted as sensible COP because \(\dot Q_{\mathrm{spot,act}}(d)\) is a sensible load.
+\begin{equation}
+P_{\mathrm{spot\,cooler}}(d)=\frac{\dot Q_{\mathrm{spot,act}}(d)}{\mathrm{COP}},
+\tag{18.5C-3c}
+\end{equation}
+\begin{equation}
+P_{\mathrm{assist\,blower}}(d)=P_{\mathrm{ab},\mathrm{elec}}(d),
+\tag{18.5C-3d}
+\end{equation}
+\begin{equation}
+P_{\mathrm{tot},c}(d)=P_{\mathrm{spot\,cooler}}(d)+P_{\mathrm{assist\,blower}}(d).
+\tag{18.5C-4}
+\end{equation}
+
+\paragraph{Step 18.5-C definitions (all new symbols).}
+\(x\in\{\mathrm{hb},\mathrm{ab}\}\): blower index. \(\mathrm{hb}\) is heating blower, \(\mathrm{ab}\) is cooling assist blower. \(\dot V\) is volumetric flow \([\mathrm{m^3/s}]\). \(\Delta p\) is pressure rise/drop \([\mathrm{Pa}]\). \(R_x(\dot V)\) in Eq.~(18.5C-1b) is blower-flow residual (system-required minus blower-available pressure). \(\dot V_{\mathrm{req},x}(d)\) is requested flow. \(\mathcal{F}_x(d)\) in Eq.~(18.5C-1c0) is the feasible-flow set. \(\dot V_{\mathrm{feas},x}(d)\) in Eq.~(18.5C-1c1) is the maximum feasible-flow helper. \(\dot V_{\mathrm{ach},x}(d)\) is achieved flow used in the final day model.
+
+\(\Delta p_{\mathrm{sys},\mathrm{ab}}\) is tied to the original pressure-balance numbering through Eqs.~(56) and (76), plus the report-to-code mapping in Eq.~(18.5C-1b0): Eq.~(56) defines \(\Delta p_{\mathrm{dist},c}\), Eq.~(18.5C-1b0) maps the reported aeration inlet pressure to \(p_{\mathrm{in},c}\), and Eq.~(76) gives the cooling total \(\Delta p_{\mathrm{tot,cool}}=\Delta p_{\mathrm{dist},c}+p_{\mathrm{in},c}\). \(p_{\mathrm{out,bnd}}\) is the bed outlet-boundary pressure (open-top/vent/offset closure). \(p_{\mathrm{bed},s}\) is local bed-side pressure in segment \(s\) from Eq.~(60). \(\Delta p_{\mathrm{Ergun},s}\) is local porous-bed backpressure from Eq.~(62). \(L_s\), \(\varepsilon\), \(d_p\), \(A_{\mathrm{trib},s}\), \(\rho_s\), \(\mu_s\), \(u_s\), and \(\dot m_{\mathrm{rel},s}\) are segment path length, porosity, representative particle diameter, tributary porous area, local density, local viscosity, superficial porous velocity, and local released mass flow; release itself follows Eq.~(15).
+
+\(\Delta p_{\mathrm{sys},\mathrm{hb}}\) follows the original heating-network numbering through Eqs.~(80) and (81): Eq.~(80) defines each group branch-path pressure \(\Delta p_{\mathrm{path},g}\), and Eq.~(81) defines the reported heating total as shared distribution plus the common/controlling branch-path requirement. \(\Delta p_{\mathrm{dist,common}}\) is common header/splitter-feed loss. \(g_{\mathrm{ctrl}}\) is the group with the largest private-path pressure, so \(\Delta p_{\mathrm{path,ctrl}}\) is the controlling branch requirement used by the parallel-network closure.
+
+\(\Delta p_{\mathrm{shutoff},x}\) is the datasheet shutoff pressure (maximum static pressure rise at zero flow; \texttt{shutoffPressure\_inH2O} converted to Pa). \(\dot V_{\mathrm{rated},x}\) is the manufacturer rated flow (\texttt{ratedFlow\_CFM}, converted to SI). \(\Delta p_{\mathrm{rated},x}\) is the static pressure rise paired with that same rated point (\texttt{ratedPressure\_inH2O}, converted to Pa). These are two points on the same blower curve, not absolute pressure states. \(\dot V_{\mathrm{free},x}\) is explicit or inferred by Eq.~(18.5C-1a2). \(\Delta p_{\mathrm{op},x}(d)\) is bounded operating pressure used for power. \(P_{\mathrm{shaft},x}(d)\) is shaft fluid power. \(\eta_x\) is total blower efficiency. \(P_{\mathrm{idle},x}\) is the blower baseline electrical draw at low flow while running (non-hydraulic parasitics), configured by \texttt{idlePower\_W}; it is nonnegative in code and only contributes when blower is enabled and solved flow is positive (Eq.~(18.5C-1h)). \(P_{\mathrm{rated},x}\) is the motor rated electrical cap. \(P_{x,\mathrm{elec}}(d)\) is blower electrical input. \(P_{h,\mathrm{coil}}(d)\) is heater-coil electrical power from Eq.~(31). \(P_{\mathrm{tot},h}(d)\) and \(P_{\mathrm{tot},c}(d)\) are total heating/cooling electrical powers. \(\dot V_{\mathrm{ach},\mathrm{ab}}(d)\) is achieved assist-blower flow used by the spot-cooler model. \(\dot m(d)=\rho_{\mathrm{air}}(T_\infty(d),p_\infty)\dot V_{\mathrm{ach},\mathrm{ab}}(d)\) is spot-cooler moist-air mass flow, and \(\dot m_{\mathrm{dry}}(d)=\dot m(d)/(1+w_{\mathrm{in}}(d))\) is dry-air flow for psychrometrics. \(\dot Q_{\mathrm{spot,req}}(d)\), \(\dot Q_{\mathrm{spot,act}}(d)\), \(\dot Q_{\mathrm{spot,max}}(d)\), \(c_p(d)\), \(T_{\mathrm{target,cfg}}\), \(\chi_{\mathrm{derive}}\), \(T_{\mathrm{target,derived}}(d)\), \(T_{\mathrm{target}}(d)\), \(T_{\mathrm{supply,actual}}(d)\), \(\dot Q_{\mathrm{sensible}}(d)\), \(P_{\mathrm{in}}(d)\), and \(\mathrm{COP}\) are spot-cooler load, capped load, available capacity, branch specific heat, configured target, derivation toggle, derived target, effective daily target, actual post-cap supply temperature, sensible cooling rate, cooler electrical input in COP definitions (\(P_{\mathrm{in}}(d)\equiv P_{\mathrm{spot\,cooler}}(d)\)), and coefficient of performance.
+
+\paragraph{Step 18.5-C NOAA/config derivation note.}
+Section 18.5 blower/equipment terms are not NOAA-derived. They come from configuration and physics re-solve outputs at each day ambient: fan-curve inputs (\(\Delta p_{\mathrm{shutoff},x},\dot V_{\mathrm{free},x}\)), electrical parameters (\(\eta_x,P_{\mathrm{idle},x},P_{\mathrm{rated},x}\)), and day-specific system pressure \(\Delta p_{\mathrm{sys},x}(\dot V)\) from the thermal-fluid model. That system-pressure term uses the original ``Friction and Pressure Losses'' equations: release and porous closure (15), (62), (60), cooling pressure totals (56), (18.5C-1b0), (76), and heating branch/total pressure equations (80), (81).
+
+\paragraph{Step 18.5-D: Duty fractions and applied net bed load.}
+\begin{equation}
+D_h^*(d)=\frac{Q_{\mathrm{load},h}(d)}{Q_{h,\mathrm{cap}}(d)},\qquad
+D_c^*(d)=\frac{Q_{\mathrm{load},c}(d)}{Q_{c,\mathrm{cap}}(d)}.
+\tag{18.5D-1}
+\end{equation}
+\begin{equation}
+D_h(d)=\min(\max(D_h^*(d),0),1),\qquad
+D_c(d)=\min(\max(D_c^*(d),0),1).
+\tag{18.5D-2}
+\end{equation}
+\begin{equation}
+Q_{\mathrm{bed,total,applied}}(d)=
+\begin{cases}
+D_h(d)\,Q_{h,\mathrm{cap}}(d), & \text{heating day},\\[4pt]
+-D_c(d)\,Q_{c,\mathrm{cap}}(d), & \text{cooling day},\\[4pt]
+0, & \text{idle day}.
+\end{cases}
+\tag{18.5D-3}
+\end{equation}
+\begin{equation}
+Q_{\mathrm{unmet},h}(d)=\max\!\left(Q_{\mathrm{load},h}(d)-Q_{h,\mathrm{cap}}(d),0\right),
+\tag{18.5D-4}
+\end{equation}
+\begin{equation}
+Q_{\mathrm{unmet},c}(d)=\max\!\left(Q_{\mathrm{load},c}(d)-Q_{c,\mathrm{cap}}(d),0\right).
+\tag{18.5D-5}
+\end{equation}
+
+\subsection*{18.6 Daily Bed Temperature, Electricity, Cost, and Water (Docx Notation)}
+\paragraph{Step 18.6-A: Split net bed load between bottom/top nodes.}
+\begin{equation}
+Q_{\mathrm{bed},b}(d)=f_b\,Q_{\mathrm{bed,total,applied}}(d),\qquad
+Q_{\mathrm{bed},t}(d)=(1-f_b)\,Q_{\mathrm{bed,total,applied}}(d).
+\tag{18.6A-1}
+\end{equation}
+
+\paragraph{Step 18.6-B: Solve daily two-node bed temperatures.}
+Using the report's Eq.~(53)-style matrix, solved day-by-day:
+\begin{equation}
+\begin{bmatrix}
+(UA)_{b,\infty}+(UA)_{12} & -(UA)_{12}\\
+-(UA)_{12} & (UA)_{t,\infty}+(UA)_{12}
+\end{bmatrix}
+\begin{bmatrix}
+T_{\mathrm{bed},b}(d)\\
+T_{\mathrm{bed},t}(d)
+\end{bmatrix}
+=
+\begin{bmatrix}
+Q_{\mathrm{bed},b}(d)+(UA)_{b,\infty}T_\infty(d)\\
+Q_{\mathrm{bed},t}(d)+(UA)_{t,\infty}T_\infty(d)
+\end{bmatrix}.
+\tag{53}
+\end{equation}
+
+\paragraph{Step 18.6-C: Daily electricity and cost.}
+\begin{equation}
+E_h(d)=\frac{24}{1000}\,P_{\mathrm{tot},h}(d)\,D_h(d),\qquad
+E_c(d)=\frac{24}{1000}\,P_{\mathrm{tot},c}(d)\,D_c(d),
+\tag{18.6C-1}
+\end{equation}
+\begin{equation}
+E_{\mathrm{day}}(d)=E_h(d)+E_c(d),
+\tag{18.6C-2}
+\end{equation}
+\begin{equation}
+C(d)=c_{\mathrm{elec}}\,E_{\mathrm{day}}(d).
+\tag{18.6C-3}
+\end{equation}
+
+\paragraph{Step 18.6-D: Daily water replacement in report notation.}
+Using the report's evaporation framework:
+\begin{equation}
+\dot m_{\mathrm{diff},i}(d)=h_{m,i}(d)A_{\mathrm{seg},i}(d)\Delta\rho_{v,i}(d),\quad
+\dot m_{\mathrm{carr},i}(d)=\dot V_{\mathrm{rel},i}(d)\Delta\rho_{v,i}(d),\quad
+\dot m_{\mathrm{heat},i}(d)=\frac{\dot m_{\mathrm{rel},i}(d)C_P\!\left(T_{\mathrm{air},i}(d)-T_{\mathrm{bed,ref}}(d)\right)}{h_{fg,i}(d)},
+\tag{107}
+\end{equation}
+\begin{equation}
+\dot m_{\mathrm{evap},i}(d)=\min\!\left(\dot m_{\mathrm{diff},i}(d),\,\dot m_{\mathrm{carr},i}(d),\,\dot m_{\mathrm{heat},i}(d)\right),
+\tag{108}
+\end{equation}
+\begin{equation}
+m_{\mathrm{water,replace}}(d)=\Delta t_d\sum_{i=1}^{N_{\mathrm{aer}}}\dot m_{\mathrm{evap},i}(d),
+\qquad \Delta t_d=24~\mathrm{h}.
+\tag{18.6D-1}
+\end{equation}
+If the run uses the simplified duty-scaled water approximation, keep:
+\begin{equation}
+m_{\mathrm{water,replace}}(d)=\dot m_{\mathrm{water},24h}\,D(d),
+\tag{18.6D-2}
+\end{equation}
+with \(D(d)\) equal to the active branch duty (\(D_h(d)\) on heating days, \(D_c(d)\) on cooling days, else \(0\)).
+
+\subsection*{Annual Sums (unchanged logic)}
+\begin{equation}
+E_{h,\mathrm{yr}}=\sum_{d=1}^{365}E_h(d),\quad
+E_{c,\mathrm{yr}}=\sum_{d=1}^{365}E_c(d),\quad
+C_{\mathrm{yr}}=\sum_{d=1}^{365}C(d),\quad
+m_{\mathrm{water,yr}}=\sum_{d=1}^{365}m_{\mathrm{water,replace}}(d).
+\tag{18.6E-1}
+\end{equation}
+
+\end{document}

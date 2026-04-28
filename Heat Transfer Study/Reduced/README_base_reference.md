@@ -197,11 +197,25 @@ Year-round climate inputs:
 
 - `year_round_analysis.climate_data.monthlyMean_C` and `monthlyStd_C` are the Connecticut statewide 2016-2025 monthly mean-temperature and monthly standard-deviation arrays derived from NOAA NCEI Climate at a Glance.
 - `year_round_analysis.climate_data.freeze.*` and `heat_wave.*` are derived from NOAA daily-summaries station `USW00014740` over the same 2016-2025 period.
+- Local NOAA climate files:
+  - raw daily rows: `Heat Transfer Study\data\climate\noaa_daily_summaries_USW00014740_2016_2025.json`
+  - derived spell bounds: `Heat Transfer Study\data\climate\noaa_heatwave_spell_anomaly_bounds_USW00014740_2016_2025.json`
+- Rebuild those files with:
+  - `python ".\Heat Transfer Study\tools\derive_noaa_heatwave_spell_bounds.py" --save-source-json ".\Heat Transfer Study\data\climate\noaa_daily_summaries_USW00014740_2016_2025.json" --output-json ".\Heat Transfer Study\data\climate\noaa_heatwave_spell_anomaly_bounds_USW00014740_2016_2025.json"`
 - The current annual driver builds a representative 365-day year by:
   - reconstructing a smooth daily ambient baseline from the 12 monthly Connecticut mean-temperature anchors using periodic Gaussian kernel regression on day of year,
   - inserting freeze days with Gaussian timing weights centered on the observed mean freeze day and a repulsion penalty so the selected days are dispersed rather than packed into one block,
-  - inserting heat-wave spells with Gaussian timing weights on spell starts plus repulsion between starts, while still keeping each individual heat-wave spell contiguous by definition,
+  - inserting heat-wave spells with Gaussian timing weights on spell starts plus repulsion between starts, then sampling spell-level anomaly magnitudes from a seeded truncated normal bounded by NOAA-derived monthly spell min/max anomaly arrays while still keeping each spell contiguous by definition,
   - then re-solving the selected heating and cooling operating points at each day's ambient temperature before computing daily duty, electricity, water use, and cost.
+- Heat-wave spell anomaly controls are in `year_round_analysis.climate_data.heat_wave.*`:
+  - `meanAnomalyAboveMonthlyMean_C`
+  - `minSpellAnomalyAboveMonthlyMean_C`
+  - `maxSpellAnomalyAboveMonthlyMean_C`
+  - `spellAnomalyStd_C`
+  - `useDerivedSpellAnomalyBounds`
+  - `derivedSpellAnomalyBoundsPath`
+  - `spellAnomalySamplingModel`
+  - `spellAnomalyRngSeed`
 - The annual plot in `outputs\year_round\year_round_energy_cost_analysis.png` is now a time-series figure:
   - top panel: ambient, bottom-node, and top-node temperatures vs day of year
   - bottom panel: daily cost and cumulative cost vs day of year

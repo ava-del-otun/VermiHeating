@@ -1,0 +1,78 @@
+============================================================
+YEAR-ROUND ENERGY, COST, AND WATER ANALYSIS
+============================================================
+Location                             : Connecticut, USA
+Electricity price basis             : 0.2830 USD/kWh (residential, Connecticut, USA)
+Electricity price source            : https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_5_06_b#:~:text=Table_title:%20Electric%20Power%20Monthly%20Table_content:%20header:%20%7C,%7C%20Residential:%2031.16%20%7C%20Commercial:%2023.03%20%7C ; Connecticut residential average retail electricity price for 2026 = 28.30 cents/kWh = 0.2830 USD/kWh.
+Climate baseline                    : NOAA monthly Connecticut statewide mean temperatures and standard deviations for 2016-2025, plus NOAA daily station event statistics for freeze days and heat waves. The Python annual layer then re-solves the selected heating and cooling operating points at each day's ambient temperature before computing duty, electricity, water use, and cost.
+NOAA statewide monthly source       : https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/statewide/time-series/6/tavg/1/{month}/2016-2025/data.json
+NOAA monthly API documentation      : https://www.ncei.noaa.gov/monitoring-content/cag/text/time-series-api-doc.html
+NOAA daily event source             : https://www.ncei.noaa.gov/access/services/data/v1?dataset=daily-summaries&stations=USW00014740&startDate=2016-01-01&endDate=2025-12-31&dataTypes=TMAX,TMIN,TAVG&units=standard&format=json
+Representative period               : 2016-2025
+Representative profile model        : periodic_gaussian_kernel_regression_with_event_overrides
+Resolved heating setpoint           : 22.0 C
+Resolved cooling setpoint           : 20.0 C
+Baseline regression model           : periodic_gaussian_kernel_regression
+Gaussian kernel bandwidth           : 18.0 days
+Baseline regression description     : Daily baseline ambient is reconstructed from the 12 monthly Connecticut mean-temperature anchors using periodic Gaussian kernel regression on day of year. Monthly standard deviations are regressed the same way for reporting and event-context purposes. Freeze and heat-wave overrides are then applied on top of that smooth baseline.
+Freeze-day definition               : Study freeze-day definition: NOAA daily-summaries TMIN <= 32 F.
+Freeze anomaly sampling model       : triangular_mean_matched_between_monthly_min_max
+Freeze anomaly RNG seed             : 4144
+Freeze anomaly bounds file          : Heat Transfer Study/data/climate/noaa_freeze_day_anomaly_bounds_USW00014740_2016_2025.json
+Freeze bounds derived from NOAA     : True
+Freeze bounds source resolved       : S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\data\climate\noaa_freeze_day_anomaly_bounds_USW00014740_2016_2025.json
+Heat-wave definition                : Study heat-wave definition: at least 3 consecutive days with NOAA daily-summaries TMAX >= 90 F.
+Heat-wave anomaly sampling model    : truncated_normal_between_monthly_min_max
+Heat-wave anomaly RNG seed          : 4143
+Heat-wave start-count allocation    : largest_remainder
+Heat-wave day-count allocation      : largest_remainder
+Heat-wave anomaly bounds file       : Heat Transfer Study/data/climate/noaa_heatwave_spell_anomaly_bounds_USW00014740_2016_2025.json
+Heat-wave bounds derived from NOAA  : True
+Heat-wave bounds source resolved    : S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\data\climate\noaa_heatwave_spell_anomaly_bounds_USW00014740_2016_2025.json
+Allocated annual freeze days        : 119
+Allocated annual heat-wave starts   : 4
+Allocated annual heat-wave days     : 15
+Daily power evaluation              : Heating and cooling electricity are computed from ambient-specific daily reevaluation of the selected operating points, not from fixed -15 C or 37.5 C reference power values.
+
+Reference operating points:
+  Heating reference (design point)  : 453.3 W electric, 426.7 W to bed
+  Cooling reference (design point)  : 52.5 W electric, 42.1 W cooling to bed
+
+Annual totals:
+  Heating electricity               : 908.0 kWh
+  Cooling electricity               : 16.4 kWh
+  Total electricity                 : 924.4 kWh
+  Annual operating cost             : 261.61 USD
+  Annual water replacement          : 1.9 kg
+  Annual unmet-load equivalent      : 4.7 kWh-equivalent
+
+Monthly climate/event table:
+  Month  Tmean(C)  Tstd(C)  Tamb,min  Tamb,max  Freeze(d)  HW starts  HW days
+  Jan     -1.34    2.12    -13.01     -0.26         26          0        0
+  Feb      0.08    1.31    -15.42      1.92         24          0        0
+  Mar      3.89    1.70     -7.09      6.39         19          0        0
+  Apr      8.91    1.39      1.30     11.70          7          0        0
+  May     14.78    1.07     11.89     17.16          0          0        0
+  Jun     19.74    0.78     17.32     27.93          0          1        3
+  Jul     23.32    0.79     21.39     28.03          0          2        8
+  Aug     21.98    1.22     19.98     26.28          0          1        4
+  Sep     18.16    0.63     15.36     19.85          0          0        0
+  Oct     12.44    1.09      3.78     15.17          2          0        0
+  Nov      5.54    1.48     -6.76      8.84         16          0        0
+  Dec      0.53    1.66    -10.68      3.14         25          0        0
+
+Monthly operating table:
+  Month  Tbottom,mean  Ttop,mean  Tbottom,min  Ttop,max  Duty,mean  Duty,peak  Eheat(kWh)  Ecool(kWh)  Cost(USD)  Water(kg)  Unmet,peak(W)
+  Jan         19.76      19.76        19.38     20.02      0.545      0.767       185.3         0.0      52.43       0.00           0.0
+  Feb         19.76      19.76        19.30     20.01      0.555      0.842       170.3         0.0      48.18       0.00           0.0
+  Mar         19.86      19.86        19.58     20.02      0.369      0.594       126.4         0.0      35.77       0.00           0.0
+  Apr         19.92      19.92        19.71     20.03      0.201      0.356        67.0         0.0      18.96       0.00           0.0
+  May         19.98      19.98        19.92     20.02      0.077      0.124        26.7         0.0       7.55       0.00           0.0
+  Jun         20.64      20.64        19.97     22.55      0.051      1.000         3.2         1.6       1.34       0.23          15.8
+  Jul         22.56      22.56        21.25     23.89      0.251      1.000         0.0         9.8       2.78       1.26          15.8
+  Aug         22.15      22.15        20.52     23.33      0.129      1.000         0.0         5.0       1.43       0.42          14.1
+  Sep         20.02      20.02        19.94     20.39      0.027      0.062         9.2         0.0       2.60       0.00           0.0
+  Oct         19.94      19.94        19.83     20.03      0.129      0.300        44.4         0.0      12.57       0.00           0.0
+  Nov         19.88      19.88        19.66     20.03      0.326      0.584       108.2         0.0      30.61       0.00           0.0
+  Dec         19.76      19.76        19.46     20.00      0.492      0.697       167.5         0.0      47.39       0.00           0.0
+============================================================

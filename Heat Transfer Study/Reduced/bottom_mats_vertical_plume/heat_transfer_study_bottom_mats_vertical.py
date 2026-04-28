@@ -5,6 +5,8 @@
 This script creates a new reduced model that:
 1) keeps the recreated cooling workflow, and
 2) replaces heating with four bottom mats plus a vertical porous-bed plume model.
+3) inherits the recreated year-round Section 18 layer, including seeded
+   spell-level heat-wave anomaly sampling.
 
 Heating-side physics includes:
 - buoyancy-driven superficial upward velocity closed by Ergun pressure-drop balance,
@@ -1255,6 +1257,16 @@ def run_year_round_with_base(
         yr_config.setdefault("parallel", {}).setdefault("python", {}).setdefault("loops", {})[
             "yearRoundDailySimulation"
         ] = False
+        yr_annual = yr_config.setdefault("year_round_analysis", {})
+        yr_climate = yr_annual.setdefault("climate_data", {})
+        yr_heat = yr_climate.setdefault("heat_wave", {})
+        yr_heat.setdefault("useDerivedSpellAnomalyBounds", True)
+        yr_heat.setdefault(
+            "derivedSpellAnomalyBoundsPath",
+            "Heat Transfer Study/data/climate/noaa_heatwave_spell_anomaly_bounds_USW00014740_2016_2025.json",
+        )
+        yr_heat.setdefault("spellAnomalySamplingModel", "truncated_normal_between_monthly_min_max")
+        yr_heat.setdefault("spellAnomalyRngSeed", 4143)
         annual_payload = base.build_year_round_payload(heating_payload, cooling_payload, yr_config)
         base.plot_year_round_energy_cost(annual_payload, output_dir)
         base.write_year_round_summary(annual_payload, output_dir)
@@ -1299,48 +1311,130 @@ def plot_combined_heating_cooling_dashboard(
         dtype=float,
     )
     mat_power = np.array([float(pt.get("totalPower_W", np.nan)) for pt in mat_points], dtype=float)
+    mat_flow = np.array([float(pt.get("totalFlow_Lpm", 0.0)) for pt in mat_points], dtype=float)
+    mat_cap = np.array([max(float(pt.get("QtoBed_W", np.nan)), 0.0) for pt in mat_points], dtype=float)
+    mat_tout = np.array([float(pt.get("airOutlet_C", np.nan)) for pt in mat_points], dtype=float)
+    mat_water = np.array([float(pt.get("waterLoss_kg_day", np.nan)) for pt in mat_points], dtype=float)
 
     fig, ax = plt.subplots(2, 2, figsize=(13.5, 8.8), constrained_layout=True)
+    cool_flow_order = np.argsort(np.nan_to_num(cool_flow, nan=np.inf))
+    mat_flow_order = np.argsort(np.nan_to_num(mat_flow, nan=np.inf))
 
-    ax[0, 0].plot(cool_flow, cool_tbed, color="tab:orange", linewidth=2.0, label="Bed temperature")
-    ax[0, 0].set_xlabel("Cooling airflow (L/min)")
+    ax[0, 0].plot(
+        cool_flow[cool_flow_order],
+        cool_tbed[cool_flow_order],
+        color="tab:orange",
+        linewidth=2.0,
+        label="bed temperature (cooling)",
+    )
+    ax[0, 0].plot(
+        mat_flow[mat_flow_order],
+        mat_tbed[mat_flow_order],
+        color="tab:green",
+        linewidth=1.9,
+        linestyle="--",
+        label="bed temperature (heating)",
+    )
+    ax[0, 0].set_xlabel("Airflow (L/min)")
     ax[0, 0].set_ylabel("Bed temperature (C)")
-    ax[0, 0].set_title("Cooling: Bed Temperature")
     ax[0, 0].grid(alpha=0.25)
     ax[0, 0].legend()
 
-    ax[0, 1].plot(cool_flow, cool_cap, color="tab:blue", linewidth=2.0, label="Cooling capacity")
-    ax[0, 1].set_xlabel("Cooling airflow (L/min)")
-    ax[0, 1].set_ylabel("Cooling capacity (W)", color="tab:blue")
-    ax[0, 1].tick_params(axis="y", labelcolor="tab:blue")
-    ax[0, 1].set_title("Cooling: Capacity and Outlet Air")
+    ax[0, 1].plot(
+        cool_flow[cool_flow_order],
+        cool_cap[cool_flow_order],
+        color="tab:blue",
+        linewidth=2.0,
+        label="Cooling capacity",
+    )
+    ax[0, 1].plot(
+        mat_flow[mat_flow_order],
+        mat_cap[mat_flow_order],
+        color="tab:orange",
+        linewidth=1.8,
+        linestyle="--",
+        label="Heating capacity",
+    )
+    ax[0, 1].set_xlabel("Airflow (L/min)")
+    ax[0, 1].set_ylabel("Capacity (W)")
     ax[0, 1].grid(alpha=0.25)
     ax_out = ax[0, 1].twinx()
-    ax_out.plot(cool_flow, cool_tout, color="tab:red", linestyle="--", linewidth=1.8, label="Outlet air temperature")
-    ax_out.set_ylabel("Outlet air temperature (C)", color="tab:red")
+    ax_out.plot(
+        cool_flow[cool_flow_order],
+        cool_tout[cool_flow_order],
+        color="tab:red",
+        linestyle="--",
+        linewidth=1.8,
+        label="outlet air temperature (cooling)",
+    )
+    ax_out.plot(
+        mat_flow[mat_flow_order],
+        mat_tout[mat_flow_order],
+        color="tab:purple",
+        linestyle="-.",
+        linewidth=1.6,
+        label="outlet air temperature (heating)",
+    )
+    ax_out.set_ylabel("Outlet air temperature (C)")
     ax_out.tick_params(axis="y", labelcolor="tab:red")
     lines = ax[0, 1].get_lines() + ax_out.get_lines()
     ax[0, 1].legend(lines, [ln.get_label() for ln in lines], loc="best")
 
-    ax[1, 0].plot(mat_tbed, mat_power, color="tab:purple", linewidth=2.1, label="Bottom mats")
+    ax[1, 0].plot(mat_tbed, mat_power, color="tab:purple", linewidth=2.1, label="Heating power")
+    cool_bed_order = np.argsort(np.nan_to_num(cool_tbed, nan=np.inf))
+    ax[1, 0].plot(
+        cool_tbed[cool_bed_order],
+        cool_power[cool_bed_order],
+        color="tab:blue",
+        linewidth=1.9,
+        linestyle="--",
+        label="Cooling power",
+    )
     ax[1, 0].set_xlabel("Bed temperature (C)")
     ax[1, 0].set_ylabel("Electrical power (W)")
-    ax[1, 0].set_title("Heating: Power vs Bed Temperature (Bottom Mats)")
     ax[1, 0].grid(alpha=0.25)
     ax[1, 0].legend()
 
     order = np.argsort(np.nan_to_num(cool_water, nan=np.inf))
-    x_water = cool_water[order]
-    y_power = cool_power[order]
-    y_flow = cool_flow[order]
-    ax[1, 1].plot(x_water, y_power, color="tab:blue", linewidth=2.0, label="Cooling electrical power")
+    x_water_c = cool_water[order]
+    y_power_c = cool_power[order]
+    y_flow_c = cool_flow[order]
+    ax[1, 1].plot(x_water_c, y_power_c, color="tab:blue", linewidth=2.0, label="Cooling electrical power")
+    mat_order = np.argsort(np.nan_to_num(mat_water, nan=np.inf))
+    x_water_h = mat_water[mat_order]
+    y_power_h = mat_power[mat_order]
+    y_flow_h = mat_flow[mat_order]
+    if np.any(np.isfinite(x_water_h) & np.isfinite(y_power_h)):
+        ax[1, 1].plot(
+            x_water_h,
+            y_power_h,
+            color="tab:purple",
+            linewidth=1.9,
+            linestyle="--",
+            label="Heating electrical power",
+        )
     ax[1, 1].set_xlabel("Moisture loss (kg/day)")
     ax[1, 1].set_ylabel("Cooling electrical power (W)", color="tab:blue")
     ax[1, 1].tick_params(axis="y", labelcolor="tab:blue")
-    ax[1, 1].set_title("Cooling: Moisture Loss vs Power and Flow")
     ax[1, 1].grid(alpha=0.25)
     ax_flow = ax[1, 1].twinx()
-    ax_flow.plot(x_water, y_flow, color="tab:orange", linestyle="--", linewidth=1.8, label="Fan flow rate")
+    ax_flow.plot(
+        x_water_c,
+        y_flow_c,
+        color="tab:orange",
+        linestyle="--",
+        linewidth=1.8,
+        label="Fan flow rate (cooling)",
+    )
+    if np.any(np.isfinite(x_water_h) & np.isfinite(y_flow_h)):
+        ax_flow.plot(
+            x_water_h,
+            y_flow_h,
+            color="tab:green",
+            linestyle="-.",
+            linewidth=1.7,
+            label="Fan flow rate (heating)",
+        )
     ax_flow.set_ylabel("Fan flow rate (L/min)", color="tab:orange")
     ax_flow.tick_params(axis="y", labelcolor="tab:orange")
     lines = ax[1, 1].get_lines() + ax_flow.get_lines()

@@ -1,0 +1,20 @@
+============================================================
+HEAT TRANSFER STUDY OUTPUT INDEX
+============================================================
+This root summary points to the mode-specific output folders.
+
+Heating mode:
+  Folder                             : S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\outputs_recreated_simplified_vertical_heatingviz_combined\heating
+  Summary                            : S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\outputs_recreated_simplified_vertical_heatingviz_combined\heating\study_summary.txt
+
+Cooling mode:
+  Folder                             : S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\outputs_recreated_simplified_vertical_heatingviz_combined\cooling
+  Summary                            : S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\outputs_recreated_simplified_vertical_heatingviz_combined\cooling\study_summary.txt
+
+Year-round analysis:
+  Folder                             : S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\outputs_recreated_simplified_vertical_heatingviz_combined\year_round
+  Summary                            : S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\outputs_recreated_simplified_vertical_heatingviz_combined\year_round\study_summary.txt
+
+Combined dashboard:
+  Figure                             : S:\AcademicResources\UCONN\10. Spring 2026\CHEG 4143W\Project\VermiHeating\Heat Transfer Study\Reduced\outputs_recreated_simplified_vertical_heatingviz_combined\combined_heating_cooling_dashboard.png
+

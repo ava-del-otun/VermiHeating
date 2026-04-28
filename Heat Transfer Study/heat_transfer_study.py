@@ -2820,10 +2820,11 @@ def in_h2o_to_pa(delta_p_in_h2o: float) -> float:
     return float(delta_p_in_h2o) * 249.08891
 
 
-def assist_blower_state(cooling_cfg: dict, total_flow_m3_s: float) -> dict:
-    blower = dict(cooling_cfg.get("assist_blower", {}))
+def blower_curve_state(blower_cfg: dict, total_flow_m3_s: float) -> dict:
+    blower = dict(blower_cfg)
     enabled = bool(blower.get("enabled", False))
-    flow_cfm = total_flow_m3_s / 0.00047194745
+    flow_m3_s = max(float(total_flow_m3_s), 0.0)
+    flow_cfm = flow_m3_s / 0.00047194745
     rated_flow_cfm = float(blower.get("ratedFlow_CFM", np.nan))
     rated_pressure_pa = in_h2o_to_pa(float(blower.get("ratedPressure_inH2O", np.nan)))
     shutoff_pressure_pa = in_h2o_to_pa(float(blower.get("shutoffPressure_inH2O", np.nan)))
@@ -2837,8 +2838,6 @@ def assist_blower_state(cooling_cfg: dict, total_flow_m3_s: float) -> dict:
     available_pressure_pa = float("nan")
     if enabled and np.isfinite(free_air_cfm) and free_air_cfm > 0.0 and np.isfinite(shutoff_pressure_pa):
         available_pressure_pa = max(shutoff_pressure_pa * (1.0 - flow_cfm / free_air_cfm), 0.0)
-    motor_power_W = float(blower.get("motorPower_W", np.nan))
-    electrical_power_W = motor_power_W if enabled and flow_cfm > 0.0 and np.isfinite(motor_power_W) else 0.0
     return {
         "enabled": enabled,
         "model": str(blower.get("model", "")),
@@ -2848,19 +2847,99 @@ def assist_blower_state(cooling_cfg: dict, total_flow_m3_s: float) -> dict:
         "shutoffPressure_Pa": float(shutoff_pressure_pa) if np.isfinite(shutoff_pressure_pa) else float("nan"),
         "impliedFreeAirFlow_CFM": float(free_air_cfm) if np.isfinite(free_air_cfm) else float("nan"),
         "requestedFlow_CFM": float(flow_cfm),
+        "requestedFlow_m3_s": float(flow_m3_s),
         "availablePressure_Pa": float(available_pressure_pa) if np.isfinite(available_pressure_pa) else float("nan"),
-        "electricalPower_W": float(electrical_power_W),
+        "ratedMotorPower_W": float(blower.get("motorPower_W", np.nan)),
+        "totalEfficiency": float(blower.get("totalEfficiency", blower.get("efficiency", np.nan))),
+        "idlePower_W": float(blower.get("idlePower_W", 0.0)),
+        "powerModel": str(blower.get("powerModel", "hydraulic_over_efficiency_capped")),
+        "electricalPower_W": 0.0,
+        "shaftPower_W": 0.0,
+        "operatingPressure_Pa": float("nan"),
     }
 
 
-def solve_assist_blower_operating_flow(
-    cooling_cfg: dict,
+def blower_electrical_power_W(
+    blower_cfg: dict,
+    total_flow_m3_s: float,
+    operating_pressure_pa: float,
+    available_pressure_pa: float = float("nan"),
+) -> float:
+    blower = dict(blower_cfg)
+    enabled = bool(blower.get("enabled", False))
+    flow_m3_s = max(float(total_flow_m3_s), 0.0)
+    if not enabled or flow_m3_s <= 0.0:
+        return 0.0
+    rated_power_W = float(blower.get("motorPower_W", np.nan))
+    idle_power_W = max(float(blower.get("idlePower_W", 0.0)), 0.0)
+    total_efficiency = float(blower.get("totalEfficiency", blower.get("efficiency", np.nan)))
+    pressure_for_power_pa = max(float(operating_pressure_pa), 0.0)
+    if np.isfinite(available_pressure_pa):
+        pressure_for_power_pa = min(pressure_for_power_pa, max(float(available_pressure_pa), 0.0))
+    shaft_power_W = flow_m3_s * pressure_for_power_pa
+    if np.isfinite(total_efficiency) and total_efficiency > 1.0e-9:
+        electrical_power_W = idle_power_W + shaft_power_W / total_efficiency
+    elif np.isfinite(rated_power_W) and rated_power_W > 0.0:
+        free_air_cfm = float(blower.get("freeAirFlow_CFM", np.nan))
+        if not np.isfinite(free_air_cfm) or free_air_cfm <= 0.0:
+            free_air_cfm = float(blower.get("ratedFlow_CFM", np.nan))
+        if np.isfinite(free_air_cfm) and free_air_cfm > 0.0:
+            flow_fraction = np.clip(lpm_to_cfm(flow_m3_s * 60000.0) / free_air_cfm, 0.0, 1.0)
+        else:
+            flow_fraction = 1.0
+        electrical_power_W = idle_power_W + max(rated_power_W - idle_power_W, 0.0) * flow_fraction
+    else:
+        electrical_power_W = 0.0
+    if np.isfinite(rated_power_W) and rated_power_W > 0.0:
+        electrical_power_W = min(electrical_power_W, rated_power_W)
+    return float(max(electrical_power_W, 0.0))
+
+
+def system_state_delta_p_pa(system_state: dict) -> float:
+    for key in ("delta_p_Pa", "deltaP_Pa"):
+        value = float(system_state.get(key, np.nan))
+        if np.isfinite(value):
+            return value
+    return float("nan")
+
+
+def finalize_blower_operating_state(
+    blower_cfg: dict,
+    total_flow_m3_s: float,
+    system_state: dict,
+    curve_state: dict,
+) -> dict:
+    out = dict(curve_state)
+    flow_m3_s = max(float(total_flow_m3_s), 0.0)
+    available_pressure_pa = float(out.get("availablePressure_Pa", np.nan))
+    system_delta_p_pa = system_state_delta_p_pa(system_state)
+    if np.isfinite(system_delta_p_pa):
+        operating_pressure_pa = max(system_delta_p_pa, 0.0)
+        if np.isfinite(available_pressure_pa):
+            operating_pressure_pa = min(operating_pressure_pa, max(available_pressure_pa, 0.0))
+    else:
+        operating_pressure_pa = max(available_pressure_pa, 0.0) if np.isfinite(available_pressure_pa) else 0.0
+    shaft_power_W = max(flow_m3_s, 0.0) * max(operating_pressure_pa, 0.0)
+    electrical_power_W = blower_electrical_power_W(
+        blower_cfg,
+        flow_m3_s,
+        operating_pressure_pa,
+        available_pressure_pa,
+    )
+    out["operatingPressure_Pa"] = float(operating_pressure_pa)
+    out["shaftPower_W"] = float(shaft_power_W)
+    out["electricalPower_W"] = float(electrical_power_W)
+    return out
+
+
+def solve_blower_operating_flow(
+    blower_cfg: dict,
     requested_flow_m3_s: float,
     system_state_fn,
 ) -> tuple[float, dict, dict, float, bool]:
     requested_flow_m3_s = max(float(requested_flow_m3_s), 0.0)
     state_cache: dict[float, dict] = {}
-    assist_cache: dict[float, dict] = {}
+    curve_cache: dict[float, dict] = {}
 
     def cached_state(flow_m3_s: float) -> dict:
         flow_m3_s = max(float(flow_m3_s), 0.0)
@@ -2868,57 +2947,92 @@ def solve_assist_blower_operating_flow(
             state_cache[flow_m3_s] = system_state_fn(flow_m3_s)
         return state_cache[flow_m3_s]
 
-    def cached_assist(flow_m3_s: float) -> dict:
+    def cached_curve(flow_m3_s: float) -> dict:
         flow_m3_s = max(float(flow_m3_s), 0.0)
-        if flow_m3_s not in assist_cache:
-            assist_cache[flow_m3_s] = assist_blower_state(cooling_cfg, flow_m3_s)
-        return assist_cache[flow_m3_s]
+        if flow_m3_s not in curve_cache:
+            curve_cache[flow_m3_s] = blower_curve_state(blower_cfg, flow_m3_s)
+        return curve_cache[flow_m3_s]
 
     requested_state = cached_state(requested_flow_m3_s)
-    requested_assist = cached_assist(requested_flow_m3_s)
-    available_req = float(requested_assist.get("availablePressure_Pa", np.nan))
-    residual_req = float(requested_state.get("delta_p_Pa", np.nan)) - available_req
+    requested_curve = cached_curve(requested_flow_m3_s)
+    available_req = float(requested_curve.get("availablePressure_Pa", np.nan))
+    residual_req = system_state_delta_p_pa(requested_state) - available_req
     if (
-        not bool(requested_assist.get("enabled", False))
+        not bool(requested_curve.get("enabled", False))
         or not np.isfinite(available_req)
         or requested_flow_m3_s <= 0.0
         or not np.isfinite(residual_req)
         or residual_req <= 0.0
     ):
-        return requested_flow_m3_s, requested_state, requested_assist, residual_req, False
+        final_curve = finalize_blower_operating_state(
+            blower_cfg,
+            requested_flow_m3_s,
+            requested_state,
+            requested_curve,
+        )
+        return requested_flow_m3_s, requested_state, final_curve, residual_req, False
 
     lo = 0.0
     hi = requested_flow_m3_s
     state_lo = cached_state(lo)
-    assist_lo = cached_assist(lo)
-    available_lo = float(assist_lo.get("availablePressure_Pa", np.nan))
-    residual_lo = float(state_lo.get("delta_p_Pa", np.nan)) - available_lo
+    curve_lo = cached_curve(lo)
+    available_lo = float(curve_lo.get("availablePressure_Pa", np.nan))
+    residual_lo = system_state_delta_p_pa(state_lo) - available_lo
     if not np.isfinite(residual_lo) or residual_lo > 0.0:
-        return 0.0, state_lo, assist_lo, residual_lo, True
+        final_curve = finalize_blower_operating_state(
+            blower_cfg,
+            0.0,
+            state_lo,
+            curve_lo,
+        )
+        return 0.0, state_lo, final_curve, residual_lo, True
 
     best_flow = lo
     best_state = state_lo
-    best_assist = assist_lo
+    best_curve = curve_lo
     best_residual = residual_lo
     for _ in range(60):
         mid = 0.5 * (lo + hi)
         state_mid = cached_state(mid)
-        assist_mid = cached_assist(mid)
-        available_mid = float(assist_mid.get("availablePressure_Pa", np.nan))
-        residual_mid = float(state_mid.get("delta_p_Pa", np.nan)) - available_mid
+        curve_mid = cached_curve(mid)
+        available_mid = float(curve_mid.get("availablePressure_Pa", np.nan))
+        residual_mid = system_state_delta_p_pa(state_mid) - available_mid
         if not np.isfinite(residual_mid):
             hi = mid
         elif residual_mid <= 0.0:
             lo = mid
             best_flow = mid
             best_state = state_mid
-            best_assist = assist_mid
+            best_curve = curve_mid
             best_residual = residual_mid
         else:
             hi = mid
         if hi - lo <= max(1.0e-9, 1.0e-6 * max(requested_flow_m3_s, 1.0)):
             break
-    return best_flow, best_state, best_assist, best_residual, True
+
+    final_curve = finalize_blower_operating_state(
+        blower_cfg,
+        best_flow,
+        best_state,
+        best_curve,
+    )
+    return best_flow, best_state, final_curve, best_residual, True
+
+
+def assist_blower_state(cooling_cfg: dict, total_flow_m3_s: float) -> dict:
+    blower_cfg = dict(cooling_cfg.get("assist_blower", {}))
+    curve_state = blower_curve_state(blower_cfg, total_flow_m3_s)
+    pseudo_state = {"delta_p_Pa": float(curve_state.get("availablePressure_Pa", np.nan))}
+    return finalize_blower_operating_state(blower_cfg, total_flow_m3_s, pseudo_state, curve_state)
+
+
+def solve_assist_blower_operating_flow(
+    cooling_cfg: dict,
+    requested_flow_m3_s: float,
+    system_state_fn,
+) -> tuple[float, dict, dict, float, bool]:
+    blower_cfg = dict(cooling_cfg.get("assist_blower", {}))
+    return solve_blower_operating_flow(blower_cfg, requested_flow_m3_s, system_state_fn)
 
 
 def summer_evaporation_loss_segment(
@@ -4936,7 +5050,13 @@ def solve_heating_aeration_tube_python(
     return state
 
 
-def simulate_heating_reference_point(config: dict, point: dict, ambient_air_C: float, bed_temp_C: float) -> dict:
+def _simulate_heating_reference_point_at_flow(
+    config: dict,
+    point: dict,
+    ambient_air_C: float,
+    bed_temp_C: float,
+    total_flow_lpm_override: float | None = None,
+) -> dict:
     summary_inputs = config.get("summary_inputs", {})
     model_overrides = normalized_model_overrides(config)
     env_inputs = effective_environment_inputs(summary_inputs, model_overrides)
@@ -4951,14 +5071,19 @@ def simulate_heating_reference_point(config: dict, point: dict, ambient_air_C: f
     string_counts = heating_string_tube_counts(model_overrides, point, n_tubes)
     topology_label = str(point.get("electricalTopologyLabel") or electrical_topology_label(string_counts))
     n_tubes = sum(string_counts)
-    total_flow_lpm = float(point.get("totalFlow_Lpm", 0.0))
+    total_flow_lpm = float(point.get("totalFlow_Lpm", 0.0)) if total_flow_lpm_override is None else float(total_flow_lpm_override)
     total_flow_m3_s = total_flow_lpm / 60000.0
     voltage_V = float(point.get("voltage_V", 0.0))
     air_in_K = ambient_air_C + 273.15
     wire = build_heating_wire_geometry(point, heater_inputs, wire_inputs)
     if not wire.get("isValid", False):
         return {
+            "totalFlow_Lpm": float(total_flow_lpm),
+            "requestedTotalFlow_Lpm": float(total_flow_lpm),
+            "achievedTotalFlow_Lpm": float(total_flow_lpm),
             "totalPower_W": float("inf"),
+            "heaterCoilPower_W": float("inf"),
+            "heatingBlowerPower_W": 0.0,
             "totalCurrent_A": float("inf"),
             "QtoBed_W": 0.0,
             "deltaP_Pa": float("inf"),
@@ -5354,7 +5479,12 @@ def simulate_heating_reference_point(config: dict, point: dict, ambient_air_C: f
         "tubePowerMean_W": float(mean_tube_power_W),
         "tubePowerMax_W": float(tube_power_max_W),
         "hWire_W_m2K": float(mean_hwire),
+        "totalFlow_Lpm": float(total_flow_lpm),
+        "requestedTotalFlow_Lpm": float(total_flow_lpm),
+        "achievedTotalFlow_Lpm": float(total_flow_lpm),
         "totalPower_W": float(total_power_W),
+        "heaterCoilPower_W": float(total_power_W),
+        "heatingBlowerPower_W": 0.0,
         "totalCurrent_A": float(total_current_A),
         "branchQtoBed_W": float(mean_branch_q_W),
         "QtoBed_W": float(q_to_bed_W),
@@ -5382,6 +5512,75 @@ def simulate_heating_reference_point(config: dict, point: dict, ambient_air_C: f
         "pressureSolveConverged": bool(pressure_solve_converged),
         "groupPressureStates": group_pressure_states,
     }
+
+
+def simulate_heating_reference_point(config: dict, point: dict, ambient_air_C: float, bed_temp_C: float) -> dict:
+    requested_total_flow_lpm = max(float(point.get("totalFlow_Lpm", 0.0)), 0.0)
+    requested_total_flow_m3_s = requested_total_flow_lpm / 60000.0
+    blower_cfg = heating_blower_config(config)
+
+    def evaluate_state_at_flow(total_flow_m3_s: float) -> dict:
+        return _simulate_heating_reference_point_at_flow(
+            config,
+            point,
+            ambient_air_C,
+            bed_temp_C,
+            float(max(total_flow_m3_s, 0.0) * 60000.0),
+        )
+
+    if not bool(blower_cfg.get("enabled", False)):
+        state = evaluate_state_at_flow(requested_total_flow_m3_s)
+        coil_power_W = max(float(state.get("totalPower_W", 0.0)), 0.0)
+        state["totalPower_W"] = float(coil_power_W)
+        state["heaterCoilPower_W"] = float(coil_power_W)
+        state["heatingBlowerPower_W"] = 0.0
+        state["requestedTotalFlow_Lpm"] = float(requested_total_flow_lpm)
+        state["achievedTotalFlow_Lpm"] = float(requested_total_flow_lpm)
+        state["totalFlow_Lpm"] = float(requested_total_flow_lpm)
+        state["heatingBlowerFlowShortfall_Lpm"] = 0.0
+        state["heatingBlowerFlowLimited"] = False
+        state["heatingBlowerOperatingResidual_Pa"] = 0.0
+        state["heatingBlowerAvailablePressure_Pa"] = float("nan")
+        state["heatingBlowerOperatingPressure_Pa"] = float("nan")
+        state["heatingBlowerShaftPower_W"] = 0.0
+        state["heatingBlowerRatedFlow_CFM"] = float("nan")
+        state["heatingBlowerRatedPressure_Pa"] = float("nan")
+        state["heatingBlowerShutoffPressure_Pa"] = float("nan")
+        state["heatingBlowerImpliedFreeAirFlow_CFM"] = float("nan")
+        state["heatingBlowerModel"] = str(blower_cfg.get("model", ""))
+        state["heatingBlowerReferenceNote"] = str(blower_cfg.get("reference", ""))
+        state["heatingBlowerTotalEfficiency"] = float(blower_cfg.get("totalEfficiency", blower_cfg.get("efficiency", np.nan)))
+        return state
+
+    achieved_flow_m3_s, state, blower_state, operating_residual_pa, blower_limited = solve_blower_operating_flow(
+        blower_cfg,
+        requested_total_flow_m3_s,
+        evaluate_state_at_flow,
+    )
+    achieved_flow_lpm = float(max(achieved_flow_m3_s, 0.0) * 60000.0)
+    coil_power_W = max(float(state.get("totalPower_W", 0.0)), 0.0)
+    blower_power_W = max(float(blower_state.get("electricalPower_W", 0.0)), 0.0)
+    state["totalPower_W"] = float(coil_power_W + blower_power_W)
+    state["heaterCoilPower_W"] = float(coil_power_W)
+    state["heatingBlowerPower_W"] = float(blower_power_W)
+    state["requestedTotalFlow_Lpm"] = float(requested_total_flow_lpm)
+    state["achievedTotalFlow_Lpm"] = float(achieved_flow_lpm)
+    state["totalFlow_Lpm"] = float(achieved_flow_lpm)
+    state["heatingBlowerFlowShortfall_Lpm"] = float(max(requested_total_flow_lpm - achieved_flow_lpm, 0.0))
+    state["heatingBlowerFlowLimited"] = bool(blower_limited and achieved_flow_m3_s + 1.0e-12 < requested_total_flow_m3_s)
+    state["heatingBlowerOperatingResidual_Pa"] = float(operating_residual_pa)
+    state["heatingBlowerAvailablePressure_Pa"] = float(blower_state.get("availablePressure_Pa", np.nan))
+    state["heatingBlowerOperatingPressure_Pa"] = float(blower_state.get("operatingPressure_Pa", np.nan))
+    state["heatingBlowerShaftPower_W"] = float(blower_state.get("shaftPower_W", np.nan))
+    state["heatingBlowerRatedFlow_CFM"] = float(blower_state.get("ratedFlow_CFM", np.nan))
+    state["heatingBlowerRatedPressure_Pa"] = float(blower_state.get("ratedPressure_Pa", np.nan))
+    state["heatingBlowerShutoffPressure_Pa"] = float(blower_state.get("shutoffPressure_Pa", np.nan))
+    state["heatingBlowerImpliedFreeAirFlow_CFM"] = float(blower_state.get("impliedFreeAirFlow_CFM", np.nan))
+    state["heatingBlowerModel"] = str(blower_state.get("model", ""))
+    state["heatingBlowerReferenceNote"] = str(blower_state.get("referenceNote", ""))
+    state["heatingBlowerTotalEfficiency"] = float(blower_state.get("totalEfficiency", np.nan))
+    return state
+
 
 IDELCHIK_CONICAL_ANGLE_DEG = np.array([0.0, 10.0, 20.0, 30.0, 40.0, 60.0, 100.0, 140.0, 180.0], dtype=float)
 IDELCHIK_CONICAL_EPSILON = np.array([0.025, 0.050, 0.075, 0.10, 0.15, 0.25, 0.60, 1.0], dtype=float)
@@ -5808,6 +6007,49 @@ def two_node_steady_state_python(bin_model: dict, ambient_C: float, q_bed_W: flo
     return float(x[0]), float(x[1])
 
 
+def heating_blower_config(config: dict) -> dict:
+    model_overrides = normalized_model_overrides(config)
+    flow_sweep = model_overrides.get("sweep", {})
+    cooling_assist = dict(config.get("cooling_mode", {}).get("assist_blower", {}))
+    heating_blower = dict(config.get("heating_blower", {}))
+    if not heating_blower and cooling_assist:
+        heating_blower = dict(cooling_assist)
+
+    rated_flow_default = float(cooling_assist.get("ratedFlow_CFM", np.nan))
+    if not np.isfinite(rated_flow_default) or rated_flow_default <= 0.0:
+        flow_max_lpm = float(flow_sweep.get("totalFlow_Lpm_max", np.nan))
+        rated_flow_default = lpm_to_cfm(flow_max_lpm) if np.isfinite(flow_max_lpm) and flow_max_lpm > 0.0 else 8.0
+    rated_pressure_default = float(cooling_assist.get("ratedPressure_inH2O", np.nan))
+    if not np.isfinite(rated_pressure_default):
+        rated_pressure_default = 10.0
+    shutoff_default = float(cooling_assist.get("shutoffPressure_inH2O", np.nan))
+    if not np.isfinite(shutoff_default):
+        shutoff_default = 28.0
+    motor_power_default = float(cooling_assist.get("motorPower_W", np.nan))
+    if not np.isfinite(motor_power_default) or motor_power_default <= 0.0:
+        motor_power_default = 190.0
+
+    heating_blower.setdefault("enabled", True)
+    heating_blower.setdefault("model", str(cooling_assist.get("model", "Shared process blower")))
+    heating_blower.setdefault("ratedFlow_CFM", float(rated_flow_default))
+    heating_blower.setdefault("ratedPressure_inH2O", float(rated_pressure_default))
+    heating_blower.setdefault("shutoffPressure_inH2O", float(shutoff_default))
+    heating_blower.setdefault("motorPower_W", float(motor_power_default))
+    heating_blower.setdefault("totalEfficiency", float(cooling_assist.get("totalEfficiency", cooling_assist.get("efficiency", 0.35))))
+    heating_blower.setdefault("idlePower_W", float(cooling_assist.get("idlePower_W", 0.0)))
+    heating_blower.setdefault("powerModel", str(cooling_assist.get("powerModel", "hydraulic_over_efficiency_capped")))
+    heating_blower.setdefault(
+        "reference",
+        str(
+            cooling_assist.get(
+                "reference",
+                "Heating blower uses the same fan-curve and power-model structure as cooling assist blower unless overridden.",
+            )
+        ),
+    )
+    return heating_blower
+
+
 def cooling_mode_config(config: dict) -> dict:
     summary_inputs = config.get("summary_inputs", {})
     model_overrides = normalized_model_overrides(config)
@@ -5836,6 +6078,9 @@ def cooling_mode_config(config: dict) -> dict:
     assist.setdefault("ratedPressure_inH2O", 10.0)
     assist.setdefault("shutoffPressure_inH2O", 28.0)
     assist.setdefault("motorPower_W", 190.0)
+    assist.setdefault("totalEfficiency", float(assist.get("efficiency", 0.35)))
+    assist.setdefault("idlePower_W", 0.0)
+    assist.setdefault("powerModel", "hydraulic_over_efficiency_capped")
     assist.setdefault(
         "reference",
         "AquaCave Whitewater WW-18 regenerative blower: 8 CFM at 10 in. water, max duty 28 in. water, 190 W",
@@ -5881,14 +6126,122 @@ def cooling_mode_config(config: dict) -> dict:
 def cost_analysis_config(config: dict) -> dict:
     cost = dict(config.get("cost_analysis", {}))
     cost.setdefault("enabled", True)
-    cost.setdefault("electricity_price_usd_per_kWh", 0.2875)
+    cost.setdefault("electricity_price_usd_per_kWh", 0.2830)
     cost.setdefault("location", "Connecticut, USA")
     cost.setdefault("tariff_class", "residential")
     cost.setdefault(
         "source",
-        "https://www.eia.gov/electricity/annual/html/epa_02_10.html ; Connecticut residential average retail electricity price for 2024 = 28.75 cents/kWh = $0.2875/kWh.",
+        "https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_5_06_b#:~:text=Table_title:%20Electric%20Power%20Monthly%20Table_content:%20header:%20%7C,%7C%20Residential:%2031.16%20%7C%20Commercial:%2023.03%20%7C ; Connecticut residential average retail electricity price for 2026 = 28.30 cents/kWh = 0.2830 USD/kWh.",
     )
     return cost
+
+
+def resolve_existing_data_path(path_value: str) -> Path | None:
+    raw = str(path_value).strip()
+    if not raw:
+        return None
+    candidate = Path(raw).expanduser()
+    search_paths = [candidate]
+    if not candidate.is_absolute():
+        search_paths.extend(
+            [
+                ROOT_DIR / candidate,
+                ROOT_DIR.parent / candidate,
+                PROJECT_ROOT / candidate,
+                Path.cwd() / candidate,
+            ]
+        )
+    for path in search_paths:
+        try:
+            if path.exists():
+                return path.resolve()
+        except OSError:
+            continue
+    return None
+
+
+def load_noaa_spell_anomaly_bounds(path_value: str) -> dict | None:
+    source_path = resolve_existing_data_path(path_value)
+    if source_path is None:
+        return None
+    try:
+        payload = json.loads(source_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+
+    required = {
+        "meanSpellAnomalyAboveMonthlyMean_C": "meanAnomalyAboveMonthlyMean_C",
+        "minSpellAnomalyAboveMonthlyMean_C": "minSpellAnomalyAboveMonthlyMean_C",
+        "maxSpellAnomalyAboveMonthlyMean_C": "maxSpellAnomalyAboveMonthlyMean_C",
+        "spellAnomalyStd_C": "spellAnomalyStd_C",
+    }
+    loaded: dict[str, list[float] | str | int] = {"sourceResolved": str(source_path)}
+    for source_key, target_key in required.items():
+        value = payload.get(source_key)
+        if not isinstance(value, list) or len(value) < 12:
+            return None
+        try:
+            loaded[target_key] = [float(v) for v in value[:12]]
+        except (TypeError, ValueError):
+            return None
+    if isinstance(payload.get("generatedUtc"), str):
+        loaded["generatedUtc"] = str(payload["generatedUtc"])
+    spell_counts = payload.get("spellCountByStartMonth")
+    if isinstance(spell_counts, list) and len(spell_counts) >= 12:
+        try:
+            loaded["spellCountByStartMonth"] = [int(float(v)) for v in spell_counts[:12]]
+        except (TypeError, ValueError):
+            pass
+    if isinstance(payload.get("spellCountTotal"), (int, float, str)):
+        try:
+            loaded["spellCountTotal"] = int(float(payload["spellCountTotal"]))
+        except (TypeError, ValueError):
+            pass
+    return loaded
+
+
+def load_noaa_freeze_anomaly_bounds(path_value: str) -> dict | None:
+    source_path = resolve_existing_data_path(path_value)
+    if source_path is None:
+        return None
+    try:
+        payload = json.loads(source_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+
+    required = {
+        "meanAnomalyBelowMonthlyMean_C": "meanAnomalyBelowMonthlyMean_C",
+        "minAnomalyBelowMonthlyMean_C": "minAnomalyBelowMonthlyMean_C",
+        "maxAnomalyBelowMonthlyMean_C": "maxAnomalyBelowMonthlyMean_C",
+        "anomalyStd_C": "anomalyStd_C",
+    }
+    loaded: dict[str, list[float] | str | int] = {"sourceResolved": str(source_path)}
+    for source_key, target_key in required.items():
+        value = payload.get(source_key)
+        if not isinstance(value, list) or len(value) < 12:
+            return None
+        try:
+            loaded[target_key] = [float(v) for v in value[:12]]
+        except (TypeError, ValueError):
+            return None
+    if isinstance(payload.get("generatedUtc"), str):
+        loaded["generatedUtc"] = str(payload["generatedUtc"])
+    freeze_counts = payload.get("freezeCountByMonth")
+    if isinstance(freeze_counts, list) and len(freeze_counts) >= 12:
+        try:
+            loaded["freezeCountByMonth"] = [int(float(v)) for v in freeze_counts[:12]]
+        except (TypeError, ValueError):
+            pass
+    if isinstance(payload.get("freezeCountTotal"), (int, float, str)):
+        try:
+            loaded["freezeCountTotal"] = int(float(payload["freezeCountTotal"]))
+        except (TypeError, ValueError):
+            pass
+    return loaded
 
 
 def year_round_analysis_config(config: dict) -> dict:
@@ -5947,6 +6300,41 @@ def year_round_analysis_config(config: dict) -> dict:
     freeze.setdefault("definition", "Study freeze-day definition: NOAA daily-summaries TMIN <= 32 F.")
     freeze.setdefault("averageDaysPerMonth", [26.3, 24.1, 18.6, 6.3, 0.2, 0.0, 0.0, 0.0, 0.0, 2.3, 16.5, 25.2])
     freeze.setdefault("meanAnomalyBelowMonthlyMean_C", [0.79, 0.85, 1.84, 3.97, 6.45, 0.0, 0.0, 0.0, 0.0, 6.64, 2.51, 1.08])
+    freeze.setdefault("minAnomalyBelowMonthlyMean_C", [0.0, 0.0, 0.0, 0.0, 6.45, 0.0, 0.0, 0.0, 0.0, 6.64, 0.0, 0.0])
+    freeze.setdefault("maxAnomalyBelowMonthlyMean_C", [0.79, 0.85, 1.84, 3.97, 6.45, 0.0, 0.0, 0.0, 0.0, 6.64, 2.51, 1.08])
+    freeze.setdefault("anomalyStd_C", [0.0] * 12)
+    freeze.setdefault("useDerivedAnomalyBounds", True)
+    freeze.setdefault(
+        "derivedAnomalyBoundsPath",
+        "Heat Transfer Study/data/climate/noaa_freeze_day_anomaly_bounds_USW00014740_2016_2025.json",
+    )
+    freeze.setdefault(
+        "derivedAnomalyBoundsDescription",
+        "If enabled and file exists, overwrite freeze anomaly mean/min/max/std arrays from this NOAA-derived JSON.",
+    )
+    freeze.setdefault("anomalySamplingModel", "triangular_mean_matched_between_monthly_min_max")
+    freeze.setdefault("anomalyRngSeed", 4144)
+    freeze.setdefault(
+        "anomalySamplingDescription",
+        "For each selected freeze day in S_f,m, draw freeze anomaly from a mean-matched triangular distribution on monthly NOAA min/max bounds (mode = clip(3*mean - min - max, min, max)).",
+    )
+    if bool(freeze.get("useDerivedAnomalyBounds", False)):
+        derived_freeze_bounds = load_noaa_freeze_anomaly_bounds(str(freeze.get("derivedAnomalyBoundsPath", "")))
+        if derived_freeze_bounds is not None:
+            freeze["meanAnomalyBelowMonthlyMean_C"] = list(derived_freeze_bounds["meanAnomalyBelowMonthlyMean_C"])
+            freeze["minAnomalyBelowMonthlyMean_C"] = list(derived_freeze_bounds["minAnomalyBelowMonthlyMean_C"])
+            freeze["maxAnomalyBelowMonthlyMean_C"] = list(derived_freeze_bounds["maxAnomalyBelowMonthlyMean_C"])
+            freeze["anomalyStd_C"] = list(derived_freeze_bounds["anomalyStd_C"])
+            freeze["anomalyBoundsDerivedFromNoaa"] = True
+            freeze["anomalyBoundsSourceResolved"] = str(derived_freeze_bounds["sourceResolved"])
+            if "generatedUtc" in derived_freeze_bounds:
+                freeze["anomalyBoundsGeneratedUtc"] = str(derived_freeze_bounds["generatedUtc"])
+            if "freezeCountByMonth" in derived_freeze_bounds:
+                freeze["anomalyBoundsFreezeCountByMonth"] = list(derived_freeze_bounds["freezeCountByMonth"])
+            if "freezeCountTotal" in derived_freeze_bounds:
+                freeze["anomalyBoundsFreezeCountTotal"] = int(derived_freeze_bounds["freezeCountTotal"])
+        else:
+            freeze.setdefault("anomalyBoundsDerivedFromNoaa", False)
     freeze.setdefault("meanDayOfMonth", [15.9, 13.9, 14.8, 10.1, 14.0, 0.0, 0.0, 0.0, 0.0, 24.2, 17.3, 16.1])
     climate["freeze"] = freeze
     heat_wave = dict(climate.get("heat_wave", {}))
@@ -5954,9 +6342,48 @@ def year_round_analysis_config(config: dict) -> dict:
         "definition",
         "Study heat-wave definition: at least 3 consecutive days with NOAA daily-summaries TMAX >= 90 F.",
     )
+    default_heat_anomaly = [0.0, 0.0, 0.0, 0.0, 10.22, 7.44, 4.12, 5.28, 9.10, 0.0, 0.0, 0.0]
+    default_heat_anomaly_min = [0.0, 0.0, 0.0, 0.0, 10.22, 5.48, 2.51, 2.74, 9.06, 0.0, 0.0, 0.0]
+    default_heat_anomaly_max = [0.0, 0.0, 0.0, 0.0, 10.22, 9.29, 6.12, 7.19, 9.13, 0.0, 0.0, 0.0]
+    default_heat_anomaly_std = [0.0, 0.0, 0.0, 0.0, 0.0, 1.30, 0.86, 1.25, 0.03, 0.0, 0.0, 0.0]
     heat_wave.setdefault("averageSpellStartsPerMonth", [0.0, 0.0, 0.0, 0.0, 0.1, 0.7, 1.7, 0.9, 0.2, 0.0, 0.0, 0.0])
     heat_wave.setdefault("averageDaysPerMonth", [0.0, 0.0, 0.0, 0.0, 0.3, 2.8, 8.4, 3.9, 0.7, 0.0, 0.0, 0.0])
-    heat_wave.setdefault("meanAnomalyAboveMonthlyMean_C", [0.0, 0.0, 0.0, 0.0, 10.96, 7.24, 3.83, 4.74, 8.43, 0.0, 0.0, 0.0])
+    heat_wave.setdefault("meanAnomalyAboveMonthlyMean_C", list(default_heat_anomaly))
+    heat_wave.setdefault("minSpellAnomalyAboveMonthlyMean_C", list(default_heat_anomaly_min))
+    heat_wave.setdefault("maxSpellAnomalyAboveMonthlyMean_C", list(default_heat_anomaly_max))
+    heat_wave.setdefault("spellAnomalyStd_C", list(default_heat_anomaly_std))
+    heat_wave.setdefault("useDerivedSpellAnomalyBounds", True)
+    heat_wave.setdefault(
+        "derivedSpellAnomalyBoundsPath",
+        "Heat Transfer Study/data/climate/noaa_heatwave_spell_anomaly_bounds_USW00014740_2016_2025.json",
+    )
+    heat_wave.setdefault(
+        "derivedSpellAnomalyBoundsDescription",
+        "If enabled and file exists, overwrite spell anomaly mean/min/max/std arrays from this NOAA-derived JSON.",
+    )
+    heat_wave.setdefault("spellAnomalySamplingModel", "truncated_normal_between_monthly_min_max")
+    heat_wave.setdefault("spellAnomalyRngSeed", 4143)
+    heat_wave.setdefault(
+        "spellAnomalySamplingDescription",
+        "For each selected heat-wave spell start in S_h,m, draw spell anomaly from a truncated normal bounded by monthly spell-level NOAA min/max anomaly arrays.",
+    )
+    if bool(heat_wave.get("useDerivedSpellAnomalyBounds", False)):
+        derived_bounds = load_noaa_spell_anomaly_bounds(str(heat_wave.get("derivedSpellAnomalyBoundsPath", "")))
+        if derived_bounds is not None:
+            heat_wave["meanAnomalyAboveMonthlyMean_C"] = list(derived_bounds["meanAnomalyAboveMonthlyMean_C"])
+            heat_wave["minSpellAnomalyAboveMonthlyMean_C"] = list(derived_bounds["minSpellAnomalyAboveMonthlyMean_C"])
+            heat_wave["maxSpellAnomalyAboveMonthlyMean_C"] = list(derived_bounds["maxSpellAnomalyAboveMonthlyMean_C"])
+            heat_wave["spellAnomalyStd_C"] = list(derived_bounds["spellAnomalyStd_C"])
+            heat_wave["spellAnomalyBoundsDerivedFromNoaa"] = True
+            heat_wave["spellAnomalyBoundsSourceResolved"] = str(derived_bounds["sourceResolved"])
+            if "generatedUtc" in derived_bounds:
+                heat_wave["spellAnomalyBoundsGeneratedUtc"] = str(derived_bounds["generatedUtc"])
+            if "spellCountByStartMonth" in derived_bounds:
+                heat_wave["spellAnomalyBoundsSpellCountByStartMonth"] = list(derived_bounds["spellCountByStartMonth"])
+            if "spellCountTotal" in derived_bounds:
+                heat_wave["spellAnomalyBoundsSpellCountTotal"] = int(derived_bounds["spellCountTotal"])
+        else:
+            heat_wave.setdefault("spellAnomalyBoundsDerivedFromNoaa", False)
     heat_wave.setdefault("meanStartDayOfMonth", [0.0, 0.0, 0.0, 0.0, 17.0, 18.7, 15.9, 11.3, 4.0, 0.0, 0.0, 0.0])
     climate["heat_wave"] = heat_wave
     annual["climate_data"] = climate
@@ -5964,7 +6391,7 @@ def year_round_analysis_config(config: dict) -> dict:
     annual["monthlyAmbient_C"] = list(climate["monthlyMean_C"])
     annual.setdefault(
         "source",
-        "Representative 365-day Connecticut climate year built from NOAA 2016-2025 statewide monthly mean temperatures and standard deviations, plus NOAA daily-station freeze and heat-wave statistics. The Python annual layer applies the current two-node bed model and re-solves the selected heating and cooling operating points at each day's ambient temperature before computing duty, electricity, water, and cost.",
+        "Representative 365-day Connecticut climate year built from NOAA 2016-2025 statewide monthly mean temperatures and standard deviations, plus NOAA daily-station freeze and heat-wave statistics. Freeze days and heat-wave spell starts are selected by Gaussian-centered repulsion scoring, and anomaly magnitudes are sampled from bounded monthly normal distributions (configurable/overridable with fixed seeds by default). The Python annual layer applies the current two-node bed model and re-solves the selected heating and cooling operating points at each day's ambient temperature before computing duty, electricity, water, and cost.",
     )
     return annual
 
@@ -5995,6 +6422,52 @@ def largest_remainder_allocation(expected_values: list[float]) -> list[int]:
         for idx in order[:remainder]:
             base[idx] += 1
     return base.tolist()
+
+
+def stochastic_round_monthly_counts(expected_values: list[float], rng: np.random.Generator) -> list[int]:
+    expected = np.maximum(np.array([float(v) for v in expected_values], dtype=float), 0.0)
+    if expected.size == 0:
+        return []
+    base = np.floor(expected).astype(int)
+    fractional = expected - base.astype(float)
+    draws = np.array(rng.random(expected.size), dtype=float)
+    rounded = base + (draws < fractional).astype(int)
+    return rounded.astype(int).tolist()
+
+
+def sample_truncated_normal(
+    rng: np.random.Generator,
+    mean: float,
+    std: float,
+    lower: float,
+    upper: float,
+    max_draws: int = 64,
+) -> float:
+    low = float(min(lower, upper))
+    high = float(max(lower, upper))
+    if high <= low:
+        return low
+    sigma = max(float(std), 1e-9)
+    for _ in range(max(int(max_draws), 1)):
+        value = float(rng.normal(float(mean), sigma))
+        if low <= value <= high:
+            return value
+    return float(np.clip(float(mean), low, high))
+
+
+def sample_triangular_mean_matched(
+    rng: np.random.Generator,
+    mean: float,
+    lower: float,
+    upper: float,
+) -> float:
+    low = float(min(lower, upper))
+    high = float(max(lower, upper))
+    if high <= low:
+        return low
+    center = float(np.clip(float(mean), low, high))
+    mode = float(np.clip(3.0 * center - low - high, low, high))
+    return float(rng.triangular(low, mode, high))
 
 
 def gaussian_weighted_day_selection(
@@ -6123,11 +6596,25 @@ def build_representative_climate_year(annual_cfg: dict) -> dict:
     heat_cfg = dict(climate.get("heat_wave", {}))
     freeze_expected = [float(v) for v in freeze_cfg.get("averageDaysPerMonth", [])]
     freeze_anomaly = [float(v) for v in freeze_cfg.get("meanAnomalyBelowMonthlyMean_C", [])]
+    freeze_anomaly_min = [float(v) for v in freeze_cfg.get("minAnomalyBelowMonthlyMean_C", [])]
+    freeze_anomaly_max = [float(v) for v in freeze_cfg.get("maxAnomalyBelowMonthlyMean_C", [])]
+    freeze_anomaly_std = [float(v) for v in freeze_cfg.get("anomalyStd_C", [])]
     freeze_mean_day = [float(v) for v in freeze_cfg.get("meanDayOfMonth", [])]
+    freeze_anomaly_sampling_model = str(
+        freeze_cfg.get("anomalySamplingModel", "triangular_mean_matched_between_monthly_min_max")
+    ).strip()
+    freeze_anomaly_sampling_seed = int(float(freeze_cfg.get("anomalyRngSeed", 4144)))
     heat_expected_starts = [float(v) for v in heat_cfg.get("averageSpellStartsPerMonth", [])]
     heat_expected_days = [float(v) for v in heat_cfg.get("averageDaysPerMonth", [])]
-    heat_anomaly = [float(v) for v in heat_cfg.get("meanAnomalyAboveMonthlyMean_C", [])]
+    heat_anomaly_mean = [float(v) for v in heat_cfg.get("meanAnomalyAboveMonthlyMean_C", [])]
+    heat_anomaly_min = [float(v) for v in heat_cfg.get("minSpellAnomalyAboveMonthlyMean_C", [])]
+    heat_anomaly_max = [float(v) for v in heat_cfg.get("maxSpellAnomalyAboveMonthlyMean_C", [])]
+    heat_anomaly_std = [float(v) for v in heat_cfg.get("spellAnomalyStd_C", [])]
     heat_mean_start = [float(v) for v in heat_cfg.get("meanStartDayOfMonth", [])]
+    heat_anomaly_sampling_model = str(
+        heat_cfg.get("spellAnomalySamplingModel", "truncated_normal_between_monthly_min_max")
+    ).strip()
+    heat_anomaly_sampling_seed = int(float(heat_cfg.get("spellAnomalyRngSeed", 4143)))
 
     n_months = min(
         len(months),
@@ -6139,7 +6626,7 @@ def build_representative_climate_year(annual_cfg: dict) -> dict:
         len(freeze_mean_day),
         len(heat_expected_starts),
         len(heat_expected_days),
-        len(heat_anomaly),
+        len(heat_anomaly_mean),
         len(heat_mean_start),
     )
     months = months[:n_months]
@@ -6149,14 +6636,44 @@ def build_representative_climate_year(annual_cfg: dict) -> dict:
     freeze_expected = freeze_expected[:n_months]
     freeze_anomaly = freeze_anomaly[:n_months]
     freeze_mean_day = freeze_mean_day[:n_months]
+    if len(freeze_anomaly_min) < n_months:
+        freeze_anomaly_min = list(freeze_anomaly_min) + [float("nan")] * (n_months - len(freeze_anomaly_min))
+    if len(freeze_anomaly_max) < n_months:
+        freeze_anomaly_max = list(freeze_anomaly_max) + [float("nan")] * (n_months - len(freeze_anomaly_max))
+    if len(freeze_anomaly_std) < n_months:
+        freeze_anomaly_std = list(freeze_anomaly_std) + [float("nan")] * (n_months - len(freeze_anomaly_std))
     heat_expected_starts = heat_expected_starts[:n_months]
     heat_expected_days = heat_expected_days[:n_months]
-    heat_anomaly = heat_anomaly[:n_months]
+    heat_anomaly_mean = heat_anomaly_mean[:n_months]
     heat_mean_start = heat_mean_start[:n_months]
+    if len(heat_anomaly_min) < n_months:
+        heat_anomaly_min = list(heat_anomaly_min) + [float("nan")] * (n_months - len(heat_anomaly_min))
+    if len(heat_anomaly_max) < n_months:
+        heat_anomaly_max = list(heat_anomaly_max) + [float("nan")] * (n_months - len(heat_anomaly_max))
+    if len(heat_anomaly_std) < n_months:
+        heat_anomaly_std = list(heat_anomaly_std) + [float("nan")] * (n_months - len(heat_anomaly_std))
 
-    freeze_alloc = largest_remainder_allocation(freeze_expected)
-    heat_start_alloc = largest_remainder_allocation(heat_expected_starts)
-    heat_day_alloc = largest_remainder_allocation(heat_expected_days)
+    freeze_sampling_model_key = freeze_anomaly_sampling_model.lower().replace("-", "_").replace(" ", "_")
+    sampling_model_key = heat_anomaly_sampling_model.lower().replace("-", "_").replace(" ", "_")
+    deterministic_models = {"off", "none", "disabled", "deterministic", "deterministic_mean"}
+    triangular_freeze_models = {
+        "triangular",
+        "triangular_mean_matched",
+        "triangular_between_monthly_min_max",
+        "triangular_mean_matched_between_monthly_min_max",
+    }
+    use_stochastic_freeze_sampling = freeze_sampling_model_key not in deterministic_models
+    use_triangular_freeze_sampling = freeze_sampling_model_key in triangular_freeze_models
+    use_stochastic_spell_sampling = sampling_model_key not in deterministic_models
+    freeze_rng = np.random.default_rng(freeze_anomaly_sampling_seed)
+    spell_rng = np.random.default_rng(heat_anomaly_sampling_seed)
+    freeze_count_rng = np.random.default_rng(freeze_anomaly_sampling_seed + 101)
+    heat_start_count_rng = np.random.default_rng(heat_anomaly_sampling_seed + 101)
+    heat_day_count_rng = np.random.default_rng(heat_anomaly_sampling_seed + 102)
+
+    freeze_alloc = stochastic_round_monthly_counts(freeze_expected, freeze_count_rng)
+    heat_start_alloc = stochastic_round_monthly_counts(heat_expected_starts, heat_start_count_rng)
+    heat_day_alloc = stochastic_round_monthly_counts(heat_expected_days, heat_day_count_rng)
     total_days = int(sum(days_per_month))
     month_midpoints = []
     cursor = 0.0
@@ -6203,17 +6720,113 @@ def build_representative_climate_year(annual_cfg: dict) -> dict:
             float(heat_mean_start[month_idx]),
         )
 
+        month_freeze_mean = max(float(freeze_anomaly[month_idx]), 0.0)
+        month_freeze_min_cfg = (
+            float(freeze_anomaly_min[month_idx]) if np.isfinite(freeze_anomaly_min[month_idx]) else month_freeze_mean
+        )
+        month_freeze_max_cfg = (
+            float(freeze_anomaly_max[month_idx]) if np.isfinite(freeze_anomaly_max[month_idx]) else month_freeze_mean
+        )
+        month_freeze_low = max(min(month_freeze_min_cfg, month_freeze_max_cfg), 0.0)
+        month_freeze_high = max(month_freeze_min_cfg, month_freeze_max_cfg, 0.0)
+        if month_freeze_high < month_freeze_low:
+            month_freeze_high = month_freeze_low
+        if month_freeze_high > month_freeze_low:
+            month_freeze_mean = float(np.clip(month_freeze_mean, month_freeze_low, month_freeze_high))
+        elif month_freeze_high > 0.0:
+            month_freeze_mean = float(month_freeze_high)
+        else:
+            month_freeze_mean = 0.0
+
+        month_freeze_std_cfg = (
+            float(freeze_anomaly_std[month_idx]) if np.isfinite(freeze_anomaly_std[month_idx]) else float("nan")
+        )
+        if np.isfinite(month_freeze_std_cfg) and month_freeze_std_cfg > 0.0:
+            month_freeze_std = month_freeze_std_cfg
+        else:
+            month_freeze_std = (month_freeze_high - month_freeze_low) / 4.0 if month_freeze_high > month_freeze_low else 0.0
+        if month_freeze_high > month_freeze_low and month_freeze_std <= 0.0:
+            month_freeze_std = max((month_freeze_high - month_freeze_low) / 4.0, 1e-3)
+
+        month_heat_mean = max(float(heat_anomaly_mean[month_idx]), 0.0)
+        month_heat_min_cfg = float(heat_anomaly_min[month_idx]) if np.isfinite(heat_anomaly_min[month_idx]) else month_heat_mean
+        month_heat_max_cfg = float(heat_anomaly_max[month_idx]) if np.isfinite(heat_anomaly_max[month_idx]) else month_heat_mean
+        month_heat_low = max(min(month_heat_min_cfg, month_heat_max_cfg), 0.0)
+        month_heat_high = max(month_heat_min_cfg, month_heat_max_cfg, 0.0)
+        if month_heat_high < month_heat_low:
+            month_heat_high = month_heat_low
+        if month_heat_high > month_heat_low:
+            month_heat_mean = float(np.clip(month_heat_mean, month_heat_low, month_heat_high))
+        elif month_heat_high > 0.0:
+            month_heat_mean = float(month_heat_high)
+        else:
+            month_heat_mean = 0.0
+
+        month_heat_std_cfg = float(heat_anomaly_std[month_idx]) if np.isfinite(heat_anomaly_std[month_idx]) else float("nan")
+        if np.isfinite(month_heat_std_cfg) and month_heat_std_cfg > 0.0:
+            month_heat_std = month_heat_std_cfg
+        else:
+            month_heat_std = (month_heat_high - month_heat_low) / 4.0 if month_heat_high > month_heat_low else 0.0
+        if month_heat_high > month_heat_low and month_heat_std <= 0.0:
+            month_heat_std = max((month_heat_high - month_heat_low) / 4.0, 1e-3)
+
         ambient_profile = np.array(base_profile, copy=True)
-        if float(freeze_anomaly[month_idx]) > 0.0 and np.any(freeze_mask):
-            ambient_profile[freeze_mask] = np.minimum(
-                ambient_profile[freeze_mask],
-                mean_c - float(freeze_anomaly[month_idx]),
-            )
-        if float(heat_anomaly[month_idx]) > 0.0 and np.any(heat_mask):
-            ambient_profile[heat_mask] = np.maximum(
-                ambient_profile[heat_mask],
-                mean_c + float(heat_anomaly[month_idx]),
-            )
+        freeze_day_anomaly_profile = np.zeros(n_days, dtype=float)
+        freeze_day_anomalies: list[float] = []
+        if np.any(freeze_mask):
+            for local_idx in np.where(freeze_mask)[0]:
+                if use_stochastic_freeze_sampling and month_freeze_high > month_freeze_low:
+                    if use_triangular_freeze_sampling:
+                        freeze_anomaly_value = sample_triangular_mean_matched(
+                            freeze_rng,
+                            month_freeze_mean,
+                            month_freeze_low,
+                            month_freeze_high,
+                        )
+                    else:
+                        freeze_anomaly_value = sample_truncated_normal(
+                            freeze_rng,
+                            month_freeze_mean,
+                            month_freeze_std,
+                            month_freeze_low,
+                            month_freeze_high,
+                        )
+                else:
+                    freeze_anomaly_value = month_freeze_mean
+                freeze_anomaly_value = float(np.clip(freeze_anomaly_value, month_freeze_low, month_freeze_high))
+                freeze_day_anomaly_profile[int(local_idx)] = freeze_anomaly_value
+                freeze_day_anomalies.append(freeze_anomaly_value)
+                if freeze_anomaly_value > 0.0:
+                    ambient_profile[int(local_idx)] = min(ambient_profile[int(local_idx)], mean_c - freeze_anomaly_value)
+
+        heat_spell_index_profile = np.full(n_days, -1, dtype=int)
+        heat_spell_anomaly_profile = np.zeros(n_days, dtype=float)
+        heat_spell_anomalies: list[float] = []
+        for spell_idx, (start_day, length_days) in enumerate(zip(heat_starts, heat_lengths), start=1):
+            if use_stochastic_spell_sampling and month_heat_high > month_heat_low:
+                spell_anomaly = sample_truncated_normal(
+                    spell_rng,
+                    month_heat_mean,
+                    month_heat_std,
+                    month_heat_low,
+                    month_heat_high,
+                )
+            else:
+                spell_anomaly = month_heat_mean
+            spell_anomaly = float(np.clip(spell_anomaly, month_heat_low, month_heat_high))
+            heat_spell_anomalies.append(spell_anomaly)
+
+            start_idx = int(max(start_day - 1, 0))
+            end_idx = int(min(n_days, start_idx + max(int(length_days), 0)))
+            if end_idx <= start_idx:
+                continue
+            heat_spell_index_profile[start_idx:end_idx] = int(spell_idx)
+            heat_spell_anomaly_profile[start_idx:end_idx] = float(spell_anomaly)
+            if spell_anomaly > 0.0:
+                ambient_profile[start_idx:end_idx] = np.maximum(
+                    ambient_profile[start_idx:end_idx],
+                    mean_c + float(spell_anomaly),
+                )
 
         monthly_rows.append(
             {
@@ -6226,15 +6839,27 @@ def build_representative_climate_year(annual_cfg: dict) -> dict:
                 "freezeDaysExpected": float(freeze_expected[month_idx]),
                 "freezeDaysAllocated": int(np.count_nonzero(freeze_mask)),
                 "freezeMeanDayOfMonth": float(freeze_mean_day[month_idx]),
-                "freezeAnomalyBelowMean_C": float(freeze_anomaly[month_idx]),
+                "freezeAnomalyBelowMean_C": float(month_freeze_mean),
+                "freezeAnomalyMin_C": float(month_freeze_low),
+                "freezeAnomalyMax_C": float(month_freeze_high),
+                "freezeAnomalyStd_C": float(month_freeze_std),
+                "freezeAnomalySamplingModel": str(freeze_anomaly_sampling_model),
+                "freezeAnomalySamplingSeed": int(freeze_anomaly_sampling_seed),
+                "freezeDayAnomalies_C": [float(v) for v in freeze_day_anomalies],
                 "heatWaveSpellStartsExpected": float(heat_expected_starts[month_idx]),
                 "heatWaveSpellStartsAllocated": len(heat_starts),
                 "heatWaveDaysExpected": float(heat_expected_days[month_idx]),
                 "heatWaveDaysAllocated": int(np.count_nonzero(heat_mask)),
                 "heatWaveMeanStartDayOfMonth": float(heat_mean_start[month_idx]),
-                "heatWaveAnomalyAboveMean_C": float(heat_anomaly[month_idx]),
+                "heatWaveAnomalyAboveMean_C": float(month_heat_mean),
+                "heatWaveAnomalyMin_C": float(month_heat_low),
+                "heatWaveAnomalyMax_C": float(month_heat_high),
+                "heatWaveAnomalyStd_C": float(month_heat_std),
+                "heatWaveSpellAnomalySamplingModel": str(heat_anomaly_sampling_model),
+                "heatWaveSpellAnomalySamplingSeed": int(heat_anomaly_sampling_seed),
                 "heatWaveStartDays": [int(v) for v in heat_starts],
                 "heatWaveSpellLengths_days": [int(v) for v in heat_lengths],
+                "heatWaveSpellAnomalies_C": [float(v) for v in heat_spell_anomalies],
                 "dayOfYearStart": day_of_year + 1,
                 "dayOfYearEnd": day_of_year + n_days,
                 "dayOfYearMid": day_of_year + 0.5 * (n_days + 1),
@@ -6254,6 +6879,9 @@ def build_representative_climate_year(annual_cfg: dict) -> dict:
                     "ambient_C": float(ambient_profile[local_idx]),
                     "freezeDay": bool(freeze_mask[local_idx]),
                     "heatWaveDay": bool(heat_mask[local_idx]),
+                    "freezeAnomalyBelowMean_C": float(freeze_day_anomaly_profile[local_idx]),
+                    "heatWaveSpellIndex": int(heat_spell_index_profile[local_idx]),
+                    "heatWaveSpellAnomalyAboveMean_C": float(heat_spell_anomaly_profile[local_idx]),
                     "monthlyMean_C": mean_c,
                     "monthlyStd_C": std_c,
                 }
@@ -6265,6 +6893,12 @@ def build_representative_climate_year(annual_cfg: dict) -> dict:
         "annualFreezeDays": int(sum(item["freezeDaysAllocated"] for item in monthly_rows)),
         "annualHeatWaveDays": int(sum(item["heatWaveDaysAllocated"] for item in monthly_rows)),
         "annualHeatWaveSpellStarts": int(sum(item["heatWaveSpellStartsAllocated"] for item in monthly_rows)),
+        "freezeAnomalySamplingModel": str(freeze_anomaly_sampling_model),
+        "freezeAnomalySamplingSeed": int(freeze_anomaly_sampling_seed),
+        "freezeAnomalyStochastic": bool(use_stochastic_freeze_sampling),
+        "heatWaveSpellAnomalySamplingModel": str(heat_anomaly_sampling_model),
+        "heatWaveSpellAnomalySamplingSeed": int(heat_anomaly_sampling_seed),
+        "heatWaveSpellAnomalyStochastic": bool(use_stochastic_spell_sampling),
     }
 
 
@@ -6348,10 +6982,15 @@ def simulate_year_round_day_task(
         "month": str(climate_day["month"]),
         "dayOfMonth": int(climate_day["dayOfMonth"]),
         "ambientBase_C": float(climate_day["ambientBase_C"]),
+        "ambientFreeze_C": float(climate_day.get("ambientFreeze_C", climate_day["ambientBase_C"])),
+        "ambientHeatRaw_C": float(climate_day.get("ambientHeatRaw_C", climate_day["ambientBase_C"])),
         "ambientSigma_C": float(climate_day["ambientSigma_C"]),
         "ambient_C": ambient_C,
         "freezeDay": bool(climate_day["freezeDay"]),
         "heatWaveDay": bool(climate_day["heatWaveDay"]),
+        "freezeAnomalyBelowMean_C": float(climate_day.get("freezeAnomalyBelowMean_C", 0.0)),
+        "heatWaveSpellIndex": int(climate_day.get("heatWaveSpellIndex", -1)),
+        "heatWaveSpellAnomalyAboveMean_C": float(climate_day.get("heatWaveSpellAnomalyAboveMean_C", 0.0)),
         "monthlyMean_C": float(climate_day["monthlyMean_C"]),
         "monthlyStd_C": float(climate_day["monthlyStd_C"]),
         "mode": mode,
@@ -6502,6 +7141,8 @@ def plot_year_round_energy_cost(payload: dict, output_dir: Path) -> None:
     daily = payload["daily"]
     climate_months = payload["climate"]["monthly"]
     x = np.array([int(item["dayOfYear"]) for item in daily], dtype=float)
+    month_index = np.array([int(item["monthIndex"]) for item in daily], dtype=int)
+    month_mean = np.array([float(item["monthlyMean_C"]) for item in daily], dtype=float)
     ambient = np.array([float(item["ambient_C"]) for item in daily], dtype=float)
     ambient_base = np.array([float(item["ambientBase_C"]) for item in daily], dtype=float)
     bottom = np.array([float(item["bottom_C"]) for item in daily], dtype=float)
@@ -6510,21 +7151,71 @@ def plot_year_round_energy_cost(payload: dict, output_dir: Path) -> None:
     cumulative_cost = np.array([float(item["cumulativeCost_usd"]) for item in daily], dtype=float)
     freeze_mask = np.array([bool(item["freezeDay"]) for item in daily], dtype=bool)
     heat_mask = np.array([bool(item["heatWaveDay"]) for item in daily], dtype=bool)
+    freeze_anomaly = np.array([float(item.get("freezeAnomalyBelowMean_C", 0.0)) for item in daily], dtype=float)
+    heat_spell_index = np.array([int(item.get("heatWaveSpellIndex", -1)) for item in daily], dtype=int)
+    heat_spell_anomaly = np.array([float(item.get("heatWaveSpellAnomalyAboveMean_C", 0.0)) for item in daily], dtype=float)
     heating_mask = np.array([str(item["mode"]) == "heating" for item in daily], dtype=bool)
     cooling_mask = np.array([str(item["mode"]) == "cooling" for item in daily], dtype=bool)
+
+    freeze_override_mask = freeze_mask & (freeze_anomaly > 0.0)
+    freeze_override_y = month_mean - np.maximum(freeze_anomaly, 0.0)
+    if not np.any(freeze_override_mask):
+        # Fallback for legacy payloads/modes with deterministic no-anomaly freeze flags.
+        freeze_override_mask = freeze_mask
+        freeze_override_y = ambient
+
+    heat_spell_start_mask = np.zeros_like(heat_mask, dtype=bool)
+    for idx in range(len(heat_mask)):
+        if not heat_mask[idx]:
+            continue
+        if idx == 0:
+            heat_spell_start_mask[idx] = True
+            continue
+        if not heat_mask[idx - 1]:
+            heat_spell_start_mask[idx] = True
+            continue
+        if month_index[idx] != month_index[idx - 1]:
+            heat_spell_start_mask[idx] = True
+            continue
+        if heat_spell_index[idx] != heat_spell_index[idx - 1]:
+            heat_spell_start_mask[idx] = True
+            continue
+
+    heat_override_mask = heat_spell_start_mask & (heat_spell_anomaly > 0.0)
+    heat_override_y = month_mean + np.maximum(heat_spell_anomaly, 0.0)
+    if not np.any(heat_override_mask):
+        # Fallback for legacy payloads without spell-index/anomaly fields.
+        heat_override_mask = heat_mask
+        heat_override_y = ambient
 
     fig, axes = plt.subplots(2, 1, figsize=(14, 10), constrained_layout=True)
 
     ax = axes[0]
-    ax.plot(x, ambient_base, color="#9da4aa", linewidth=1.1, linestyle="--", label="Gaussian-regressed ambient baseline")
-    ax.plot(x, ambient, color="tab:gray", linewidth=1.6, label="Ambient with event overrides")
-    ax.plot(x, bottom, color="tab:blue", linewidth=1.9, label="Bottom node")
-    ax.plot(x, top, color="tab:red", linewidth=1.9, label="Top node")
-    ax.axhspan(15.0, 25.0, color="#dfead7", alpha=0.40, label="Worm-safe band")
-    if np.any(freeze_mask):
-        ax.scatter(x[freeze_mask], ambient[freeze_mask], marker="v", s=12, color="#1f77b4", label="Freeze days")
-    if np.any(heat_mask):
-        ax.scatter(x[heat_mask], ambient[heat_mask], marker="^", s=14, color="#d62728", label="Heat-wave days")
+    ax.plot(x, ambient_base, color="#9da4aa", linewidth=1.1, linestyle="--", label="Regressed ambient baseline")
+    ax.plot(x, ambient, color="tab:gray", linewidth=1.6, label="Ambient with monthly spell frequencies")
+    ax.plot(x, bottom, color="tab:blue", linewidth=1.9, label="Bed temperature")
+    #ax.plot(x, top, color="tab:red", linewidth=1.9, label="Bed temperature")
+    ax.axhspan(15.0, 25.0, color="#dfead7", alpha=0.40, label="Worm-safe range")
+    if np.any(freeze_override_mask):
+        ax.scatter(
+            x[freeze_override_mask],
+            freeze_override_y[freeze_override_mask],
+            marker="v",
+            s=14,
+            color="#1f77b4",
+            label="Freeze override points",
+            zorder=4,
+        )
+    if np.any(heat_override_mask):
+        ax.scatter(
+            x[heat_override_mask],
+            heat_override_y[heat_override_mask],
+            marker="^",
+            s=18,
+            color="#d62728",
+            label="Heat-wave spell override points",
+            zorder=4,
+        )
     for month_info in climate_months[:-1]:
         ax.axvline(float(month_info["dayOfYearEnd"]) + 0.5, color="#d0d0d0", linewidth=0.8, alpha=0.7)
     ax.set_xticks([float(item["dayOfYearMid"]) for item in climate_months], [item["month"] for item in climate_months])
@@ -6547,7 +7238,7 @@ def plot_year_round_energy_cost(payload: dict, output_dir: Path) -> None:
     handles1 = [
         Patch(facecolor="#c66b4e", edgecolor="#c66b4e", alpha=0.85, label="Daily heating cost"),
         Patch(facecolor="#4f8cc9", edgecolor="#4f8cc9", alpha=0.85, label="Daily cooling cost"),
-        Patch(facecolor="#b7b7b7", edgecolor="#b7b7b7", alpha=0.85, label="Daily idle cost"),
+        #Patch(facecolor="#b7b7b7", edgecolor="#b7b7b7", alpha=0.85, label="Daily idle cost"),
     ]
     labels1 = [handle.get_label() for handle in handles1]
     handles2, labels2 = ax2.get_legend_handles_labels()
@@ -6556,9 +7247,9 @@ def plot_year_round_energy_cost(payload: dict, output_dir: Path) -> None:
 
     fig.suptitle(
         "Year-Round Temperature and Cost vs Time\n"
-        f"JSON inputs used: T_heat,set = {float(payload['yearRoundConfig']['heatingSetpoint_C']):.1f} C, "
-        f"T_cool,set = {float(payload['yearRoundConfig']['coolingSetpoint_C']):.1f} C, "
-        f"electricity = {float(payload['electricityPrice_usd_per_kWh']):.4f} USD/kWh",
+        #f"JSON inputs used: T_heat,set = {float(payload['yearRoundConfig']['heatingSetpoint_C']):.1f} C, "
+        #f"T_cool,set = {float(payload['yearRoundConfig']['coolingSetpoint_C']):.1f} C, "
+        f"{float(payload['electricityPrice_usd_per_kWh']):.4f} USD/kWh",
         fontsize=15,
         fontweight="bold",
     )
@@ -6591,7 +7282,17 @@ def write_year_round_summary(payload: dict, output_dir: Path) -> None:
         f"Gaussian kernel bandwidth           : {float(climate_cfg['gaussianKernelBandwidth_days']):.1f} days",
         f"Baseline regression description     : {climate_cfg['baselineRegressionDescription']}",
         f"Freeze-day definition               : {freeze_cfg['definition']}",
+        f"Freeze anomaly sampling model       : {freeze_cfg.get('anomalySamplingModel', 'deterministic_mean')}",
+        f"Freeze anomaly RNG seed             : {int(float(freeze_cfg.get('anomalyRngSeed', 0)))}",
+        f"Freeze anomaly bounds file          : {freeze_cfg.get('derivedAnomalyBoundsPath', 'inline arrays')}",
+        f"Freeze bounds derived from NOAA     : {bool(freeze_cfg.get('anomalyBoundsDerivedFromNoaa', False))}",
+        f"Freeze bounds source resolved       : {freeze_cfg.get('anomalyBoundsSourceResolved', 'n/a')}",
         f"Heat-wave definition                : {heat_cfg['definition']}",
+        f"Heat-wave anomaly sampling model    : {heat_cfg.get('spellAnomalySamplingModel', 'deterministic_mean')}",
+        f"Heat-wave anomaly RNG seed          : {int(float(heat_cfg.get('spellAnomalyRngSeed', 0)))}",
+        f"Heat-wave anomaly bounds file       : {heat_cfg.get('derivedSpellAnomalyBoundsPath', 'inline arrays')}",
+        f"Heat-wave bounds derived from NOAA  : {bool(heat_cfg.get('spellAnomalyBoundsDerivedFromNoaa', False))}",
+        f"Heat-wave bounds source resolved    : {heat_cfg.get('spellAnomalyBoundsSourceResolved', 'n/a')}",
         f"Allocated annual freeze days        : {int(payload['climate']['annualFreezeDays'])}",
         f"Allocated annual heat-wave starts   : {int(payload['climate']['annualHeatWaveSpellStarts'])}",
         f"Allocated annual heat-wave days     : {int(payload['climate']['annualHeatWaveDays'])}",

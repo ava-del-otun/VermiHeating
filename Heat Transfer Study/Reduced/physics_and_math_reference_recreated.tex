@@ -464,7 +464,11 @@ Implementation anchors:
 \section{Year-round layer}
 The annual model builds a representative climate year via periodic Gaussian-kernel
 regression from monthly means/standard deviations, then applies freeze-day and
-heat-wave overrides:
+heat-wave overrides. Heat-wave spell starts are selected by Gaussian-centered
+repulsion scoring, and spell anomaly magnitudes are sampled from a seeded
+truncated normal bounded by NOAA-derived monthly spell min/max anomaly arrays
+(derived-file source:
+\code{Heat Transfer Study/data/climate/noaa\_heatwave\_spell\_anomaly\_bounds\_USW00014740\_2016\_2025.json}):
 \srcref{heat_transfer_study_recreated.py:L6910-L7023}.
 
 Daily simulation:

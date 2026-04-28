@@ -1799,7 +1799,7 @@ where \(\sigma\) is the configured \code{priority\_order} permutation over the i
 \item When the assist blower is enabled, the summer branch treats the sampled flow as a request and applies an outer scalar bisection on \(\dot V\) so that \(\Delta p_{\mathrm{tot}}(\dot V)\) matches the available blower static if the requested flow is not directly achievable \srcref{heat_transfer_study.py:L2793-L2858}; \srcref{heat_transfer_study.py:L3061-L3378}.
 \item The summer branch solves for a bed-reference temperature by bracketing and bisection over the scalar residual relating branch cooling to the lumped required cooling target \srcref{heat_transfer_study.py:L2774-L2899}.
 \item Display interpolation in the plotting layer is presentation-only and does not alter the underlying evaluated candidate set \srcref{heat_transfer_study.py:L555-L562}.
-\item The annual climate layer uses periodic Gaussian-kernel regression over day-of-year and then overlays freeze-day and heat-wave events \srcref{heat_transfer_study.py:L4633-L4858}.
+\item The annual climate layer uses periodic Gaussian-kernel regression over day-of-year, overlays freeze-day events, and applies heat-wave spell anomalies through seeded bounded-normal sampling within NOAA-derived monthly spell min/max bounds \srcref{heat_transfer_study.py:L4633-L4858}.
 \item Radial plume and habitat calculations use midpoint-grid union-area estimates rather than closed-form geometric intersection formulas \srcref{heat_transfer_study.py:L1383-L1595}.
 \item NSGA-II is applied to integer-valued indices or discrete point indices through \texttt{pymoo}; the optimizer explores the discrete repository candidate set rather than an interpolated continuous space \srcref{heat_transfer_study.py:L2410-L2499}; \srcref{heat_transfer_study.py:L3123-L3208}.
 \end{itemize}
@@ -1875,7 +1875,7 @@ When the assist blower is enabled, the summer branch also closes the achieved ai
 
 \section{Annual climate and year-round operating layer}
 \input{section18_report_walkthrough}
-\subsection{Climate anchors and regression baseline}
+\subsection{Climate reference values and regression baseline}
 The annual layer stores for each month \(m\) a Connecticut monthly mean temperature \(\bar T_m\) and monthly standard deviation \(\sigma_m\) derived from the NOAA series described in \filepath{Heat Transfer Study/VermiHeatLoss.tex:L2576-L2616}. The representative-year ambient baseline uses circular Gaussian-kernel regression:
 \begin{equation}
 \label{eq:kernel_baseline}
@@ -1888,7 +1888,37 @@ with wraparound day distance
 \label{eq:circular_day_distance}
 \delta_i(d)=\min\!\left(|d-d_i|,\ P-|d-d_i|\right).
 \end{equation}
-This same periodic Gaussian regression is applied both to the monthly mean anchors and to the monthly standard-deviation anchors \srcref{heat_transfer_study.py:L4794-L4808}; \srcref{heat_transfer_study.py:L4866-L4879}.
+Identity clarification for Eqs.~\eqref{eq:kernel_baseline}--\eqref{eq:circular_day_distance}: \(d\) is the evaluated day-of-year; \(P\) is the annual period length (\(365\) days in this implementation); \(d_i\) is the day-of-year reference day for reference point \(i\) (month midpoint in this implementation); \(i\) indexes monthly reference points; \(h\) is the Gaussian bandwidth in days; and \(y_i\) is the active reference-value family at \(i\), used in two separate passes (\(y_i=\bar T_i\) for baseline ambient and \(y_i=\sigma_i\) for daily spread). When month-midpoint notation \(d_m\) appears, it is the same reference-day map as \(d_i\) under the one-reference-point-per-month construction.
+This same periodic Gaussian regression is applied both to the monthly mean reference values and to the monthly standard-deviation reference values \srcref{heat_transfer_study.py:L4794-L4808}; \srcref{heat_transfer_study.py:L4866-L4879}.
+Therefore, for the mean-temperature pass used by the annual layer,
+\begin{equation}
+\label{eq:baseline_ambient_explicit}
+T_{\infty,\mathrm{base}}(d)=\frac{\sum_{i=1}^{12} w_i(d)\,\bar T_i}{\sum_{i=1}^{12} w_i(d)},
+\end{equation}
+with \(w_i(d)\) and \(\delta_i(d)\) from Eqs.~\eqref{eq:kernel_baseline}--\eqref{eq:circular_day_distance}.
+\subsubsection*{Temperature-variable identity and derivation map}
+\begin{itemize}[leftmargin=*]
+\item \(\bar T_m\): configured monthly mean ambient (from \texttt{climate\_data.monthlyMean\_C}).
+\item \(\sigma_m\): configured monthly ambient spread (from \texttt{climate\_data.monthlyStd\_C}).
+\item \(T_{\infty,\mathrm{base}}(d)\): daily baseline ambient from periodic Gaussian regression of \(\bar T_m\).
+\item \(\sigma(d)\): daily spread profile from periodic Gaussian regression of \(\sigma_m\).
+\item \(T_m(d)\): month-local ambient profile while freeze/heat-wave overrides are being applied.
+\item \(T_\infty(d)\): final day ambient after all event overlays, passed to daily load and capacity solves.
+\item \(T_{h,\mathrm{set}},T_{c,\mathrm{set}}\): resolved annual heating/cooling setpoints from the year-round config (or inherited model defaults).
+\item \(T_b(d),T_t(d)\): daily bottom/top bed-node temperatures from Eq.~\eqref{eq:daily_two_node_matrix}, solved using \(Q_{\mathrm{bed}}(d)\) and \(T_\infty(d)\).
+\item Heat-wave spell threshold temperature: \(\bar T_m+\Delta T_{h,m,q}\), where \(\Delta T_{h,m,q}\) is the spell-specific bounded-normal draw.
+\item NOAA spell-bound artifacts: raw rows in \texttt{Heat Transfer Study/data/climate/noaa\_daily\_summaries\_USW00014740\_2016\_2025.json}, derived bounds in \texttt{Heat Transfer Study/data/climate/noaa\_heatwave\_spell\_anomaly\_bounds\_USW00014740\_2016\_2025.json}, extraction via \texttt{Heat Transfer Study/tools/derive\_noaa\_heatwave\_spell\_bounds.py}.
+\end{itemize}
+\paragraph{Capacity/power identity map (used in Eqs.~\eqref{eq:annual_heating_capacity}--\eqref{eq:annual_cooling_capacity}).}
+\begin{itemize}[leftmargin=*]
+\item \(Q_{\mathrm{to\,bed},h}(T_\infty(d))\): signed net bed heat-transfer rate from the heating reference-point re-solve at day ambient \(T_\infty(d)\) (positive for heating-to-bed).
+\item \(Q_{\mathrm{to\,bed},c}(T_\infty(d))\): signed net bed heat-transfer rate from the cooling reference-point re-solve at day ambient \(T_\infty(d)\) (typically negative for cooling/removal from bed).
+\item \(Q_{h,\mathrm{cap}}(d)\), \(Q_{c,\mathrm{cap}}(d)\): positive capacity magnitudes used in duty equations, where \(Q_{h,\mathrm{cap}}(d)=Q_{\mathrm{to\,bed},h}(T_\infty(d))\) and \(Q_{c,\mathrm{cap}}(d)=-Q_{\mathrm{to\,bed},c}(T_\infty(d))\).
+\item \(P_h(T_\infty(d))\): heating electrical power returned by the heating re-solve at day ambient \(T_\infty(d)\).
+\item \(P_{\mathrm{spot\,cooler}}(d)\): spot-cooler electrical power returned by the cooling re-solve on day \(d\).
+\item \(P_{\mathrm{assist\,blower}}(d)\): assist-blower electrical power returned by the cooling re-solve on day \(d\).
+\item \(P_{h,\mathrm{elec}}(d)\), \(P_{c,\mathrm{elec}}(d)\): mode electric powers used in Eqs.~\eqref{eq:daily_energy_modes}--\eqref{eq:daily_energy}, with \(P_{h,\mathrm{elec}}(d)=P_h(T_\infty(d))\) and \(P_{c,\mathrm{elec}}(d)=P_{\mathrm{spot\,cooler}}(d)+P_{\mathrm{assist\,blower}}(d)\).
+\end{itemize}
 
 \subsection{Freeze-day allocation and anomaly override}
 Expected monthly freeze-day counts are converted to representative integer counts by largest-remainder allocation:
@@ -1899,48 +1929,447 @@ n_{f,m}=\mathrm{LR}(F_m).
 Within each month, day-of-month weights are centered on the observed mean freeze day \(\mu_{f,m}\):
 \begin{equation}
 \label{eq:freeze_weight}
-w_{f,m}(i)=\exp\!\left[-\frac{(i-\mu_{f,m})^2}{2s_{f,m}^2}\right],
+w_{f,m}(r)=\exp\!\left[-\frac{(r-\mu_{f,m})^2}{2s_{f,m}^2}\right],
 \end{equation}
 and sequential selection applies a repulsion modifier
 \begin{equation}
 \label{eq:freeze_repulsion}
-\tilde w_{f,m}(i)=
-w_{f,m}(i)\prod_{j\in\mathcal{S}_{f,m}}
-\left[1-0.65\exp\!\left(-\frac{(i-j)^2}{2r_{f,m}^2}\right)\right].
+\tilde w_{f,m}(r)=
+w_{f,m}(r)\prod_{p\in\mathcal{S}_{f,m}}
+\left[1-0.65\exp\!\left(-\frac{(r-p)^2}{2r_{f,m}^2}\right)\right].
 \end{equation}
-On the selected freeze days, the ambient profile is overridden by
+Here \(r\) and \(p\) are day-of-month indices within month \(m\) (not kernel indices from Eq.~\eqref{eq:kernel_baseline}); \(s_{f,m}\) is the freeze-timing spread parameter; \(r_{f,m}\) is the repulsion length scale; and \(\mathcal{S}_{f,m}\) is the set of freeze days already selected in that month.
+In the current implementation:
+\[
+s_{f,m}=\max\!\left(2,\frac{L_m}{6}\right),\qquad
+r_{f,m}=\max\!\left(1.5,\frac{L_m}{14}\right),
+\]
+where \(L_m\) is the number of days in month \(m\).
+\paragraph{Freeze-anomaly magnitude derivation (explicit).}
+Define monthly freeze-anomaly center and bounds:
+\begin{equation}
+\label{eq:freeze_bounds_params}
+M_{f,m}\equiv \Delta T_{f,m},
+\quad
+a_{f,m}=\Delta T_{f,m}^{\mathrm{low}},
+\quad
+b_{f,m}=\Delta T_{f,m}^{\mathrm{high}},
+\quad
+\mu_{f,m}^{\star}=\mathrm{clip}(M_{f,m},a_{f,m},b_{f,m}).
+\end{equation}
+Here \(\Delta T_{f,m}^{\mathrm{low}},\Delta T_{f,m}^{\mathrm{high}}\) are anomaly-magnitude bounds (not temperatures), loaded from
+\(\texttt{climate\_data.freeze.minAnomalyBelowMonthlyMean\_C}[m]\) and
+\(\texttt{climate\_data.freeze.maxAnomalyBelowMonthlyMean\_C}[m]\).
+Historical NOAA derivation in month \(m\): for each freeze day \(j\),
+\[
+a_{m,j}=\max\!\left(0,\bar T_m-T^{\mathrm{freeze\ day}}_{m,j}\right),
+\]
+\[
+\Delta T_{f,m}^{\mathrm{low}}=\min_j a_{m,j},\qquad
+\Delta T_{f,m}^{\mathrm{high}}=\max_j a_{m,j}.
+\]
+So \(\mu_{f,m}^{\star}\) is the bounded (clipped) freeze-anomaly center for month \(m\).
+Define mean-matched triangular mode:
+\begin{equation}
+\label{eq:freeze_std_normal_defs}
+c_{f,m}^{\mathrm{raw}}=3\mu_{f,m}^{\star}-a_{f,m}-b_{f,m},
+\qquad
+c_{f,m}=\mathrm{clip}(c_{f,m}^{\mathrm{raw}},a_{f,m},b_{f,m}).
+\end{equation}
+Here \(c_{f,m}^{\mathrm{raw}}\) is the unconstrained triangular-mode target, chosen so that
+\[
+\frac{a_{f,m}+b_{f,m}+c_{f,m}^{\mathrm{raw}}}{3}=\mu_{f,m}^{\star}
+\]
+before clipping to \([a_{f,m},b_{f,m}]\).
+Why: this mean-matching preserves the intended monthly anomaly center while still allowing bounded day-to-day stochastic variation.
+Define triangular density on \([a_{f,m},b_{f,m}]\):
+\begin{equation}
+\label{eq:freeze_truncnorm_density}
+t_{f,m}(x)=
+\begin{cases}
+\dfrac{2(x-a_{f,m})}{(b_{f,m}-a_{f,m})(c_{f,m}-a_{f,m})}, & a_{f,m}\le x\le c_{f,m},\\[6pt]
+\dfrac{2(b_{f,m}-x)}{(b_{f,m}-a_{f,m})(b_{f,m}-c_{f,m})}, & c_{f,m}\le x\le b_{f,m},\\[6pt]
+0, & \text{otherwise}.
+\end{cases}
+\end{equation}
+For any \(a_{f,m}\le u\le v\le b_{f,m}\),
+\begin{equation}
+\label{eq:freeze_prob_integral}
+\Pr(u\le X_{f,m,q}\le v)=\int_u^v t_{f,m}(x)\,dx.
+\end{equation}
+
+\paragraph{Code-equivalent freeze-event draw for \(X_{f,m,q}\).}
+With seed \(s_f=\texttt{freeze.anomalyRngSeed}\), default freeze draw is
+\begin{equation}
+\label{eq:freeze_draw_trial}
+X_{f,m,q}=\mathrm{Triangular}(a_{f,m},c_{f,m},b_{f,m}).
+\end{equation}
+Then clip:
+\begin{equation}
+\label{eq:freeze_draw_choice}
+X_{f,m,q}\leftarrow \mathrm{clip}(X_{f,m,q},a_{f,m},b_{f,m}).
+\end{equation}
+Define string normalization
+\[
+\operatorname{norm}(s)=\operatorname{lower}\!\Big(\operatorname{replace}\big(\operatorname{replace}(s,\texttt{"-"},\texttt{"\_"}),\texttt{" "},\texttt{"\_"}\big)\Big).
+\]
+Define freeze model key
+\[
+\kappa_f=\operatorname{norm}\!\left(\texttt{freeze.anomalySamplingModel}\right).
+\]
+Define explicit mode flags (equivalent to code logic):
+\[
+\texttt{isDeterministic}_f=
+\begin{cases}
+1, & \kappa_f=\texttt{off}\ \text{or}\ \texttt{none}\ \text{or}\ \texttt{disabled}\ \text{or}\ \texttt{deterministic}\ \text{or}\ \texttt{deterministic\_mean},\\
+0, & \text{otherwise},
+\end{cases}
+\]
+\[
+\texttt{isTriangular}_f=
+\begin{cases}
+1, & \kappa_f=\texttt{triangular}\ \text{or}\ \texttt{triangular\_mean\_matched}\ \text{or}\ \texttt{triangular\_between\_monthly\_min\_max}\ \text{or}\ \texttt{triangular\_mean\_matched\_between\_monthly\_min\_max},\\
+0, & \text{otherwise}.
+\end{cases}
+\]
+Conceptual meaning:
+\begin{itemize}[leftmargin=*]
+\item \(\kappa_f\) is a configuration key (text), not a measured climate variable.
+\item \(\operatorname{norm}(\cdot)\) converts formatting variants to one canonical key so branch selection is robust.
+\item \(\texttt{isDeterministic}_f=1\) selects deterministic freeze magnitude assignment:
+\[
+\Delta T_{f,m,q}=\mu_{f,m}^{\star}\ \text{for all selected }q.
+\]
+\item \(\texttt{isTriangular}_f=1\) selects triangular stochastic assignment:
+\[
+\Delta T_{f,m,q}=X_{f,m,q},\quad X_{f,m,q}\in[a_{f,m},b_{f,m}].
+\]
+\item These are logic flags (yes/no), not climate variables.
+\end{itemize}
+Then event magnitude assignment is
+\begin{equation}
+\label{eq:freeze_event_assignment}
+\Delta T_{f,m,q}=
+\begin{cases}
+\mu_{f,m}^{\star}, & \texttt{isDeterministic}_f=1,\\
+X_{f,m,q},\ \ X_{f,m,q}=\mathrm{Triangular}(a_{f,m},c_{f,m},b_{f,m}), & \texttt{isTriangular}_f=1\ \text{and }b_{f,m}>a_{f,m},\\
+\mu_{f,m}^{\star}, & b_{f,m}\le a_{f,m},\\
+\mu_{f,m}^{\star}\ \text{or legacy bounded-normal draw}, & \texttt{isDeterministic}_f=0\ \text{and}\ \texttt{isTriangular}_f=0,
+\end{cases}
+\end{equation}
+followed by \(\Delta T_{f,m,q}\leftarrow\mathrm{clip}(\Delta T_{f,m,q},a_{f,m},b_{f,m})\).
+Define day allocation:
+\begin{equation}
+\label{eq:freeze_day_anomaly_allocation}
+A_{f,m}(r)=
+\begin{cases}
+0, & r\notin\mathcal{S}_{f,m},\\
+\Delta T_{f,m,q}, & r=d_{f,m,q}\ \text{for some }q\in\{1,\dots,n_{f,m}\},
+\end{cases}
+\qquad r=1,\dots,L_m.
+\end{equation}
+where \(d_{f,m,1}<\cdots<d_{f,m,n_{f,m}}\) are selected freeze days.
+Here \(A_{f,m}(r)\) is a deterministic day-to-magnitude map; it does not itself generate random values.
+Stochasticity (when \(\texttt{isTriangular}_f=1\)) enters only when drawing \(\Delta T_{f,m,q}\), after which \(q\) is paired with ordered selected days \(d_{f,m,1}<\cdots<d_{f,m,n_{f,m}}\) with no additional random reshuffle.
+
+On selected freeze days, the ambient profile is overridden by
+\begin{equation}
+\label{eq:freeze_threshold}
+T_{f,m}^{\mathrm{th}}(d)=\bar T_m-A_{f,m}(r_m(d)).
+\end{equation}
+\(T_{f,m}^{\mathrm{th}}(d)\) is the day-level freeze-threshold ambient (the clamp value used by the freeze override).
 \begin{equation}
 \label{eq:freeze_override}
-T_m(d)=\min\!\left(T_{\mathrm{base},m}(d),\,\bar T_m-\Delta T_{f,m}\right).
+T_m(d)=\min\!\left(T_{\mathrm{base},m}(d),\,T_{f,m}^{\mathrm{th}}(d)\right).
 \end{equation}
+Here \(r_m(d)\) is the day-of-month index for day-of-year \(d\), and \(T_m(d)\) denotes the month-local daily ambient profile after applying freeze overrides.
 These relations correspond to \srcref{heat_transfer_study.py:L4683-L4732}; \srcref{heat_transfer_study.py:L4893-L4906}.
 
 \subsection{Heat-wave allocation and anomaly override}
-Monthly spell starts and total heat-wave days are likewise allocated by largest-remainder rounding:
+This subsection is organized as a derivation pipeline from monthly statistics to daily ambient temperature.
+
+\paragraph{Step 1: Integer event allocation.}
+Monthly spell starts and total heat-wave days are allocated by largest-remainder rounding:
 \begin{equation}
 \label{eq:heatwave_alloc}
 n_{s,m}=\mathrm{LR}(S_m),
 \qquad
 n_{h,m}=\mathrm{LR}(H_m).
 \end{equation}
-The start-day weighting is
+\paragraph{Step 2: Construct spell lengths from total days.}
+The implementation enforces a minimum spell length of 3 days and at least one non-spell day between consecutive spells.
+Therefore, the spell-start count is feasibility-limited by
+\begin{equation}
+\label{eq:heatwave_spell_count_cap}
+n_{s,m}\leftarrow \min\!\left(n_{s,m},\left\lfloor\frac{L_m+1}{4}\right\rfloor\right).
+\end{equation}
+Given this \(n_{s,m}\), feasible total spell days satisfy
+\begin{equation}
+\label{eq:heatwave_total_days_bounds}
+n_{h,m}^{\min}=3n_{s,m},
+\qquad
+n_{h,m}^{\max}=L_m-(n_{s,m}-1),
+\end{equation}
+\begin{equation}
+\label{eq:heatwave_total_days_clip}
+n_{h,m}\leftarrow \min\!\big(\max(n_{h,m},n_{h,m}^{\min}),\,n_{h,m}^{\max}\big).
+\end{equation}
+Then initialize spell lengths:
+\begin{equation}
+\label{eq:heatwave_lengths_init}
+\ell_{h,m,q}=3,\qquad q=1,\dots,n_{s,m}.
+\end{equation}
+Define remaining days after minimum allocation:
+\begin{equation}
+\label{eq:heatwave_lengths_total}
+e_m=n_{h,m}-3n_{s,m}.
+\end{equation}
+Those \(e_m\) days are distributed cyclically across spells in code. Equivalent closed form:
+\begin{equation}
+\label{eq:heatwave_lengths_qr}
+\text{for }n_{s,m}>0:\qquad
+u_m=\left\lfloor\frac{e_m}{n_{s,m}}\right\rfloor,\qquad
+v_m=e_m-u_m n_{s,m},
+\end{equation}
+\begin{equation}
+\label{eq:heatwave_lengths_closed}
+\ell_{h,m,q}=
+\begin{cases}
+3+u_m+1, & q\le v_m,\\
+3+u_m, & q>v_m,
+\end{cases}
+\qquad q=1,\dots,n_{s,m},
+\end{equation}
+so
+\[
+\sum_{q=1}^{n_{s,m}}\ell_{h,m,q}=n_{h,m}.
+\]
+Example: \(n_{s,m}=3\), \(n_{h,m}=14\Rightarrow e_m=5,\ u_m=1,\ v_m=2\), hence \((\ell_{h,m,1},\ell_{h,m,2},\ell_{h,m,3})=(5,5,4)\).
+If \(n_{s,m}=0\), the spell-length vector is empty and no heat-wave spell blocks are created for that month.
+
+\paragraph{Step 3: Compute start-day preference score.}
+The base start-day weighting is
 \begin{equation}
 \label{eq:heatwave_weight}
-w_{h,m}(i)=\exp\!\left[-\frac{(i-\mu_{h,m})^2}{2s_{h,m}^2}\right],
+w_{h,m}(r)=\exp\!\left[-\frac{(r-\mu_{h,m})^2}{2s_{h,m}^2}\right],
 \end{equation}
-with repulsion-modified score
+where \(r\) is day-of-month index in month \(m\), and \(s_{h,m}\) is start-day spread.
+
+\paragraph{Step 4: Build the already-selected set recursively.}
+In explicit recursive form:
+\begin{equation}
+\label{eq:heatwave_start_set_init}
+\mathcal{S}_{h,m}^{(0)}=\varnothing,
+\end{equation}
+\begin{equation}
+\label{eq:heatwave_start_set_candidates}
+\mathcal{I}_{h,m}^{(k)}=\{1,\dots,L_m\}\setminus\mathcal{S}_{h,m}^{(k-1)},
+\end{equation}
 \begin{equation}
 \label{eq:heatwave_repulsion}
-\tilde w_{h,m}(i)=
-w_{h,m}(i)\prod_{j\in\mathcal{S}_{h,m}}
-\left[1-0.65\exp\!\left(-\frac{(i-j)^2}{2r_{h,m}^2}\right)\right].
+\operatorname{score}_{h,m}^{(k)}(r)=
+w_{h,m}(r)\prod_{p\in\mathcal{S}_{h,m}^{(k-1)}}
+\left[1-0.65\exp\!\left(-\frac{(r-p)^2}{2r_{h,m}^2}\right)\right],
+\qquad r\in\mathcal{I}_{h,m}^{(k)},
 \end{equation}
-Each selected heat-wave spell is forced to last at least three days in the code, and the ambient override is
+\begin{equation}
+\label{eq:heatwave_start_set_choice}
+d_{h,m,k}\in\mathcal{I}_{h,m}^{(k)},
+\qquad
+\operatorname{score}_{h,m}^{(k)}(d_{h,m,k})=
+\max_{r\in\mathcal{I}_{h,m}^{(k)}}\operatorname{score}_{h,m}^{(k)}(r),
+\end{equation}
+\begin{equation}
+\label{eq:heatwave_start_set_update}
+\mathcal{S}_{h,m}^{(k)}=\mathcal{S}_{h,m}^{(k-1)}\cup\{d_{h,m,k}\},
+\qquad
+k=1,\dots,n_{s,m},
+\qquad
+\mathcal{S}_{h,m}=\mathcal{S}_{h,m}^{(n_{s,m})}.
+\end{equation}
+So at iteration \(k\), the phrase ``already selected'' means \(\mathcal{S}_{h,m}^{(k-1)}\). Here \(r_{h,m}\) is repulsion length scale.
+
+\paragraph{Step 5: Enforce feasible contiguous spell windows.}
+Selected starts are projected to feasible non-overlapping starts \(s_{h,m,q}\) within month bounds. Spell \(q\) occupies
+\[
+d_{h,m,1}^{\mathrm{raw}}<\cdots<d_{h,m,n_{s,m}}^{\mathrm{raw}},
+\qquad
+\{d_{h,m,1}^{\mathrm{raw}},\dots,d_{h,m,n_{s,m}}^{\mathrm{raw}}\}=\mathcal{S}_{h,m}.
+\]
+So \(d_{h,m,q}^{\mathrm{raw}}\) is the \(q\)-th ordered raw start day before feasibility clipping.
+Define feasible bounds:
+\[
+e_{h,m,q}=
+\begin{cases}
+1, & q=1,\\
+s_{h,m,q-1}+\ell_{h,m,q-1}+1, & q\ge 2,
+\end{cases}
+\qquad
+u_{h,m,q}=L_m-\left(\sum_{p=q}^{n_{s,m}}\ell_{h,m,p}+(n_{s,m}-q)\right)+1.
+\]
+Then project each raw start:
+\[
+s_{h,m,q}=
+\begin{cases}
+e_{h,m,q}, & d_{h,m,q}^{\mathrm{raw}}<e_{h,m,q},\\
+d_{h,m,q}^{\mathrm{raw}}, & e_{h,m,q}\le d_{h,m,q}^{\mathrm{raw}}\le u_{h,m,q},\\
+u_{h,m,q}, & d_{h,m,q}^{\mathrm{raw}}>u_{h,m,q}.
+\end{cases}
+\]
+\[
+\text{(code equivalent: }s_{h,m,q}=\mathrm{clip}(d_{h,m,q}^{\mathrm{raw}},e_{h,m,q},u_{h,m,q})\text{).}
+\]
+\[
+\text{Construction path: }\mathcal{S}_{h,m}\xrightarrow{\text{sort}}d^{\mathrm{raw}}\xrightarrow{\text{clip}}s.
+\]
+\begin{equation}
+\label{eq:heatwave_spell_block}
+\mathcal{B}_{h,m,q}=\{\,r:\ s_{h,m,q}\le r\le s_{h,m,q}+\ell_{h,m,q}-1\,\},
+\end{equation}
+and \(q(d)=q\) when \(r_m(d)\in\mathcal{B}_{h,m,q}\).
+Thus \(\mathcal{B}_{h,m,q}\) is a spell-day block (all days in spell \(q\)), not a start-day set.
+\begin{equation}
+\label{eq:heatwave_spell_block_size}
+\left|\mathcal{B}_{h,m,q}\right|=\ell_{h,m,q}.
+\end{equation}
+Define month-\(m\) all-spell day set:
+\begin{equation}
+\label{eq:heatwave_spell_block_union}
+\mathcal{B}_{h,m}^{\mathrm{all}}=\bigcup_{q=1}^{n_{s,m}}\mathcal{B}_{h,m,q}.
+\end{equation}
+Because spell blocks are non-overlapping by construction,
+\begin{equation}
+\label{eq:heatwave_spell_block_union_size}
+\left|\mathcal{B}_{h,m}^{\mathrm{all}}\right|
+=\sum_{q=1}^{n_{s,m}}\left|\mathcal{B}_{h,m,q}\right|
+=\sum_{q=1}^{n_{s,m}}\ell_{h,m,q}
+=n_{h,m}.
+\end{equation}
+
+\paragraph{Step 6: Sample spell anomaly and propagate to ambient.}
+For each spell \(q\), anomaly magnitude is sampled as a bounded random variable:
+\begin{equation}
+\label{eq:heatwave_spell_anomaly_sample}
+\Delta T_{h,m,q}\in[a_{h,m},b_{h,m}],
+\qquad
+\Pr(u\le\Delta T_{h,m,q}\le v)=\int_u^v f_{h,m}(x)\,dx,
+\end{equation}
+for any \(a_{h,m}\le u\le v\le b_{h,m}\). This uses a truncated normal density on \([a_{h,m},b_{h,m}]\) with
+\begin{equation}
+\label{eq:heatwave_truncnorm_params}
+a_{h,m}=\Delta T_{h,m}^{\mathrm{low}},
+\quad
+b_{h,m}=\Delta T_{h,m}^{\mathrm{high}},
+\quad
+\mu_{h,m}^{\star}=\mathrm{clip}(\Delta T_{h,m},a_{h,m},b_{h,m}),
+\quad
+\sigma_{h,m}^{\star}=\max(\sigma_{\Delta T,h,m},\varepsilon),
+\end{equation}
+Here \(\sigma_{\Delta T,h,m}\) is the month-\(m\) spell-anomaly spread from
+\(\texttt{heat\_wave.spellAnomalyStd\_C}[m]\). If missing or nonpositive, implementation fallback is
+\[
+\sigma_{\Delta T,h,m}=
+\begin{cases}
+(\Delta T_{h,m}^{\mathrm{high}}-\Delta T_{h,m}^{\mathrm{low}})/4, & \Delta T_{h,m}^{\mathrm{high}}>\Delta T_{h,m}^{\mathrm{low}},\\
+0, & \Delta T_{h,m}^{\mathrm{high}}\le\Delta T_{h,m}^{\mathrm{low}}.
+\end{cases}
+\]
+The stochastic sampling floor is
+\[
+\varepsilon=10^{-3}\,^\circ\mathrm{C}.
+\]
+Here \(\Delta T_{h,m}\), \(\Delta T_{h,m}^{\mathrm{low}}\), and \(\Delta T_{h,m}^{\mathrm{high}}\) are spell-anomaly-above-monthly-mean statistics from
+\(\texttt{heat\_wave.meanAnomalyAboveMonthlyMean\_C}[m]\),
+\(\texttt{heat\_wave.minSpellAnomalyAboveMonthlyMean\_C}[m]\), and
+\(\texttt{heat\_wave.maxSpellAnomalyAboveMonthlyMean\_C}[m]\).
+Historical NOAA derivation in month \(m\): if \(\mathcal{B}_{h,m,q}\) is the day set for historical spell \(q\) (grouped by spell start month \(m\)),
+\[
+a^{(h)}_{m,q}
+=\frac{1}{|\mathcal{B}_{h,m,q}|}\sum_{t\in\mathcal{B}_{h,m,q}}
+\max\!\left(0,\ T^{\mathrm{avg}}_t-\bar T_{m(t)}\right),
+\]
+where \(T^{\mathrm{avg}}_t\) is NOAA daily mean proxy (TAVG if present, else \((TMAX+TMIN)/2\)) and \(m(t)\) is the calendar month index of day \(t\). Hence \(\bar T_{m(t)}\) is the same monthly-mean notation \(\bar T_m\), evaluated at day \(t\)'s month.
+Then
+\[
+\Delta T_{h,m}=\frac{1}{N_m}\sum_{q=1}^{N_m}a^{(h)}_{m,q},\qquad
+\Delta T_{h,m}^{\mathrm{low}}=\min_q a^{(h)}_{m,q},\qquad
+\Delta T_{h,m}^{\mathrm{high}}=\max_q a^{(h)}_{m,q}.
+\]
+\begin{equation}
+\label{eq:heatwave_std_normal_defs}
+g_{\mathrm{std}}(z)=\frac{1}{\sqrt{2\pi}}\,\exp\!\left(-\frac{z^2}{2}\right),
+\qquad
+G_{\mathrm{std}}(z)=\int_{-\infty}^{z} g_{\mathrm{std}}(t)\,dt,
+\end{equation}
+\begin{equation}
+\label{eq:heatwave_truncnorm_density}
+f_{h,m}(x)=
+\frac{
+g_{\mathrm{std}}\!\left(\frac{x-\mu_{h,m}^{\star}}{\sigma_{h,m}^{\star}}\right)
+}{
+\sigma_{h,m}^{\star}
+\left[
+G_{\mathrm{std}}\!\left(\frac{b_{h,m}-\mu_{h,m}^{\star}}{\sigma_{h,m}^{\star}}\right)
+-G_{\mathrm{std}}\!\left(\frac{a_{h,m}-\mu_{h,m}^{\star}}{\sigma_{h,m}^{\star}}\right)
+\right]
+},
+\qquad
+a_{h,m}\le x\le b_{h,m},
+\end{equation}
+and \(f_{h,m}(x)=0\) outside \([a_{h,m},b_{h,m}]\).
+Here \(z\) is a dimensionless standard-normal coordinate (z-score), and \(Z_{h,m,q,t}\) is one random draw from that \(N(0,1)\) distribution.
+So \(z\) itself is unbounded:
+\[
+z\in(-\infty,\infty).
+\]
+Bounds are enforced only through accepted anomaly values:
+\[
+a_{h,m}\le Y_{h,m,q,t}\le b_{h,m},
+\]
+equivalently,
+\[
+\frac{a_{h,m}-\mu_{h,m}^{\star}}{\sigma_{h,m}^{\star}}
+\le z \le
+\frac{b_{h,m}-\mu_{h,m}^{\star}}{\sigma_{h,m}^{\star}}.
+\]
+Implementation-equivalent draw equations for spell \(q\) are
+\begin{equation}
+\label{eq:heatwave_rejection_draw}
+Z_{h,m,q,t}\sim g_{\mathrm{std}},\qquad
+Y_{h,m,q,t}=\mu_{h,m}^{\star}+\sigma_{h,m}^{\star}Z_{h,m,q,t},\qquad t=1,\dots,64.
+\end{equation}
+\begin{equation}
+\label{eq:heatwave_rejection_tau}
+\tau_{h,m,q}=\min\left\{t\in\{1,\dots,64\}:a_{h,m}\le Y_{h,m,q,t}\le b_{h,m}\right\}.
+\end{equation}
+If \(\tau_{h,m,q}\) exists, set \(\Delta T_{h,m,q}=Y_{h,m,q,\tau_{h,m,q}}\). If not, the implementation fallback is
+\begin{equation}
+\label{eq:heatwave_rejection_fallback}
+\Delta T_{h,m,q}=\min\!\left(\max\!\left(\mu_{h,m}^{\star},a_{h,m}\right),\,b_{h,m}\right).
+\end{equation}
+with fixed seed in the implementation for reproducibility.
+In this repository state, \(\Delta T_{h,m}\), \(\Delta T_{h,m}^{\mathrm{low}}\), \(\Delta T_{h,m}^{\mathrm{high}}\), and \(\sigma_{\Delta T,h,m}\) are NOAA-derived from spell-level daily-station records (2016--2025, \texttt{USW00014740}), grouped by spell start month.
+The threshold implied by spell \(q\) is
+\begin{equation}
+\label{eq:heatwave_threshold}
+T_{h,m,q}^{\mathrm{th}}=\bar T_m+\Delta T_{h,m,q}.
+\end{equation}
+The final ambient override is
 \begin{equation}
 \label{eq:heatwave_override}
-T_m(d)=\max\!\left(T_m(d),\,\bar T_m+\Delta T_{h,m}\right).
+T_m(d)=
+\begin{cases}
+\max\!\left(T_{\mathrm{base},m}(d),\,T_{h,m,q(d)}^{\mathrm{th}},\,T_{\infty,\mathrm{preH}}(d)\right), & r_m(d)\in\mathcal{B}_{h,m}^{\mathrm{all}},\\
+T_{\infty,\mathrm{preH}}(d), & r_m(d)\notin\mathcal{B}_{h,m}^{\mathrm{all}}.
+\end{cases}
 \end{equation}
-These relations correspond to \srcref{heat_transfer_study.py:L4735-L4791}; \srcref{heat_transfer_study.py:L4907-L4911}.
+Equivalent dependency chain:
+\begin{equation}
+\label{eq:heatwave_chain}
+f_{h,m}(x)\Rightarrow \Delta T_{h,m,q}\Rightarrow T_{h,m,q}^{\mathrm{th}}
+\Rightarrow T_m(d)\Rightarrow T_\infty(d).
+\end{equation}
+Here \(q(d)\) denotes the active spell index on day \(d\). These relations correspond to \srcref{heat_transfer_study.py:L4735-L4791}; \srcref{heat_transfer_study.py:L4907-L4911}.
 
 \subsection{Daily heating and cooling loads}
 For each representative day \(d\), the required heating and cooling loads are
@@ -1968,6 +2397,85 @@ Q_{c,\mathrm{cap}}(d)=-Q_{\mathrm{to\,bed},c}\!\left(T_\infty(d)\right),
 \qquad
 P_{c,\mathrm{elec}}(d)=P_{\mathrm{spot\,cooler}}(d)+P_{\mathrm{assist\,blower}}(d).
 \end{equation}
+Identity clarification for Eqs.~\eqref{eq:annual_heating_capacity}--\eqref{eq:annual_cooling_capacity}: \(Q_{\mathrm{to\,bed},h}(T_\infty(d))\) and \(Q_{\mathrm{to\,bed},c}(T_\infty(d))\) are the signed net bed heat-transfer outputs of the day-ambient heating/cooling re-solves. \(P_h(T_\infty(d))\) is the heating electrical input at that day ambient. \(P_{\mathrm{spot\,cooler}}(d)\) and \(P_{\mathrm{assist\,blower}}(d)\) are the cooling electric-power components from the same day-ambient cooling re-solve.
+
+The explicit derivation path for these quantities is:
+\begin{equation}
+\label{eq:annual_heating_resistance}
+R_{\mathrm{tube},g}(d)=\rho_{20}\!\left[1+\alpha\!\left(\bar T_{w,g}(d)-20\right)\right]\frac{L_{w,g}}{A_{w,g}},
+\end{equation}
+\begin{equation}
+\label{eq:annual_heating_current_power}
+I_{\mathrm{tube},g}(d)=\frac{V}{N_{s,g}R_{\mathrm{tube},g}(d)},
+\qquad
+P_{\mathrm{tube},g}(d)=I_{\mathrm{tube},g}^2(d)R_{\mathrm{tube},g}(d),
+\end{equation}
+\begin{equation}
+\label{eq:annual_heating_total_power}
+P_h(T_\infty(d))=\sum_g n_{\mathrm{tube},g}P_{\mathrm{tube},g}(d).
+\end{equation}
+For heating-mode bed transfer,
+\begin{equation}
+\label{eq:annual_heating_q_to_bed}
+Q_{\mathrm{to\,bed},h}(T_\infty(d))=
+\sum_{b=1}^{N_b}\sum_{s=1}^{N_{\mathrm{seg}}}
+\left(Q_{\mathrm{wall},b,s}+Q_{\mathrm{jet},b,s}-Q_{\mathrm{evap},b,s}\right).
+\end{equation}
+For cooling electrical components,
+\begin{equation}
+\label{eq:annual_cooling_spot_req_act}
+\dot Q_{\mathrm{spot,req}}(d)=\dot m(d)c_p(d)\max\!\left(T_\infty(d)-T_{\mathrm{target}},0\right),
+\qquad
+\dot Q_{\mathrm{spot,act}}(d)=\min\!\left(\dot Q_{\mathrm{spot,req}}(d),\dot Q_{\mathrm{spot,max}}(d)\right),
+\end{equation}
+\begin{equation}
+\label{eq:annual_cooling_spot_power}
+P_{\mathrm{spot\,cooler}}(d)=\frac{\dot Q_{\mathrm{spot,act}}(d)}{\mathrm{COP}},
+\end{equation}
+\begin{equation}
+\label{eq:annual_cooling_blower_power}
+P_{\mathrm{assist\,blower}}(d)=
+\begin{cases}
+P_{\mathrm{motor}}, & \dot V_{\mathrm{ach}}(d)>0\ \text{and blower enabled},\\
+0, & \text{otherwise}.
+\end{cases}
+\end{equation}
+with operating flow determined from the scalar residual
+\begin{equation}
+\label{eq:annual_cooling_flow_residual}
+R_{\dot V}(\dot V)=\Delta p_{\mathrm{sys}}(\dot V)-\Delta p_{\mathrm{avail}}(\dot V),
+\end{equation}
+and bisection on \([0,\dot V_{\mathrm{req}}(d)]\) returning
+\begin{equation}
+\label{eq:annual_cooling_flow_achieved}
+\dot V_{\mathrm{ach}}(d)=\max\!\left\{\dot V\in[0,\dot V_{\mathrm{req}}(d)] : R_{\dot V}(\dot V)\le 0\right\}.
+\end{equation}
+Cooling-mode bed transfer is
+\begin{equation}
+\label{eq:annual_cooling_q_to_bed}
+Q_{\mathrm{to\,bed},c}(T_\infty(d))=
+\sum_{s=1}^{N_{\mathrm{seg}}}
+\left(Q_{\mathrm{wall},s}+Q_{\mathrm{jet},s}-Q_{\mathrm{evap},s}\right).
+\end{equation}
+Thus ``re-solve for \(Q_{\mathrm{to\,bed}}\)'' means re-running the day-ambient operating-point equations and scalar closure residuals, then evaluating the segment heat-balance sums in Eqs.~\eqref{eq:annual_heating_q_to_bed} and \eqref{eq:annual_cooling_q_to_bed}. The 2\(\times\)2 bed-node system in Eq.~\eqref{eq:daily_two_node_matrix} is solved directly as \(\mathbf{A}\mathbf{T}=\mathbf{b}\), not by residual iteration.
+
+\paragraph{Variable definitions for Eqs.~\eqref{eq:annual_heating_resistance}--\eqref{eq:annual_cooling_q_to_bed}.}
+\begin{itemize}[leftmargin=*]
+\item Indexing and counts: \(d\) day index; \(g\) heater-tube group; \(b\) aeration branch; \(s\) axial segment; \(n_{\mathrm{tube},g}\) number of tubes in group \(g\); \(N_b\) total branches; \(N_{\mathrm{seg}}\) total segments.
+\item Electrical/wire symbols: \(\rho_{20}\) wire resistivity at \(20\,^\circ\mathrm{C}\); \(\alpha\) temperature coefficient of resistivity; \(\bar T_{w,g}(d)\) representative wire temperature; \(L_{w,g}\) wire length; \(A_{w,g}\) wire cross-sectional area; \(V\) applied voltage; \(N_{s,g}\) number of series elements in group \(g\); \(R_{\mathrm{tube},g}(d)\) tube resistance; \(I_{\mathrm{tube},g}(d)\) tube/string current; \(P_{\mathrm{tube},g}(d)\) tube/string electric power; \(P_h(T_\infty(d))\) total heating electric power.
+\item Heating bed-transfer symbols: \(\dot m_{\mathrm{mean},b,s}\) mean segment flow; \(c_{p,b,s}\) segment specific heat; \(T_{\mathrm{air,in},b,s},T_{\mathrm{air,out},b,s}\) segment inlet/outlet air temperatures; \(\dot m_{\mathrm{rel},b,s}\) released jet flow; \(T_{\mathrm{rel},b,s}\) jet/release temperature; \(T_{\mathrm{bed,ref}}\) bed reference temperature used in segment balances; \(\dot m_{\mathrm{evap},b,s}\) evaporation mass flow; \(h_{fg,b,s}\) latent heat; \(Q_{\mathrm{wall},b,s}\), \(Q_{\mathrm{jet},b,s}\), \(Q_{\mathrm{evap},b,s}\) segment wall/jet/evaporation terms; \(Q_{\mathrm{to\,bed},h}(T_\infty(d))\) net signed heating-mode bed transfer.
+\item Cooling-load and cooler-power symbols: \(\dot m(d)\) day cooling-branch mass flow; \(c_p(d)\) day effective specific heat; \(T_\infty(d)\) day ambient temperature; \(T_{\mathrm{target}}\) spot-cooler target temperature; \(\dot Q_{\mathrm{spot,req}}(d)\) requested sensible cooling load; \(\dot Q_{\mathrm{spot,max}}(d)\) available maximum sensible capacity; \(\dot Q_{\mathrm{spot,act}}(d)\) actual (capped) sensible load; \(\mathrm{COP}\) coefficient of performance; \(P_{\mathrm{spot\,cooler}}(d)\) spot-cooler electrical power.
+\item Blower and residual symbols: \(\Delta p_{\mathrm{shutoff}}\) blower shutoff pressure; \(\dot V_{\mathrm{free}}\) blower free-delivery volumetric flow; \(\Delta p_{\mathrm{avail}}(\dot V)\) available blower pressure at trial flow \(\dot V\); \(\Delta p_{\mathrm{sys}}(\dot V)\) required system pressure at trial flow; \(R_{\dot V}(\dot V)\) flow residual; \(\dot V_{\mathrm{req}}(d)\) requested flow; \(\dot V_{\mathrm{ach}}(d)\) achieved flow; \(P_{\mathrm{motor}}\) rated blower motor power; \(P_{\mathrm{assist\,blower}}(d)\) assist-blower electric power.
+\item Cooling bed-transfer symbols: \(Q_{\mathrm{wall},s}\), \(Q_{\mathrm{jet},s}\), \(Q_{\mathrm{evap},s}\) segment contributions in cooling mode; \(Q_{\mathrm{to\,bed},c}(T_\infty(d))\) net signed cooling-mode bed transfer (typically negative).
+\end{itemize}
+
+\paragraph{Derivation notes for these equations.}
+\begin{itemize}[leftmargin=*]
+\item Eqs.~\eqref{eq:annual_heating_resistance}--\eqref{eq:annual_heating_total_power} follow temperature-corrected resistivity, Ohm's law, and Joule heating.
+\item Eqs.~\eqref{eq:annual_heating_q_to_bed} and \eqref{eq:annual_cooling_q_to_bed} are first-law sums of segment sensible gain/loss and latent evaporation sink terms.
+\item Eqs.~\eqref{eq:annual_cooling_spot_req_act} and \eqref{eq:annual_cooling_spot_power} use the sensible-load relation \(\dot m c_p \Delta T\), capacity capping, then COP conversion to electric power.
+\item Eqs.~\eqref{eq:annual_cooling_flow_residual}--\eqref{eq:annual_cooling_flow_achieved} define operating flow as the residual-consistent blower/system match solved by scalar bisection.
+\end{itemize}
 The required duty fractions are
 \begin{equation}
 \label{eq:daily_duty_required}
@@ -1985,6 +2493,7 @@ f_{\mathrm{day}}=
 1, & \dot Q_{\mathrm{nom}}=0\ \text{and}\ \dot Q_{\mathrm{load}}>0,
 \end{cases}
 \end{equation}
+Identity clarification for Eq.~\eqref{eq:daily_duty}: \(\dot Q_{\mathrm{load}}\) and \(\dot Q_{\mathrm{nom}}\) are generic placeholders for the active-mode required load and nominal capacity. In the heating branch, \(\dot Q_{\mathrm{load}}=Q_{\mathrm{req},h}(d)\) and \(\dot Q_{\mathrm{nom}}=Q_{h,\mathrm{cap}}(d)\), so \(f_{\mathrm{day}}=D_h(d)\). In the cooling branch, \(\dot Q_{\mathrm{load}}=Q_{\mathrm{req},c}(d)\) and \(\dot Q_{\mathrm{nom}}=Q_{c,\mathrm{cap}}(d)\), so \(f_{\mathrm{day}}=D_c(d)\). \(D(d)\) in Eq.~\eqref{eq:daily_water} denotes this active-branch duty fraction for day \(d\).
 which, in mode-specific notation, are exactly
 \begin{equation}
 \label{eq:daily_duty_clipped}
@@ -2127,7 +2636,7 @@ Symbol & Meaning & Units \\
 \item [R15] Ergun, S. ``Fluid Flow Through Packed Columns.'' \emph{Chemical Engineering Progress} 48(2), 1952, pp.~89--94. The current repository uses the standard Ergun packed-bed pressure-drop form as a segmentwise porous-bed backpressure surrogate between each aeration-segment release zone and the nearest top opening.
 \item [R16] Fornes, F.; Mendoza-Hern\'andez, D.; Garc\'ia-de-la-Fuente, R.; Abad, M.; Belda, R.M. ``Composting versus vermicomposting: A comparative study of organic matter evolution through straight and combined processes.'' \emph{Bioresource Technology} 118, 2012, pp.~296--305. Table~2 on p.~299 reports total porosity for the composting (COM), vermicomposting (VER), and combined composting-plus-vermicomposting (C\,+\,V) stages. The current repository uses the COM day~21 and day~63 total-porosity values (\(80.1\) and \(79.9\%\)~v/v) as the bracketing measurements around the nominal 30-day pre-composting interval, giving the default constant \(\varepsilon=0.80\), and notes the weak variation of the C\,+\,V values over the later vermicomposting interval when justifying the constant-porosity simplification.
 \item [R17] Idel'chik, I.E. \emph{Handbook of Hydraulic Resistance}. For helical-coil obstruction context, the consulted scan was checked at the ``Tubes with wire ribbing'' entry in Section VIII (printed p.~337; PDF page 346) and at ``Spiral-ribbed air heater,'', Diagram 12-21, in Section XII (printed p.~482; PDF page 491). The current repository uses these as source-backed motivation for the added coil-obstruction surrogate rather than as a direct one-chart closed-form fit.
-\item [R18] Harper, E.; Miller, F.C.; Macauley, B.J. ``Physical management and interpretation of an environmentally controlled composting ecosystem.'' \emph{Australian Journal of Experimental Agriculture} 32, 1992, pp.~657--667. This source provides measured heat-output and oxygen-consumption linkage in controlled composting, including the reported linear relation equivalent to about \(9.8\) MJ heat per kg \(O_2\) consumed (used here as a lower empirical oxygen-to-heat anchor).
+\item [R18] Harper, E.; Miller, F.C.; Macauley, B.J. ``Physical management and interpretation of an environmentally controlled composting ecosystem.'' \emph{Australian Journal of Experimental Agriculture} 32, 1992, pp.~657--667. This source provides measured heat-output and oxygen-consumption linkage in controlled composting, including the reported linear relation equivalent to about \(9.8\) MJ heat per kg \(O_2\) consumed (used here as a lower empirical oxygen-to-heat reference).
 \item [R19] de Guardia, A.; Petiot, C.; Benoist, J.C.; Druilhe, C. ``Characterization and modelling of the heat transfers in a pilot-scale reactor during composting under forced aeration.'' \emph{Waste Management} 32(6), 2012, pp.~1091--1105. This source formulates biodegradation heat as \(H_{\mathrm{BIO}}=r_{O_2}h_{\mathrm{BIO}}\), reports literature \(h_{\mathrm{BIO}}\) ranges around \(304\)--\(448\) kJ/mol \(O_2\), and uses \(h_{\mathrm{BIO}}=440\) kJ/mol \(O_2\) in model runs.
 \item [R20] Sonowal, P.; Khwairakpam, M.; Kalamdhad, A.S. ``Stability Analysis of Dewatered Sludge of Pulp and Paper Mill During Vermicomposting.'' \emph{Waste and Biomass Valorization}, 2013. This source provides vermicomposting OUR magnitudes used here for parameterization, including initial values near \(18.9\) mg \(O_2\)/g VS/day and mature-stage values near \(2.0\)--\(3.1\) mg \(O_2\)/g VS/day.
 \item [R21] Gea, T.; Barrena, R.; Artola, A.; S\'anchez, A. ``Monitoring the Biological Activity of the Composting Process: Oxygen Uptake Rate (OUR), Respirometric Index (RI), and Respiratory Quotient (RQ).'' \emph{Biotechnology and Bioengineering} 88(4), 2004, pp.~520--527. This source supports dynamic OUR as the preferred activity indicator and provides reported OUR ranges and static-vs-dynamic interpretation used for modeling rationale.
