@@ -10422,8 +10422,8 @@ def plot_wall_blanket_heating_curves(payload: dict, output_dir: Path, config: di
     duty_needed = np.array([float(pt.get("dutyNeeded", np.nan)) for pt in points], dtype=float)
     tb = np.array([float(pt.get("TbottomFullPower_C", np.nan)) for pt in points], dtype=float)
     tt = np.array([float(pt.get("TtopFullPower_C", np.nan)) for pt in points], dtype=float)
+    tbed = 0.5 * (tb + tt)
     blanket_temp = np.array([float(pt.get("blanketSurfaceTemp_C", np.nan)) for pt in points], dtype=float)
-    temp_spread = np.abs(tb - tt)
     feasible_mask = np.array(
         [bool(pt.get("isFeasibleByCriteria", pt.get("isFeasible", False))) for pt in points],
         dtype=bool,
@@ -10435,6 +10435,12 @@ def plot_wall_blanket_heating_curves(payload: dict, output_dir: Path, config: di
     opt_cfg = optimization_config(config or {})
     min_bottom = float(opt_cfg.get("min_bottom_temp_C", np.nan))
     min_top = float(opt_cfg.get("min_top_temp_C", np.nan))
+    if np.isfinite(min_bottom) and np.isfinite(min_top):
+        min_bed = max(min_bottom, min_top)
+    elif np.isfinite(min_bottom):
+        min_bed = min_bottom
+    else:
+        min_bed = min_top
     max_current = float(limits.get("maxTotalCurrent_A", np.nan))
 
     fig, axes = plt.subplots(2, 2, figsize=(13.6, 9.2))
@@ -10478,30 +10484,20 @@ def plot_wall_blanket_heating_curves(payload: dict, output_dir: Path, config: di
     ax.legend(loc="best", fontsize=8)
 
     ax = axes[0, 1]
-    ax.plot(duty, tb, linewidth=2.0, color="tab:orange", label="Bottom node")
-    ax.plot(duty, tt, linewidth=2.0, color="tab:green", label="Top node")
+    ax.plot(duty, tbed, linewidth=2.0, color="tab:orange", label="Bed temperature")
     ax.plot(duty, blanket_temp, linewidth=1.5, color="tab:purple", linestyle="--", label="Blanket surface")
-    if np.isfinite(min_bottom):
-        ax.axhline(min_bottom, color="tab:red", linestyle="--", linewidth=1.2, label="Bottom minimum")
-    if np.isfinite(min_top):
-        ax.axhline(min_top, color="tab:olive", linestyle=":", linewidth=1.2, label="Top minimum")
-    ax2 = ax.twinx()
-    ax2.plot(duty, temp_spread, linewidth=1.6, color="tab:brown", linestyle="-.", label="Bottom-top spread")
+    if np.isfinite(min_bed):
+        ax.axhline(min_bed, color="tab:red", linestyle="--", linewidth=1.2, label="Bed minimum")
     ax.set_xlabel("Blanket duty fraction")
     ax.set_ylabel("Temperature (C)")
-    ax2.set_ylabel("Spread (C)")
-    ax.set_title("Node and Blanket Temperatures (Full Range)")
+    ax.set_title("Bed and Blanket Temperatures (Full Range)")
     ax.grid(True, alpha=0.25)
-    lines = ax.get_lines() + ax2.get_lines()
-    ax.legend(lines, [ln.get_label() for ln in lines], loc="best", fontsize=8)
+    ax.legend(loc="best", fontsize=8)
 
     ax = axes[1, 0]
-    ax.plot(duty, tb, linewidth=2.0, color="tab:orange", label="Bottom node")
-    ax.plot(duty, tt, linewidth=2.0, color="tab:green", label="Top node")
-    if np.isfinite(min_bottom):
-        ax.axhline(min_bottom, color="tab:red", linestyle="--", linewidth=1.2, label="Bottom minimum")
-    if np.isfinite(min_top):
-        ax.axhline(min_top, color="tab:olive", linestyle=":", linewidth=1.2, label="Top minimum")
+    ax.plot(duty, tbed, linewidth=2.0, color="tab:orange", label="Bed temperature")
+    if np.isfinite(min_bed):
+        ax.axhline(min_bed, color="tab:red", linestyle="--", linewidth=1.2, label="Bed minimum")
     ax.fill_between(
         duty,
         0.0,
@@ -10512,7 +10508,7 @@ def plot_wall_blanket_heating_curves(payload: dict, output_dir: Path, config: di
         alpha=0.20,
         label="Feasible duty region",
     )
-    lower_zoom = float(np.nanmin([np.nanmin(tb), np.nanmin(tt)])) - 2.0
+    lower_zoom = float(np.nanmin(tbed)) - 2.0
     ax.set_ylim(lower_zoom, 40.0)
     ax.set_xlabel("Blanket duty fraction")
     ax.set_ylabel("Bed temperature (C)")
@@ -10563,7 +10559,7 @@ def plot_wall_blanket_heating_curves(payload: dict, output_dir: Path, config: di
         0.02,
         0.03,
         "Top-left: bed heating, ambient loss, and electrical demand versus blanket duty. "
-        "Top-right: full-range thermal behavior including blanket-surface temperature and bottom-top spread. "
+        "Top-right: full-range thermal behavior including bed and blanket-surface temperature. "
         "Bottom-left: 0-40 C operating zoom with feasible-duty shading. Bottom-right: current margin and required duty to meet the lumped winter heat load.",
         fontsize=9,
         wrap=True,
@@ -10586,30 +10582,18 @@ def plot_wall_blanket_heating_curves(payload: dict, output_dir: Path, config: di
     ax[0, 0].grid(alpha=0.25)
     ax[0, 0].legend(loc="best")
 
-    ax[0, 1].plot(duty, tb, linewidth=2.0, color="tab:orange", label="Bottom node")
-    ax[0, 1].plot(duty, tt, linewidth=2.0, color="tab:green", label="Top node")
+    ax[0, 1].plot(duty, tbed, linewidth=2.0, color="tab:orange", label="Bed temperature")
     ax[0, 1].plot(duty, blanket_temp, linewidth=1.5, color="tab:purple", linestyle="--", label="Blanket surface")
-    if np.isfinite(min_bottom):
-        ax[0, 1].axhline(min_bottom, color="tab:red", linestyle="--", linewidth=1.2, label="Bottom minimum")
-    if np.isfinite(min_top):
-        ax[0, 1].axhline(min_top, color="tab:olive", linestyle=":", linewidth=1.2, label="Top minimum")
-    ax_spread = ax[0, 1].twinx()
-    ax_spread.plot(duty, temp_spread, linewidth=1.8, color="tab:brown", linestyle="-.", label="Bottom-top spread")
+    if np.isfinite(min_bed):
+        ax[0, 1].axhline(min_bed, color="tab:red", linestyle="--", linewidth=1.2, label="Bed minimum")
     ax[0, 1].set_xlabel("Blanket duty fraction")
-    ax[0, 1].set_ylabel("Temperature (C)", color="tab:blue")
-    ax[0, 1].tick_params(axis="y", labelcolor="tab:blue")
-    ax_spread.set_ylabel("Spread (C)", color="tab:red")
-    ax_spread.tick_params(axis="y", labelcolor="tab:red")
+    ax[0, 1].set_ylabel("Temperature (C)")
     ax[0, 1].grid(alpha=0.25)
-    lines = ax[0, 1].get_lines() + ax_spread.get_lines()
-    ax[0, 1].legend(lines, [ln.get_label() for ln in lines], loc="best")
+    ax[0, 1].legend(loc="best")
 
-    ax[1, 0].plot(duty, tb, linewidth=2.0, color="tab:orange", label="Bottom node")
-    ax[1, 0].plot(duty, tt, linewidth=2.0, color="tab:green", label="Top node")
-    if np.isfinite(min_bottom):
-        ax[1, 0].axhline(min_bottom, color="tab:red", linestyle="--", linewidth=1.2, label="Bottom minimum")
-    if np.isfinite(min_top):
-        ax[1, 0].axhline(min_top, color="tab:olive", linestyle=":", linewidth=1.2, label="Top minimum")
+    ax[1, 0].plot(duty, tbed, linewidth=2.0, color="tab:orange", label="Bed temperature")
+    if np.isfinite(min_bed):
+        ax[1, 0].axhline(min_bed, color="tab:red", linestyle="--", linewidth=1.2, label="Bed minimum")
     ax[1, 0].fill_between(
         duty,
         0.0,
@@ -11041,13 +11025,8 @@ def plot_combined_heating_cooling_dashboard(heating_payload: dict, cooling_paylo
         [0.5 * (float(pt.get("TbottomFullPower_C", np.nan)) + float(pt.get("TtopFullPower_C", np.nan))) for pt in heat_points],
         dtype=float,
     )
-    heat_duty = np.array([float(pt.get("blanketDuty", np.nan)) for pt in heat_points], dtype=float)
     heat_power = np.array([float(pt.get("totalPower_W", np.nan)) for pt in heat_points], dtype=float)
-    heat_flow = np.array([float(pt.get("totalFlow_Lpm", 0.0)) for pt in heat_points], dtype=float)
     heat_cap = np.array([max(float(pt.get("QtoBed_W", np.nan)), 0.0) for pt in heat_points], dtype=float)
-    heat_tout = np.array([float(pt.get("airOutlet_C", np.nan)) for pt in heat_points], dtype=float)
-    heat_blanket_temp = np.array([float(pt.get("blanketSurfaceTemp_C", np.nan)) for pt in heat_points], dtype=float)
-    heat_water = np.array([float(pt.get("waterLoss_kg_day", np.nan)) for pt in heat_points], dtype=float)
 
     cool_flow = np.array([float(pt.get("totalFlow_Lpm", np.nan)) for pt in cool_points], dtype=float)
     cool_tbed = np.array(
@@ -11057,13 +11036,6 @@ def plot_combined_heating_cooling_dashboard(heating_payload: dict, cooling_paylo
     cool_cap = np.array([max(-float(pt.get("QtoBed_W", np.nan)), 0.0) for pt in cool_points], dtype=float)
     cool_tout = np.array([float(pt.get("airOutlet_C", np.nan)) for pt in cool_points], dtype=float)
     cool_water = np.array([float(pt.get("waterLoss_kg_day", np.nan)) for pt in cool_points], dtype=float)
-    cool_power = np.array(
-        [
-            max(float(pt.get("assistBlowerPower_W", 0.0)), 0.0) + max(float(pt.get("spotCoolerPower_W", 0.0)), 0.0)
-            for pt in cool_points
-        ],
-        dtype=float,
-    )
 
     def has_spread(arr: np.ndarray) -> bool:
         finite = np.asarray(arr[np.isfinite(arr)], dtype=float)
@@ -11153,7 +11125,7 @@ def plot_combined_heating_cooling_dashboard(heating_payload: dict, cooling_paylo
     lines = [line_cap_c, line_tout_c]
     ax_cap_c.legend(lines, [ln.get_label() for ln in lines], loc="best", fontsize=9, framealpha=0.95)
 
-    # Bottom-left: separate heating/cooling power scales and bed-temperature x scales.
+    # Bottom-left: heating electrical power versus heating bed temperature only.
     ax_heat_pow = ax[1, 0]
     heat_bed_order = np.argsort(np.nan_to_num(heat_tbed, nan=np.inf))
     line_heat_pow = ax_heat_pow.plot(
@@ -11164,85 +11136,22 @@ def plot_combined_heating_cooling_dashboard(heating_payload: dict, cooling_paylo
         linestyle="-",
         label="Heating power",
     )[0]
-    cool_bed_order = np.argsort(np.nan_to_num(cool_tbed, nan=np.inf))
-    ax_cool_pow = ax_heat_pow.twinx()
-    ax_cool_pow_x = ax_cool_pow.twiny()
-    ax_cool_pow_x.patch.set_visible(False)
-    line_cool_pow = ax_cool_pow_x.plot(
-        cool_tbed[cool_bed_order],
-        cool_power[cool_bed_order],
-        color="tab:blue",
-        linewidth=1.9,
-        linestyle="-",
-        label="Cooling power",
-    )[0]
     ax_heat_pow.set_xlabel("Bed temperature (heating) (C)")
-    ax_cool_pow_x.set_xlabel("Bed temperature (cooling) (C)")
     ax_heat_pow.set_ylabel("Heating electrical power (W)", color="tab:purple")
-    ax_cool_pow.set_ylabel("")
     ax_heat_pow.tick_params(axis="y", labelcolor="tab:purple")
-    ax_cool_pow.tick_params(axis="y", labelcolor="tab:blue", pad=2)
     ax_heat_pow.grid(alpha=0.25)
     heat_pow_lims = padded_limits(heat_power)
     if heat_pow_lims is not None:
         ax_heat_pow.set_ylim(*heat_pow_lims)
-    cool_pow_lims = padded_limits(cool_power, pad_frac=0.18)
-    if cool_pow_lims is not None:
-        ax_cool_pow.set_ylim(*cool_pow_lims)
     heat_bed_lims = padded_limits(heat_tbed, pad_frac=0.05, min_pad=0.2)
     if heat_bed_lims is not None:
         ax_heat_pow.set_xlim(*heat_bed_lims)
-    cool_bed_lims = padded_limits(cool_tbed, pad_frac=0.08, min_pad=0.05)
-    if cool_bed_lims is not None:
-        ax_cool_pow_x.set_xlim(*cool_bed_lims)
-    ax_cool_pow.yaxis.set_major_formatter(ScalarFormatter(useOffset=False))
-    ax_cool_pow.ticklabel_format(axis="y", style="plain", useOffset=False)
-    lines = [line_heat_pow, line_cool_pow]
-    ax_heat_pow.legend(lines, [ln.get_label() for ln in lines], loc="best", fontsize=9, framealpha=0.95)
+    ax_heat_pow.legend([line_heat_pow], [line_heat_pow.get_label()], loc="best", fontsize=9, framealpha=0.95)
 
     order = np.argsort(np.nan_to_num(cool_water, nan=np.inf))
     x_water_c = cool_water[order]
-    y_power_c = cool_power[order]
     y_flow_c = cool_flow[order]
-    heat_order = np.argsort(np.nan_to_num(heat_water, nan=np.inf))
-    x_water_h = heat_water[heat_order]
-    y_power_h = heat_power[heat_order]
-    ax_pow_c = ax[1, 1]
-    line_pow_c = ax_pow_c.plot(
-        x_water_c,
-        y_power_c,
-        color="tab:blue",
-        linewidth=2.0,
-        label="Cooling electrical power",
-    )[0]
-    line_pow_h = None
-    if np.any(np.isfinite(x_water_h) & np.isfinite(y_power_h)):
-        ax_pow_h = ax_pow_c.twinx()
-        ax_pow_h.spines["right"].set_position(("axes", 1.10))
-        ax_pow_h.patch.set_visible(False)
-        line_pow_h = ax_pow_h.plot(
-            x_water_h,
-            y_power_h,
-            color="tab:purple",
-            linewidth=1.9,
-            linestyle="--",
-            label="Heating electrical power",
-        )[0]
-        ax_pow_h.set_ylabel("Heating electrical power (W)", color="tab:purple")
-        ax_pow_h.tick_params(axis="y", labelcolor="tab:purple")
-        pow_h_lims = padded_limits(y_power_h, pad_frac=0.10)
-        if pow_h_lims is not None:
-            ax_pow_h.set_ylim(*pow_h_lims)
-    ax_pow_c.set_xlabel("Moisture loss (kg/day)")
-    ax_pow_c.set_ylabel("Cooling electrical power (W)", color="tab:blue", labelpad=-2)
-    ax_pow_c.tick_params(axis="y", labelcolor="tab:blue", pad=2)
-    ax_pow_c.grid(alpha=0.25)
-    ax_pow_c.yaxis.set_major_formatter(ScalarFormatter(useOffset=False))
-    ax_pow_c.ticklabel_format(axis="y", style="plain", useOffset=False)
-    pow_c_lims = padded_limits(y_power_c, pad_frac=0.10)
-    if pow_c_lims is not None:
-        ax_pow_c.set_ylim(*pow_c_lims)
-    ax_flow = ax_pow_c.twinx()
+    ax_flow = ax[1, 1]
     line_flow_c = ax_flow.plot(
         x_water_c,
         y_flow_c,
@@ -11251,25 +11160,17 @@ def plot_combined_heating_cooling_dashboard(heating_payload: dict, cooling_paylo
         linewidth=1.8,
         label="Fan flow rate (cooling)",
     )[0]
+    ax_flow.set_xlabel("Moisture loss (kg/day)")
     ax_flow.set_ylabel("Fan flow rate (L/min)", color="tab:orange")
     ax_flow.tick_params(axis="y", labelcolor="tab:orange")
+    ax_flow.grid(alpha=0.25)
     flow_lims = padded_limits(y_flow_c)
     if flow_lims is not None:
         ax_flow.set_ylim(*flow_lims)
-    x_union = np.concatenate(
-        [
-            x_water_c[np.isfinite(x_water_c)],
-            x_water_h[np.isfinite(x_water_h)],
-        ]
-    )
-    x_lims = padded_limits(x_union, pad_frac=0.06, min_pad=1.0e-3)
+    x_lims = padded_limits(x_water_c[np.isfinite(x_water_c)], pad_frac=0.06, min_pad=1.0e-3)
     if x_lims is not None:
-        ax_pow_c.set_xlim(*x_lims)
-    lines = [line_pow_c]
-    if line_pow_h is not None:
-        lines.append(line_pow_h)
-    lines.append(line_flow_c)
-    ax_pow_c.legend(lines, [ln.get_label() for ln in lines], loc="best", fontsize=9, framealpha=0.95)
+        ax_flow.set_xlim(*x_lims)
+    ax_flow.legend([line_flow_c], [line_flow_c.get_label()], loc="best", fontsize=9, framealpha=0.95)
 
     fig.suptitle("Combined Heating/Cooling Dashboard")
     fig.savefig(output_dir / "combined_heating_cooling_dashboard.png", dpi=240)
